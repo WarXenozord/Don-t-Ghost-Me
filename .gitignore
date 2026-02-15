@@ -1,0 +1,65 @@
+# Unity generated folders
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+[Mm]emoryCaptures/
+[Uu]ser[Ss]ettings/
+[Aa]rtifacts/
+[Rr]ecordings/
+[Tt]est[Rr]esults/
+
+# Unity cache / generated metadata
+sysinfo.txt
+*.pidb
+*.suo
+*.user
+*.userprefs
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+*.pidb.meta
+*.pdb.meta
+*.mdb.meta
+
+# Visual Studio / Rider / VS Code
+.vs/
+.vscode/
+.idea/
+*.csproj
+*.unityproj
+*.sln
+*.sln.docstates
+
+# Crash and profiling artifacts
+*.stackdump
+*.dmp
+*.diag
+
+# Build outputs and package artifacts
+*.apk
+*.aab
+*.ipa
+*.app
+*.exe
+*.x86
+*.x86_64
+*.dll
+*.so
+*.dylib
+*.bundle
+*.unitypackage
+
+# Addressables / AssetBundles output (if generated in project)
+ServerData/
+AssetBundles/
+
+# OS-specific noise
+.DS_Store
+Thumbs.db
+Desktop.ini
