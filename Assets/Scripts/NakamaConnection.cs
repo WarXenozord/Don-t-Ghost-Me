@@ -6,10 +6,10 @@ using UnityEngine;
 public class NakamaConnection : MonoBehaviour
 {
     [Header("Nakama")]
-    public string scheme = "http";        // local: http, prod: https
-    public string host = "127.0.0.1";
-    public int port = 7350;
-    public string serverKey = "defaultkey";
+    public string scheme = "https";
+    public string host = "nakama.juanlibonatti.com";
+    public int port = 443;
+    public string serverKey = "6a990ac72bd7bf85414160d6cd207e1b45f56535ddf71566af85e6b217aa850b";
 
     // Kept for compatibility with existing scripts/inspector setup.
     [Header("Match")]
@@ -39,7 +39,7 @@ public class NakamaConnection : MonoBehaviour
         Socket.ReceivedMatchState += OnReceivedMatchState;
         Socket.ReceivedMatchPresence += OnReceivedMatchPresence;
 
-        await Socket.ConnectAsync(Session);
+        await Socket.ConnectAsync(Session, true); // IMPORTANT for HTTPS/WSS
 
         Debug.Log($"[Nakama] Connected as {Session.Username} ({Session.UserId}).");
     }
