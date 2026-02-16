@@ -56,6 +56,7 @@ public class EnemySpawnManager : MonoBehaviour
         {
             transport.OnEnemySpawn -= OnEnemySpawnReceived;
             transport.OnEnemySnapshot -= OnEnemySnapshotReceived;
+            transport.OnEnemyTeleport -= OnEnemyTeleportReceived;
             _bound = false;
         }
     }
@@ -154,6 +155,19 @@ public class EnemySpawnManager : MonoBehaviour
         }
     }
 
+    private void OnEnemyTeleportReceived(MatchTransport.EnemyTeleportMsg msg)
+    {
+        if (msg == null || string.IsNullOrEmpty(msg.spawnId)) return;
+        if (!TryGet(msg.spawnId, out var go) || go == null) return;
+
+        var pos = new Vector3(msg.x, msg.y, msg.z);
+        go.transform.position = pos;
+        go.transform.rotation = Quaternion.Euler(0f, msg.yaw, 0f);
+
+        _targetPosBySpawnId[msg.spawnId] = pos;
+        _targetYawBySpawnId[msg.spawnId] = msg.yaw;
+    }
+
     private void ApplySpawn(MatchTransport.EnemySpawnMsg msg)
     {
         if (msg == null || string.IsNullOrEmpty(msg.spawnId)) return;
@@ -175,6 +189,9 @@ public class EnemySpawnManager : MonoBehaviour
         var go = Instantiate(enemyPrefab, pos, Quaternion.Euler(0f, msg.yaw, 0f));
         go.name = "Enemy_" + ShortId(msg.spawnId);
         _enemiesBySpawnId[msg.spawnId] = go;
+        var id = go.GetComponent<EnemyNetIdentity>();
+        if (id == null) id = go.AddComponent<EnemyNetIdentity>();
+        id.spawnId = msg.spawnId;
 
         var isHost = conn != null && conn.IsCurrentPlayerMatchCreator;
         var ai = go.GetComponent<EnemySimpleAI>();
@@ -208,7 +225,30 @@ public class EnemySpawnManager : MonoBehaviour
         if (!transport || _bound) return;
         transport.OnEnemySpawn += OnEnemySpawnReceived;
         transport.OnEnemySnapshot += OnEnemySnapshotReceived;
+        transport.OnEnemyTeleport += OnEnemyTeleportReceived;
         _bound = true;
+    }
+
+    public bool HostBroadcastTeleport(string spawnId, Vector3 position, float yaw, int reason = 0)
+    {
+        ResolveRefs();
+        if (conn == null || transport == null || conn.Match == null) return false;
+        if (!conn.IsCurrentPlayerMatchCreator) return false;
+        if (string.IsNullOrEmpty(spawnId)) return false;
+
+        var msg = new MatchTransport.EnemyTeleportMsg
+        {
+            spawnId = spawnId,
+            x = position.x,
+            y = position.y,
+            z = position.z,
+            yaw = yaw,
+            reason = reason
+        };
+
+        OnEnemyTeleportReceived(msg);
+        transport.BroadcastEnemyTeleport(msg);
+        return true;
     }
 
     private void TickEnemySnapshots()

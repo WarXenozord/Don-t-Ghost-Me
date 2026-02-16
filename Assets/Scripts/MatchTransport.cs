@@ -14,6 +14,7 @@ public class MatchTransport : MonoBehaviour
     public const long OPCODE_START = 12;
     public const long OPCODE_ENEMY_SPAWN = 20;
     public const long OPCODE_ENEMY_SNAPSHOT = 21;
+    public const long OPCODE_ENEMY_TELEPORT = 22;
 
     public NakamaConnection conn;
 
@@ -24,6 +25,7 @@ public class MatchTransport : MonoBehaviour
     public event Action<StartMsg> OnStart;
     public event Action<EnemySpawnMsg> OnEnemySpawn;
     public event Action<EnemySnapshotMsg> OnEnemySnapshot;
+    public event Action<EnemyTeleportMsg> OnEnemyTeleport;
     private bool _isBound;
     private NakamaConnection _boundConn;
 
@@ -139,6 +141,12 @@ public class MatchTransport : MonoBehaviour
                 Debug.Log("[MatchTransport] RECV_ENEMY_SNAPSHOT enemies=" + (msg.enemies == null ? 0 : msg.enemies.Length));
             }
         }
+        else if (state.OpCode == OPCODE_ENEMY_TELEPORT)
+        {
+            var msg = JsonUtility.FromJson<EnemyTeleportMsg>(json);
+            msg.senderUserId = state.UserPresence.UserId;
+            OnEnemyTeleport?.Invoke(msg);
+        }
     }
 
     public async void SendInput(InputMsg msg)
@@ -198,6 +206,13 @@ public class MatchTransport : MonoBehaviour
             _nextSendEnemySnapshotLogAt = Time.unscaledTime + Mathf.Max(0.1f, debugLogInterval);
             Debug.Log("[MatchTransport] SEND_ENEMY_SNAPSHOT enemies=" + (msg.enemies == null ? 0 : msg.enemies.Length));
         }
+    }
+
+    public async void BroadcastEnemyTeleport(EnemyTeleportMsg msg)
+    {
+        if (conn?.Socket == null || conn.Match == null) return;
+        var bytes = Encoding.UTF8.GetBytes(JsonUtility.ToJson(msg));
+        await conn.Socket.SendMatchStateAsync(conn.Match.Id, OPCODE_ENEMY_TELEPORT, bytes);
     }
 
     [Serializable]
@@ -275,6 +290,16 @@ public class MatchTransport : MonoBehaviour
         public float x, y, z;
         public float yaw;
         public int aiState;
+    }
+
+    [Serializable]
+    public class EnemyTeleportMsg
+    {
+        public string spawnId;
+        public float x, y, z;
+        public float yaw;
+        public int reason;
+        [NonSerialized] public string senderUserId;
     }
 
     [Serializable]

@@ -165,7 +165,7 @@ AudioSource:
     m_Curve:
     - serializedVersion: 3
       time: 0
-      value: 0
+      value: 1
       inSlope: 0
       outSlope: 0
       tangentMode: 0
@@ -246,6 +246,14 @@ MonoBehaviour:
     m_Bits: 4294967295
   mediumRefreshInterval: 0.5
   hostAuthoritativeMechanics: 1
+  contactDistance: 1
+  contactRearmDistance: 1.6
+  firstTouchMinTeleportDistance: 12
+  firstTouchMaxTeleportDistance: 20
+  firstTouchMinDistanceFromMedium: 8
+  contactAudioSource: {fileID: 1879015478588035561}
+  firstTouchClip: {fileID: 8300000, guid: 3cef3ddd5ee00c8438062af9b9562f96, type: 3}
+  secondTouchClip: {fileID: 8300000, guid: 8fc25ff3acba3f549974b0d14a400aa8, type: 3}
 --- !u!143 &4074586490499717683
 CharacterController:
   m_ObjectHideFlags: 0
