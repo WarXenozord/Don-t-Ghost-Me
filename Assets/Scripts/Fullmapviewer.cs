@@ -26,7 +26,7 @@ public class FullMapViewer : MonoBehaviour
     public GameObject        mapPanel;
     public RawImage          mapRawImage;
     [Tooltip("The minimap corner RawImage — hidden while the full map is open.")]
-    public RawImage          minimapRawImage;
+    public GameObject          minimapRawImage;
     public Button            openButton;
     public Button            closeButton;
 
