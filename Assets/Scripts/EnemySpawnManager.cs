@@ -14,10 +14,10 @@ public class EnemySpawnManager : MonoBehaviour
     public bool enableDebugLogs = true;
 
     [Header("Enemy Snapshot")]
-    [Min(1f)] public float enemySnapshotSendHz = 10f;
+    [Min(1f)] public float enemySnapshotSendHz = 15f;
     [Min(0f)] public float enemyLerpPos = 14f;
     [Min(0f)] public float enemyLerpYaw = 14f;
-    [Min(0f)] public float enemyHardSnapDistance = 1.5f;
+    [Min(0f)] public float enemyHardSnapDistance = 1.0f;
 
     private readonly Dictionary<string, GameObject> _enemiesBySpawnId = new Dictionary<string, GameObject>();
     private readonly Dictionary<string, Vector3> _targetPosBySpawnId = new Dictionary<string, Vector3>();
@@ -56,6 +56,7 @@ public class EnemySpawnManager : MonoBehaviour
         {
             transport.OnEnemySpawn -= OnEnemySpawnReceived;
             transport.OnEnemySnapshot -= OnEnemySnapshotReceived;
+            transport.OnEnemyTeleport -= OnEnemyTeleportReceived;
             _bound = false;
         }
     }
@@ -126,6 +127,25 @@ public class EnemySpawnManager : MonoBehaviour
             _targetPosBySpawnId[e.spawnId] = new Vector3(e.x, e.y, e.z);
             _targetYawBySpawnId[e.spawnId] = e.yaw;
             _targetStateBySpawnId[e.spawnId] = e.aiState;
+
+            // ASAP host-truth correction: do not wait for the regular update loop when error is large.
+            if (TryGet(e.spawnId, out var go) && go != null)
+            {
+                var targetPos = _targetPosBySpawnId[e.spawnId];
+                var dist = Vector3.Distance(go.transform.position, targetPos);
+                if (dist >= enemyHardSnapDistance)
+                {
+                    go.transform.position = targetPos;
+                    go.transform.rotation = Quaternion.Euler(0f, e.yaw, 0f);
+
+                    var aiImmediate = go.GetComponent<EnemySimpleAI>();
+                    if (aiImmediate != null)
+                    {
+                        aiImmediate.SetAuthoritativeInstance(false);
+                        aiImmediate.ApplyHostState(e.aiState);
+                    }
+                }
+            }
         }
 
         if (enableDebugLogs && Time.unscaledTime >= _nextEnemyDebugLogAt)
@@ -133,6 +153,19 @@ public class EnemySpawnManager : MonoBehaviour
             _nextEnemyDebugLogAt = Time.unscaledTime + 1f;
             Debug.Log("[EnemySpawn] RECV_SNAPSHOT count=" + msg.enemies.Length);
         }
+    }
+
+    private void OnEnemyTeleportReceived(MatchTransport.EnemyTeleportMsg msg)
+    {
+        if (msg == null || string.IsNullOrEmpty(msg.spawnId)) return;
+        if (!TryGet(msg.spawnId, out var go) || go == null) return;
+
+        var pos = new Vector3(msg.x, msg.y, msg.z);
+        go.transform.position = pos;
+        go.transform.rotation = Quaternion.Euler(0f, msg.yaw, 0f);
+
+        _targetPosBySpawnId[msg.spawnId] = pos;
+        _targetYawBySpawnId[msg.spawnId] = msg.yaw;
     }
 
     private void ApplySpawn(MatchTransport.EnemySpawnMsg msg)
@@ -156,6 +189,9 @@ public class EnemySpawnManager : MonoBehaviour
         var go = Instantiate(enemyPrefab, pos, Quaternion.Euler(0f, msg.yaw, 0f));
         go.name = "Enemy_" + ShortId(msg.spawnId);
         _enemiesBySpawnId[msg.spawnId] = go;
+        var id = go.GetComponent<EnemyNetIdentity>();
+        if (id == null) id = go.AddComponent<EnemyNetIdentity>();
+        id.spawnId = msg.spawnId;
 
         var isHost = conn != null && conn.IsCurrentPlayerMatchCreator;
         var ai = go.GetComponent<EnemySimpleAI>();
@@ -189,7 +225,30 @@ public class EnemySpawnManager : MonoBehaviour
         if (!transport || _bound) return;
         transport.OnEnemySpawn += OnEnemySpawnReceived;
         transport.OnEnemySnapshot += OnEnemySnapshotReceived;
+        transport.OnEnemyTeleport += OnEnemyTeleportReceived;
         _bound = true;
+    }
+
+    public bool HostBroadcastTeleport(string spawnId, Vector3 position, float yaw, int reason = 0)
+    {
+        ResolveRefs();
+        if (conn == null || transport == null || conn.Match == null) return false;
+        if (!conn.IsCurrentPlayerMatchCreator) return false;
+        if (string.IsNullOrEmpty(spawnId)) return false;
+
+        var msg = new MatchTransport.EnemyTeleportMsg
+        {
+            spawnId = spawnId,
+            x = position.x,
+            y = position.y,
+            z = position.z,
+            yaw = yaw,
+            reason = reason
+        };
+
+        OnEnemyTeleportReceived(msg);
+        transport.BroadcastEnemyTeleport(msg);
+        return true;
     }
 
     private void TickEnemySnapshots()

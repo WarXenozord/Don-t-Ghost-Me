@@ -784,6 +784,10 @@ MonoBehaviour:
   transport: {fileID: 0}
   enemyPrefab: {fileID: 3748400079962273149, guid: 3e707070d4901ed4da8f1da255e6baa8, type: 3}
   enableDebugLogs: 1
+  enemySnapshotSendHz: 10
+  enemyLerpPos: 14
+  enemyLerpYaw: 14
+  enemyHardSnapDistance: 1
 --- !u!1 &1673759879
 GameObject:
   m_ObjectHideFlags: 0

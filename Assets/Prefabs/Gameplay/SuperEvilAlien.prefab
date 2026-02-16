@@ -121,7 +121,7 @@ AudioSource:
   OutputAudioMixerGroup: {fileID: 0}
   m_audioClip: {fileID: 8300000, guid: c06ab841851028d4687393cf8ff5e8ce, type: 3}
   m_PlayOnAwake: 1
-  m_Volume: 0.113
+  m_Volume: 0.011
   m_Pitch: 1
   Loop: 1
   Mute: 0
@@ -165,7 +165,7 @@ AudioSource:
     m_Curve:
     - serializedVersion: 3
       time: 0
-      value: 0
+      value: 1
       inSlope: 0
       outSlope: 0
       tangentMode: 0
@@ -245,6 +245,15 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 4294967295
   mediumRefreshInterval: 0.5
+  hostAuthoritativeMechanics: 1
+  contactDistance: 1
+  contactRearmDistance: 1.6
+  firstTouchMinTeleportDistance: 12
+  firstTouchMaxTeleportDistance: 20
+  firstTouchMinDistanceFromMedium: 8
+  contactAudioSource: {fileID: 1879015478588035561}
+  firstTouchClip: {fileID: 8300000, guid: 3cef3ddd5ee00c8438062af9b9562f96, type: 3}
+  secondTouchClip: {fileID: 8300000, guid: 8fc25ff3acba3f549974b0d14a400aa8, type: 3}
 --- !u!143 &4074586490499717683
 CharacterController:
   m_ObjectHideFlags: 0
