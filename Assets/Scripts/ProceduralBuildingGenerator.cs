@@ -930,7 +930,886 @@ public class ProceduralBuildingGenerator : MonoBehaviour
         );
         return true;
     }
+    public bool TryGetSafeSpawnPoint(Vector3 requestedPos, out Vector3 safePos, int preferredFloor = 0, float margin = 0.35f, bool allowDoors = false)
+    {
+        safePos = requestedPos;
+        if (rooms == null || rooms.Count == 0) return false;
+        if (allowDoors && doors != null && doors.Count > 0)
+        {
+            var bestDoorScore = float.MaxValue;
+            var bestDoorPos = requestedPos;
+            var bestDoorY = requestedPos.y;
 
+            for (var i = 0; i < doors.Count; i++)
+            {
+                var door = doors[i];
+                if (door == null) continue;
+
+                var floorIdx = preferredFloor;
+                if (door.roomA >= 0 && door.roomA < rooms.Count && rooms[door.roomA] != null)
+                {
+                    floorIdx = rooms[door.roomA].floorIndex;
+                }
+                else if (door.roomB >= 0 && door.roomB < rooms.Count && rooms[door.roomB] != null)
+                {
+                    floorIdx = rooms[door.roomB].floorIndex;
+                }
+
+                if (preferredFloor >= 0 && floorIdx != preferredFloor) continue;
+
+                var halfX = Mathf.Max(0.05f, door.size.x * 0.5f);
+                var halfZ = Mathf.Max(0.05f, door.size.z * 0.5f);
+
+                // Expand walkable zone around door so movement can cross threshold from both sides.
+                var approachDepth = Mathf.Max(0.9f, margin * 2.5f);
+                var sidePadding = Mathf.Max(0.25f, margin * 0.75f);
+                if (door.size.x < door.size.z)
+                {
+                    // Thin on X axis => wall thickness along X, opening across Z.
+                    halfX += approachDepth;
+                    halfZ += sidePadding;
+                }
+                else
+                {
+                    // Thin on Z axis => wall thickness along Z, opening across X.
+                    halfZ += approachDepth;
+                    halfX += sidePadding;
+                }
+
+                var clampedX = Mathf.Clamp(requestedPos.x, door.position.x - halfX, door.position.x + halfX);
+                var clampedZ = Mathf.Clamp(requestedPos.z, door.position.z - halfZ, door.position.z + halfZ);
+                var dx = requestedPos.x - clampedX;
+                var dz = requestedPos.z - clampedZ;
+                var score = dx * dx + dz * dz;
+
+                if (score < bestDoorScore)
+                {
+                    bestDoorScore = score;
+                    bestDoorPos = new Vector3(clampedX, requestedPos.y, clampedZ);
+                    if (door.roomA >= 0 && door.roomA < rooms.Count && rooms[door.roomA] != null)
+                    {
+                        bestDoorY = rooms[door.roomA].position.y + 0.5f;
+                    }
+                    else if (door.roomB >= 0 && door.roomB < rooms.Count && rooms[door.roomB] != null)
+                    {
+                        bestDoorY = rooms[door.roomB].position.y + 0.5f;
+                    }
+                    else
+                    {
+                        bestDoorY = floorIdx * floorHeight + 0.5f;
+                    }
+                }
+            }
+
+            var doorCaptureRadius = Mathf.Max(1.6f, margin * 4f);
+            if (bestDoorScore <= doorCaptureRadius * doorCaptureRadius)
+            {
+                safePos = new Vector3(bestDoorPos.x, bestDoorY, bestDoorPos.z);
+                return true;
+            }
+        }
+
+        var bestIndex = -1;
+        var bestScore = float.MaxValue;
+        var foundPreferredFloor = false;
+
+        for (var i = 0; i < rooms.Count; i++)
+        {
+            var room = rooms[i];
+            if (room == null) continue;
+            if (room.floorIndex == preferredFloor) foundPreferredFloor = true;
+        }
+
+        for (var i = 0; i < rooms.Count; i++)
+        {
+            var room = rooms[i];
+            if (room == null) continue;
+            if (foundPreferredFloor && room.floorIndex != preferredFloor) continue;
+
+            var minX = room.position.x + margin;
+            var maxX = room.position.x + room.size.x - margin;
+            var minZ = room.position.z + margin;
+            var maxZ = room.position.z + room.size.z - margin;
+
+            if (minX > maxX)
+            {
+                minX = room.position.x;
+                maxX = room.position.x + room.size.x;
+            }
+            if (minZ > maxZ)
+            {
+                minZ = room.position.z;
+                maxZ = room.position.z + room.size.z;
+            }
+
+            var clampedX = Mathf.Clamp(requestedPos.x, minX, maxX);
+            var clampedZ = Mathf.Clamp(requestedPos.z, minZ, maxZ);
+            var dx = requestedPos.x - clampedX;
+            var dz = requestedPos.z - clampedZ;
+            var score = dx * dx + dz * dz;
+
+            if (score < bestScore)
+            {
+                bestScore = score;
+                bestIndex = i;
+            }
+        }
+
+        if (bestIndex < 0) return false;
+
+        var bestRoom = rooms[bestIndex];
+        var rMinX = bestRoom.position.x + margin;
+        var rMaxX = bestRoom.position.x + bestRoom.size.x - margin;
+        var rMinZ = bestRoom.position.z + margin;
+        var rMaxZ = bestRoom.position.z + bestRoom.size.z - margin;
+
+        if (rMinX > rMaxX)
+        {
+            rMinX = bestRoom.position.x;
+            rMaxX = bestRoom.position.x + bestRoom.size.x;
+        }
+        if (rMinZ > rMaxZ)
+        {
+            rMinZ = bestRoom.position.z;
+            rMaxZ = bestRoom.position.z + bestRoom.size.z;
+        }
+
+        safePos = new Vector3(
+            Mathf.Clamp(requestedPos.x, rMinX, rMaxX),
+            bestRoom.position.y + 0.5f,
+            Mathf.Clamp(requestedPos.z, rMinZ, rMaxZ)
+        );
+        return true;
+    }
+    
+    public int GetContainingRoomIndex(Vector3 worldPos, int preferredFloor = 0)
+    {
+        if (rooms == null || rooms.Count == 0) return -1;
+
+        var hasPreferredFloor = false;
+        for (var i = 0; i < rooms.Count; i++)
+        {
+            var r = rooms[i];
+            if (r != null && r.floorIndex == preferredFloor)
+            {
+                hasPreferredFloor = true;
+                break;
+            }
+        }
+
+        var bestIdx = -1;
+        var bestDist2 = float.MaxValue;
+        for (var i = 0; i < rooms.Count; i++)
+        {
+            var r = rooms[i];
+            if (r == null) continue;
+            if (hasPreferredFloor && r.floorIndex != preferredFloor) continue;
+
+            var minX = r.position.x;
+            var maxX = r.position.x + r.size.x;
+            var minZ = r.position.z;
+            var maxZ = r.position.z + r.size.z;
+            var inside = worldPos.x >= minX && worldPos.x <= maxX && worldPos.z >= minZ && worldPos.z <= maxZ;
+            if (!inside) continue;
+
+            var cx = r.position.x + r.size.x * 0.5f;
+            var cz = r.position.z + r.size.z * 0.5f;
+            var dx = worldPos.x - cx;
+            var dz = worldPos.z - cz;
+            var d2 = dx * dx + dz * dz;
+            if (d2 < bestDist2)
+            {
+                bestDist2 = d2;
+                bestIdx = i;
+            }
+        }
+
+        if (bestIdx >= 0) return bestIdx;
+
+        for (var i = 0; i < rooms.Count; i++)
+        {
+            var r = rooms[i];
+            if (r == null) continue;
+            if (hasPreferredFloor && r.floorIndex != preferredFloor) continue;
+
+            var cx = r.position.x + r.size.x * 0.5f;
+            var cz = r.position.z + r.size.z * 0.5f;
+            var dx = worldPos.x - cx;
+            var dz = worldPos.z - cz;
+            var d2 = dx * dx + dz * dz;
+            if (d2 < bestDist2)
+            {
+                bestDist2 = d2;
+                bestIdx = i;
+            }
+        }
+
+        return bestIdx;
+    }
+
+    public bool TryBuildDoorWaypointPath(Vector3 fromWorldPos, Vector3 toWorldPos, List<Vector3> outWaypoints, int preferredFloor = 0, float margin = 0.35f)
+    {
+        if (outWaypoints == null) return false;
+        outWaypoints.Clear();
+
+        if (rooms == null || doors == null || rooms.Count == 0 || doors.Count == 0) return false;
+
+        var startRoom = GetContainingRoomIndex(fromWorldPos, preferredFloor);
+        var endRoom = GetContainingRoomIndex(toWorldPos, preferredFloor);
+        if (startRoom < 0 || endRoom < 0) return false;
+        if (startRoom == endRoom) return true;
+
+        var q = new Queue<int>();
+        var visited = new HashSet<int>();
+        var prevRoom = new Dictionary<int, int>();
+        var prevDoor = new Dictionary<int, int>();
+
+        visited.Add(startRoom);
+        prevRoom[startRoom] = -1;
+        q.Enqueue(startRoom);
+
+        var found = false;
+        while (q.Count > 0)
+        {
+            var r = q.Dequeue();
+            if (r == endRoom)
+            {
+                found = true;
+                break;
+            }
+
+            var room = rooms[r];
+            if (room == null || room.connectedDoorIndices == null) continue;
+
+            for (var i = 0; i < room.connectedDoorIndices.Count; i++)
+            {
+                var doorIdx = room.connectedDoorIndices[i];
+                if (doorIdx < 0 || doorIdx >= doors.Count) continue;
+                var d = doors[doorIdx];
+                if (d == null) continue;
+
+                var next = -1;
+                if (d.roomA == r) next = d.roomB;
+                else if (d.roomB == r) next = d.roomA;
+                if (next < 0 || next >= rooms.Count) continue;
+                if (rooms[next] == null) continue;
+                if (rooms[next].floorIndex != rooms[startRoom].floorIndex) continue;
+                if (visited.Contains(next)) continue;
+
+                visited.Add(next);
+                prevRoom[next] = r;
+                prevDoor[next] = doorIdx;
+                q.Enqueue(next);
+            }
+        }
+
+        if (!found) return false;
+
+        var doorPath = new List<int>();
+        var cur = endRoom;
+        while (cur != startRoom)
+        {
+            if (!prevDoor.TryGetValue(cur, out var dIdx)) break;
+            doorPath.Add(dIdx);
+            if (!prevRoom.TryGetValue(cur, out cur)) break;
+            if (cur < 0) break;
+        }
+
+        doorPath.Reverse();
+        for (var i = 0; i < doorPath.Count; i++)
+        {
+            var dIdx = doorPath[i];
+            if (dIdx < 0 || dIdx >= doors.Count) continue;
+            var d = doors[dIdx];
+            if (d == null) continue;
+
+            var doorPos = d.position;
+            var requested = new Vector3(doorPos.x, fromWorldPos.y, doorPos.z);
+            if (TryGetSafeSpawnPoint(requested, out var safe, preferredFloor, margin, allowDoors: true))
+            {
+                outWaypoints.Add(safe);
+            }
+            else
+            {
+                outWaypoints.Add(requested);
+            }
+        }
+
+        return true;
+    }
+    
+    public bool TryBuildDoorTransitionPath(Vector3 fromWorldPos, Vector3 toWorldPos, List<Vector3> outWaypoints, int preferredFloor = 0, float approachDistance = 0.9f, int fallbackNearestDoors = 3, float margin = 0.35f, int blockedDoorIdx = -1)
+    {
+        if (outWaypoints == null) return false;
+        outWaypoints.Clear();
+
+        if (rooms == null || doors == null || rooms.Count == 0 || doors.Count == 0) return false;
+
+        int GetDoorFloor(BuildingDoor d)
+        {
+            if (d.roomA >= 0 && d.roomA < rooms.Count && rooms[d.roomA] != null) return rooms[d.roomA].floorIndex;
+            if (d.roomB >= 0 && d.roomB < rooms.Count && rooms[d.roomB] != null) return rooms[d.roomB].floorIndex;
+            return preferredFloor;
+        }
+
+        Vector3 RoomCenter2D(int roomIdx)
+        {
+            if (roomIdx < 0 || roomIdx >= rooms.Count || rooms[roomIdx] == null) return Vector3.zero;
+            var r = rooms[roomIdx];
+            return new Vector3(r.position.x + r.size.x * 0.5f, 0f, r.position.z + r.size.z * 0.5f);
+        }
+
+        bool PushPoint(Vector3 p)
+        {
+            if (TryGetSafeSpawnPoint(p, out var safe, preferredFloor, margin, allowDoors: true))
+            {
+                if (outWaypoints.Count == 0 || Vector3.Distance(outWaypoints[outWaypoints.Count - 1], safe) > 0.05f)
+                {
+                    outWaypoints.Add(safe);
+                    return true;
+                }
+                return false;
+            }
+
+            if (outWaypoints.Count == 0 || Vector3.Distance(outWaypoints[outWaypoints.Count - 1], p) > 0.05f)
+            {
+                outWaypoints.Add(p);
+                return true;
+            }
+            return false;
+        }
+
+        void AddDoorCrossing(int doorIdx, int fromRoom, int toRoom)
+        {
+            if (doorIdx < 0 || doorIdx >= doors.Count) return;
+            var d = doors[doorIdx];
+            if (d == null) return;
+
+            var normal = d.wallFacingX ? Vector3.right : Vector3.forward;
+            var dir = normal;
+
+            if (fromRoom >= 0 && toRoom >= 0)
+            {
+                var cFrom = RoomCenter2D(fromRoom);
+                var cTo = RoomCenter2D(toRoom);
+                if (Vector3.Dot(cTo - cFrom, normal) < 0f) dir = -normal;
+            }
+            else
+            {
+                var desired = new Vector3(toWorldPos.x - fromWorldPos.x, 0f, toWorldPos.z - fromWorldPos.z);
+                if (Vector3.Dot(desired, normal) < 0f) dir = -normal;
+            }
+
+            var center = new Vector3(d.position.x, fromWorldPos.y, d.position.z);
+            var approach = center - dir * approachDistance;
+            var across = center + dir * approachDistance;
+
+            PushPoint(approach);
+            PushPoint(across);
+        }
+
+        var startRoom = GetContainingRoomIndex(fromWorldPos, preferredFloor);
+        var endRoom = GetContainingRoomIndex(toWorldPos, preferredFloor);
+
+        if (startRoom >= 0 && endRoom >= 0 && startRoom != endRoom)
+        {
+            var q = new Queue<int>();
+            var visited = new HashSet<int>();
+            var prevRoom = new Dictionary<int, int>();
+            var prevDoor = new Dictionary<int, int>();
+
+            visited.Add(startRoom);
+            prevRoom[startRoom] = -1;
+            q.Enqueue(startRoom);
+
+            var found = false;
+            while (q.Count > 0)
+            {
+                var r = q.Dequeue();
+                if (r == endRoom)
+                {
+                    found = true;
+                    break;
+                }
+
+                var room = rooms[r];
+                if (room == null || room.connectedDoorIndices == null) continue;
+
+                for (var i = 0; i < room.connectedDoorIndices.Count; i++)
+                {
+                    var dIdx = room.connectedDoorIndices[i];
+                    if (dIdx < 0 || dIdx >= doors.Count) continue;
+                    var d = doors[dIdx];
+                    if (d == null) continue;
+                    if (GetDoorFloor(d) != preferredFloor) continue;
+
+                    var next = -1;
+                    if (d.roomA == r) next = d.roomB;
+                    else if (d.roomB == r) next = d.roomA;
+                    if (next < 0 || next >= rooms.Count) continue;
+                    if (rooms[next] == null || rooms[next].floorIndex != preferredFloor) continue;
+                    if (visited.Contains(next)) continue;
+
+                    visited.Add(next);
+                    prevRoom[next] = r;
+                    prevDoor[next] = dIdx;
+                    q.Enqueue(next);
+                }
+            }
+
+            if (found)
+            {
+                var transitions = new List<(int fromRoom, int toRoom, int doorIdx)>();
+                var cur = endRoom;
+                while (cur != startRoom)
+                {
+                    if (!prevDoor.TryGetValue(cur, out var dIdx)) break;
+                    if (!prevRoom.TryGetValue(cur, out var prev)) break;
+                    if (prev < 0) break;
+                    transitions.Add((prev, cur, dIdx));
+                    cur = prev;
+                }
+
+                transitions.Reverse();
+                for (var i = 0; i < transitions.Count; i++)
+                {
+                    var t = transitions[i];
+                    AddDoorCrossing(t.doorIdx, t.fromRoom, t.toRoom);
+                }
+
+                if (outWaypoints.Count > 0) return true;
+            }
+        }
+
+        // Fallback: pick up to N nearest doors on this floor and use their crossing pairs as preferred waypoints.
+        var candidates = new List<int>();
+        var scored = new List<(int doorIdx, float score)>();
+        for (var i = 0; i < doors.Count; i++)
+        {
+            if (i == blockedDoorIdx) continue;
+            var d = doors[i];
+            if (d == null) continue;
+            if (GetDoorFloor(d) != preferredFloor) continue;
+
+            var dx = d.position.x - fromWorldPos.x;
+            var dz = d.position.z - fromWorldPos.z;
+            var s = dx * dx + dz * dz;
+            scored.Add((i, s));
+        }
+
+        scored.Sort((a, b) => a.score.CompareTo(b.score));
+        var take = Mathf.Min(Mathf.Max(1, fallbackNearestDoors), scored.Count);
+        for (var i = 0; i < take; i++)
+        {
+            candidates.Add(scored[i].doorIdx);
+        }
+
+        for (var i = 0; i < candidates.Count; i++)
+        {
+            AddDoorCrossing(candidates[i], -1, -1);
+        }
+
+        return outWaypoints.Count > 0;
+    }
+
+    public int GetNearestDoorIndex(Vector3 worldPos, int preferredFloor = 0)
+    {
+        if (doors == null || doors.Count == 0) return -1;
+
+        var bestIdx = -1;
+        var bestScore = float.MaxValue;
+
+        for (var i = 0; i < doors.Count; i++)
+        {
+            var d = doors[i];
+            if (d == null) continue;
+
+            var floorIdx = preferredFloor;
+            if (d.roomA >= 0 && d.roomA < rooms.Count && rooms[d.roomA] != null)
+            {
+                floorIdx = rooms[d.roomA].floorIndex;
+            }
+            else if (d.roomB >= 0 && d.roomB < rooms.Count && rooms[d.roomB] != null)
+            {
+                floorIdx = rooms[d.roomB].floorIndex;
+            }
+
+            if (floorIdx != preferredFloor) continue;
+
+            var dx = d.position.x - worldPos.x;
+            var dz = d.position.z - worldPos.z;
+            var score = dx * dx + dz * dz;
+            if (score < bestScore)
+            {
+                bestScore = score;
+                bestIdx = i;
+            }
+        }
+
+        return bestIdx;
+    }
+
+    public void CollectRoomCenterNodes(List<Vector3> outCenters, int preferredFloor = 0, float margin = 0.35f)
+    {
+        if (outCenters == null) return;
+        outCenters.Clear();
+        if (rooms == null || rooms.Count == 0) return;
+
+        for (var i = 0; i < rooms.Count; i++)
+        {
+            var r = rooms[i];
+            if (r == null) continue;
+            if (r.floorIndex != preferredFloor) continue;
+
+            var center = new Vector3(r.position.x + r.size.x * 0.5f, r.position.y + 0.5f, r.position.z + r.size.z * 0.5f);
+            if (TryGetSafeSpawnPoint(center, out var safe, preferredFloor, margin, allowDoors: false))
+            {
+                outCenters.Add(safe);
+            }
+            else
+            {
+                outCenters.Add(center);
+            }
+        }
+    }
+
+    public bool TryBuildRoomDoorNodePath(Vector3 fromWorldPos, Vector3 toWorldPos, List<Vector3> outNodes, int preferredFloor = 0, float margin = 0.35f)
+    {
+        if (outNodes == null) return false;
+        outNodes.Clear();
+
+        if (rooms == null || doors == null || rooms.Count == 0) return false;
+
+        var startRoom = GetContainingRoomIndex(fromWorldPos, preferredFloor);
+        var endRoom = GetContainingRoomIndex(toWorldPos, preferredFloor);
+        if (startRoom < 0 || endRoom < 0) return false;
+
+        bool TryGetRoomCenter(int roomIdx, out Vector3 center)
+        {
+            center = Vector3.zero;
+            if (roomIdx < 0 || roomIdx >= rooms.Count || rooms[roomIdx] == null) return false;
+            var r = rooms[roomIdx];
+            center = new Vector3(r.position.x + r.size.x * 0.5f, r.position.y + 0.5f, r.position.z + r.size.z * 0.5f);
+            if (TryGetSafeSpawnPoint(center, out var safe, preferredFloor, margin, allowDoors: false))
+            {
+                center = safe;
+            }
+            return true;
+        }
+
+        if (!TryGetRoomCenter(startRoom, out var startCenter)) return false;
+        outNodes.Add(startCenter);
+
+        if (startRoom == endRoom)
+        {
+            if (TryGetRoomCenter(endRoom, out var sameCenter))
+            {
+                if (Vector3.Distance(sameCenter, outNodes[outNodes.Count - 1]) > 0.05f)
+                {
+                    outNodes.Add(sameCenter);
+                }
+            }
+            return outNodes.Count > 0;
+        }
+
+        var q = new Queue<int>();
+        var visited = new HashSet<int>();
+        var prevRoom = new Dictionary<int, int>();
+        var prevDoor = new Dictionary<int, int>();
+
+        visited.Add(startRoom);
+        prevRoom[startRoom] = -1;
+        q.Enqueue(startRoom);
+
+        var found = false;
+        while (q.Count > 0)
+        {
+            var r = q.Dequeue();
+            if (r == endRoom)
+            {
+                found = true;
+                break;
+            }
+
+            var room = rooms[r];
+            if (room == null || room.connectedDoorIndices == null) continue;
+
+            for (var i = 0; i < room.connectedDoorIndices.Count; i++)
+            {
+                var dIdx = room.connectedDoorIndices[i];
+                if (dIdx < 0 || dIdx >= doors.Count) continue;
+                var d = doors[dIdx];
+                if (d == null) continue;
+
+                var next = -1;
+                if (d.roomA == r) next = d.roomB;
+                else if (d.roomB == r) next = d.roomA;
+                if (next < 0 || next >= rooms.Count) continue;
+                if (rooms[next] == null || rooms[next].floorIndex != preferredFloor) continue;
+                if (visited.Contains(next)) continue;
+
+                visited.Add(next);
+                prevRoom[next] = r;
+                prevDoor[next] = dIdx;
+                q.Enqueue(next);
+            }
+        }
+
+        if (!found) return outNodes.Count > 0;
+
+        var transitions = new List<(int fromRoom, int toRoom, int doorIdx)>();
+        var cur = endRoom;
+        while (cur != startRoom)
+        {
+            if (!prevDoor.TryGetValue(cur, out var dIdx)) break;
+            if (!prevRoom.TryGetValue(cur, out var prev)) break;
+            if (prev < 0) break;
+            transitions.Add((prev, cur, dIdx));
+            cur = prev;
+        }
+
+        transitions.Reverse();
+        for (var i = 0; i < transitions.Count; i++)
+        {
+            var t = transitions[i];
+            if (t.doorIdx >= 0 && t.doorIdx < doors.Count && doors[t.doorIdx] != null)
+            {
+                var d = doors[t.doorIdx];
+                var doorCenter = new Vector3(d.position.x, fromWorldPos.y, d.position.z);
+                if (TryGetSafeSpawnPoint(doorCenter, out var safeDoor, preferredFloor, margin, allowDoors: true))
+                {
+                    doorCenter = safeDoor;
+                }
+                if (Vector3.Distance(doorCenter, outNodes[outNodes.Count - 1]) > 0.05f)
+                {
+                    outNodes.Add(doorCenter);
+                }
+            }
+
+            if (TryGetRoomCenter(t.toRoom, out var roomCenter))
+            {
+                if (Vector3.Distance(roomCenter, outNodes[outNodes.Count - 1]) > 0.05f)
+                {
+                    outNodes.Add(roomCenter);
+                }
+            }
+        }
+
+        return outNodes.Count > 0;
+    }
+
+    public bool TryBuildExplicitRoomDoorGraphPath(Vector3 fromWorldPos, Vector3 toWorldPos, List<Vector3> outNodes, int preferredFloor = 0, float margin = 0.35f)
+    {
+        if (outNodes == null) return false;
+        outNodes.Clear();
+
+        if (rooms == null || doors == null || rooms.Count == 0) return false;
+
+        var startRoom = GetContainingRoomIndex(fromWorldPos, preferredFloor);
+        var endRoom = GetContainingRoomIndex(toWorldPos, preferredFloor);
+        if (startRoom < 0 || endRoom < 0) return false;
+
+        // Graph nodes are only room centers and door centers.
+        var nodePositions = new List<Vector3>();
+        var adjacency = new List<List<int>>();
+
+        var roomNodeByRoomIdx = new Dictionary<int, int>();
+        for (var r = 0; r < rooms.Count; r++)
+        {
+            var room = rooms[r];
+            if (room == null) continue;
+            if (room.floorIndex != preferredFloor) continue;
+
+            var center = new Vector3(room.position.x + room.size.x * 0.5f, room.position.y + 0.5f, room.position.z + room.size.z * 0.5f);
+
+            var nodeIdx = nodePositions.Count;
+            nodePositions.Add(center);
+            adjacency.Add(new List<int>());
+            roomNodeByRoomIdx[r] = nodeIdx;
+        }
+
+        if (!roomNodeByRoomIdx.TryGetValue(startRoom, out var startNode)) return false;
+        if (!roomNodeByRoomIdx.TryGetValue(endRoom, out var endNode)) return false;
+
+        for (var d = 0; d < doors.Count; d++)
+        {
+            var door = doors[d];
+            if (door == null) continue;
+            if (!roomNodeByRoomIdx.ContainsKey(door.roomA) || !roomNodeByRoomIdx.ContainsKey(door.roomB)) continue;
+
+            var doorCenter = new Vector3(door.position.x, fromWorldPos.y, door.position.z);
+
+            var doorNode = nodePositions.Count;
+            nodePositions.Add(doorCenter);
+            adjacency.Add(new List<int>());
+
+            var roomANode = roomNodeByRoomIdx[door.roomA];
+            var roomBNode = roomNodeByRoomIdx[door.roomB];
+
+            adjacency[roomANode].Add(doorNode);
+            adjacency[doorNode].Add(roomANode);
+
+            adjacency[roomBNode].Add(doorNode);
+            adjacency[doorNode].Add(roomBNode);
+        }
+
+        // BFS shortest path on unweighted graph.
+        var q = new Queue<int>();
+        var visited = new HashSet<int>();
+        var prev = new Dictionary<int, int>();
+
+        visited.Add(startNode);
+        prev[startNode] = -1;
+        q.Enqueue(startNode);
+
+        var found = false;
+        while (q.Count > 0)
+        {
+            var n = q.Dequeue();
+            if (n == endNode)
+            {
+                found = true;
+                break;
+            }
+
+            var neigh = adjacency[n];
+            for (var i = 0; i < neigh.Count; i++)
+            {
+                var nn = neigh[i];
+                if (visited.Contains(nn)) continue;
+                visited.Add(nn);
+                prev[nn] = n;
+                q.Enqueue(nn);
+            }
+        }
+
+        if (!found)
+        {
+            outNodes.Add(nodePositions[startNode]);
+            if (startNode != endNode) outNodes.Add(nodePositions[endNode]);
+            return outNodes.Count > 0;
+        }
+
+        var pathNodeIndices = new List<int>();
+        var cur = endNode;
+        while (cur >= 0)
+        {
+            pathNodeIndices.Add(cur);
+            if (!prev.TryGetValue(cur, out cur)) break;
+        }
+        pathNodeIndices.Reverse();
+
+        for (var i = 0; i < pathNodeIndices.Count; i++)
+        {
+            var p = nodePositions[pathNodeIndices[i]];
+            if (outNodes.Count > 0 && Vector3.Distance(outNodes[outNodes.Count - 1], p) <= 0.05f) continue;
+            outNodes.Add(p);
+        }
+
+        return outNodes.Count > 0;
+    }
+
+    public bool TryGetDoorPassAxisAtPosition(Vector3 worldPos, out Vector3 axis, float maxDistance = 1.5f, int preferredFloor = 0)
+    {
+        axis = Vector3.zero;
+        if (doors == null || rooms == null || doors.Count == 0 || rooms.Count == 0) return false;
+
+        var bestIdx = -1;
+        var bestScore = maxDistance * maxDistance;
+
+        for (var i = 0; i < doors.Count; i++)
+        {
+            var d = doors[i];
+            if (d == null) continue;
+            if (d.roomA < 0 || d.roomA >= rooms.Count || rooms[d.roomA] == null) continue;
+            if (d.roomB < 0 || d.roomB >= rooms.Count || rooms[d.roomB] == null) continue;
+
+            if (rooms[d.roomA].floorIndex != preferredFloor || rooms[d.roomB].floorIndex != preferredFloor) continue;
+
+            var dx = d.position.x - worldPos.x;
+            var dz = d.position.z - worldPos.z;
+            var score = dx * dx + dz * dz;
+            if (score < bestScore)
+            {
+                bestScore = score;
+                bestIdx = i;
+            }
+        }
+
+        if (bestIdx < 0) return false;
+
+        var door = doors[bestIdx];
+        var a = rooms[door.roomA];
+        var b = rooms[door.roomB];
+        var centerA = new Vector3(a.position.x + a.size.x * 0.5f, 0f, a.position.z + a.size.z * 0.5f);
+        var centerB = new Vector3(b.position.x + b.size.x * 0.5f, 0f, b.position.z + b.size.z * 0.5f);
+
+        var dir = centerB - centerA;
+        if (dir.sqrMagnitude <= 0.0001f)
+        {
+            dir = door.wallFacingX ? Vector3.right : Vector3.forward;
+        }
+
+        axis = new Vector3(dir.x, 0f, dir.z).normalized;
+        return axis.sqrMagnitude > 0.0001f;
+    }
+
+    public bool TryGetNearestDoorCenter(Vector3 worldPos, out Vector3 doorCenter, int preferredFloor = 0)
+    {
+        doorCenter = worldPos;
+        var doorIdx = GetNearestDoorIndex(worldPos, preferredFloor);
+        if (doorIdx < 0 || doors == null || doorIdx >= doors.Count || doors[doorIdx] == null) return false;
+
+        var d = doors[doorIdx];
+        var y = worldPos.y;
+        if (d.roomA >= 0 && d.roomA < rooms.Count && rooms[d.roomA] != null)
+        {
+            y = rooms[d.roomA].position.y + 0.5f;
+        }
+        else if (d.roomB >= 0 && d.roomB < rooms.Count && rooms[d.roomB] != null)
+        {
+            y = rooms[d.roomB].position.y + 0.5f;
+        }
+
+        doorCenter = new Vector3(d.position.x, y, d.position.z);
+        return true;
+    }
+    public bool TryGetNearestDoorHop(Vector3 worldPos, out Vector3 doorCenter, out Vector3 oppositeRoomCenter, int preferredFloor = 0)
+    {
+        doorCenter = worldPos;
+        oppositeRoomCenter = worldPos;
+
+        var doorIdx = GetNearestDoorIndex(worldPos, preferredFloor);
+        if (doorIdx < 0 || doors == null || doorIdx >= doors.Count || doors[doorIdx] == null) return false;
+
+        var d = doors[doorIdx];
+        if (d.roomA < 0 || d.roomA >= rooms.Count || rooms[d.roomA] == null) return false;
+        if (d.roomB < 0 || d.roomB >= rooms.Count || rooms[d.roomB] == null) return false;
+
+        var roomA = rooms[d.roomA];
+        var roomB = rooms[d.roomB];
+        if (roomA.floorIndex != preferredFloor || roomB.floorIndex != preferredFloor) return false;
+
+        var currentRoom = GetContainingRoomIndex(worldPos, preferredFloor);
+        var targetRoomIdx = d.roomA;
+        if (currentRoom == d.roomA) targetRoomIdx = d.roomB;
+        else if (currentRoom == d.roomB) targetRoomIdx = d.roomA;
+        else
+        {
+            var centerA = new Vector3(roomA.position.x + roomA.size.x * 0.5f, 0f, roomA.position.z + roomA.size.z * 0.5f);
+            var centerB = new Vector3(roomB.position.x + roomB.size.x * 0.5f, 0f, roomB.position.z + roomB.size.z * 0.5f);
+            var toA = (new Vector3(worldPos.x, 0f, worldPos.z) - centerA).sqrMagnitude;
+            var toB = (new Vector3(worldPos.x, 0f, worldPos.z) - centerB).sqrMagnitude;
+            targetRoomIdx = toA <= toB ? d.roomB : d.roomA;
+        }
+
+        var y = rooms[targetRoomIdx].position.y + 0.5f;
+        doorCenter = new Vector3(d.position.x, y, d.position.z);
+
+        var tr = rooms[targetRoomIdx];
+        oppositeRoomCenter = new Vector3(tr.position.x + tr.size.x * 0.5f, tr.position.y + 0.5f, tr.position.z + tr.size.z * 0.5f);
+        return true;
+    }
     [ContextMenu("Generate Building")]
     public void RegenerateBuilding() => GenerateBuilding();
     // ?????????????????????????????????????????????????????????????????????????
@@ -950,13 +1829,10 @@ public class ProceduralBuildingGenerator : MonoBehaviour
 
         Debug.Log("[Minimap] Floorplan sprites built.");
     }
-
     private void BuildProps()
     {
         if (propSpawner == null) return;
         propSpawner.Furnish(rooms, walls, buildingParentMap, roomGeometry, seed);
         Debug.Log("[Props] Furnishing complete.");
     }
-
-
 }

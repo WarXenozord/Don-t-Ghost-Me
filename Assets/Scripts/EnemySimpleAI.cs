@@ -23,11 +23,23 @@ public class EnemySimpleAI : SoundAgroListener
     [Min(0f)] public float waypointReachDistance = 0.5f;
     [Min(0f)] public float patrolSampleRadius = 12f;
     [Min(0f)] public float patrolResampleInterval = 8f;
+    [Min(0f)] public float revisitPenalty = 1f;
+
+    [Header("Navigation")]
+    [Min(0.05f)] public float repathInterval = 0.35f;
+    [Min(0f)] public float repathTargetDelta = 1f;
+    [Min(0f)] public float stuckTimeout = 1.25f;
+    [Min(0f)] public float progressDistance = 0.2f;
+    [Range(0f, 1f)] public float doorAxisSteer = 0.45f;
+    [Min(0.1f)] public float attackNoGainTimeout = 1f;
+    [Min(0f)] public float attackGainEpsilon = 0.1f;
+    [Min(0f)] public float attackRerouteMinPlayerDistance = 2.5f;
 
     [Header("Vision")]
     [Min(0f)] public float sightDistance = 14f;
     [Range(1f, 180f)] public float sightAngle = 75f;
     [Min(0f)] public float loseTargetDistance2D = 18f;
+    public bool requireSameRoomForVision = true;
     public bool requireLineOfSight = false;
     public LayerMask sightBlockMask = ~0;
 
@@ -37,12 +49,26 @@ public class EnemySimpleAI : SoundAgroListener
     private CharacterController _controller;
     private ProceduralBuildingGenerator _generator;
     private readonly List<MediumController> _knownMediums = new List<MediumController>();
+    private readonly List<Vector3> _routeNodes = new List<Vector3>();
+    private readonly List<Vector3> _roomCenterNodes = new List<Vector3>();
+    private readonly Dictionary<int, int> _nodeVisits = new Dictionary<int, int>();
 
     private Vector3 _patrolTarget;
     private Vector3 _investigateTarget;
     private MediumController _attackTarget;
     private float _nextPatrolResampleAt;
     private float _nextMediumRefreshAt;
+
+    private Vector3 _routeDestination;
+    private int _routeIndex;
+    private float _nextRepathAt;
+    private Vector3 _lastProgressPos;
+    private float _lastProgressAt;
+    private float _attackNoGainStartedAt;
+    private float _attackNoGainStartDist;
+    private bool _attackRerouteToDoorActive;
+    private readonly List<Vector3> _attackRerouteNodes = new List<Vector3>();
+    private int _attackRerouteIndex;
 
     void Awake()
     {
@@ -53,6 +79,8 @@ public class EnemySimpleAI : SoundAgroListener
     void Start()
     {
         PickNextPatrolTarget(force: true);
+        _lastProgressPos = transform.position;
+        _lastProgressAt = Time.time;
     }
 
     void Update()
@@ -62,8 +90,10 @@ public class EnemySimpleAI : SoundAgroListener
         var visibleTarget = FindVisibleMedium();
         if (visibleTarget != null)
         {
+            var enteringAttack = state != EnemyState.Attack || _attackTarget != visibleTarget;
             _attackTarget = visibleTarget;
             state = EnemyState.Attack;
+            if (enteringAttack) ResetAttackTracking();
         }
 
         switch (state)
@@ -83,11 +113,7 @@ public class EnemySimpleAI : SoundAgroListener
     protected override void OnSoundAgroHeard(SoundAgroEvent evt, float perceivedIntensity)
     {
         _investigateTarget = evt.worldPosition;
-
-        if (state != EnemyState.Attack)
-        {
-            state = EnemyState.Investigate;
-        }
+        if (state != EnemyState.Attack) state = EnemyState.Investigate;
     }
 
     private void TickPatrol()
@@ -96,52 +122,161 @@ public class EnemySimpleAI : SoundAgroListener
         {
             PickNextPatrolTarget(force: true);
         }
-
-        MoveTowards(_patrolTarget, patrolSpeed);
+        NavigateTo(_patrolTarget, patrolSpeed);
     }
 
     private void TickInvestigate()
     {
-        MoveTowards(_investigateTarget, investigateSpeed);
+        var reached = NavigateTo(_investigateTarget, investigateSpeed);
+        if (!reached) return;
 
-        if (Reached2D(_investigateTarget, waypointReachDistance))
-        {
-            _attackTarget = null;
-            state = EnemyState.Patrol;
-            PickNextPatrolTarget(force: true);
-        }
+        _attackTarget = null;
+        state = EnemyState.Patrol;
+        PickNextPatrolTarget(force: true);
     }
 
     private void TickAttack()
     {
         if (_attackTarget == null)
         {
+            _attackRerouteToDoorActive = false;
             state = EnemyState.Patrol;
             PickNextPatrolTarget(force: true);
             return;
         }
 
         var targetPos = _attackTarget.transform.position;
-        MoveTowards(targetPos, attackSpeed);
+        var distNow = Distance2D(transform.position, targetPos);
+
+        if (_attackRerouteToDoorActive)
+        {
+            if (_attackRerouteIndex >= _attackRerouteNodes.Count)
+            {
+                _attackRerouteToDoorActive = false;
+                ResetAttackTracking();
+                return;
+            }
+
+            var rerouteTarget = _attackRerouteNodes[_attackRerouteIndex];
+            var reachedDoor = MoveTowards(rerouteTarget, attackSpeed);
+            TrackProgress();
+            if (reachedDoor || Reached2D(rerouteTarget, waypointReachDistance))
+            {
+                _attackRerouteIndex++;
+                if (_attackRerouteIndex >= _attackRerouteNodes.Count)
+                {
+                    _attackRerouteToDoorActive = false;
+                    ResetAttackTracking();
+                }
+            }
+        }
+        else
+        {
+            MoveTowards(targetPos, attackSpeed);
+            TrackProgress();
+
+            if (distNow < _attackNoGainStartDist - attackGainEpsilon)
+            {
+                _attackNoGainStartDist = distNow;
+                _attackNoGainStartedAt = Time.time;
+            }
+            else if (Time.time - _attackNoGainStartedAt >= attackNoGainTimeout)
+            {
+                if (distNow >= attackRerouteMinPlayerDistance &&
+                    _generator != null &&
+                    _generator.TryGetNearestDoorHop(transform.position, out var nearDoor, out var nextRoomCenter, preferredFloor: 0))
+                {
+                    _attackRerouteNodes.Clear();
+                    _attackRerouteNodes.Add(nearDoor);
+                    _attackRerouteNodes.Add(nextRoomCenter);
+                    _attackRerouteIndex = 0;
+                    _attackRerouteToDoorActive = true;
+                }
+                _attackNoGainStartDist = distNow;
+                _attackNoGainStartedAt = Time.time;
+            }
+        }
 
         var stillVisible = CanSeeMedium(_attackTarget);
         var far2D = Distance2D(transform.position, targetPos) >= loseTargetDistance2D;
         if (!stillVisible && far2D)
         {
             _attackTarget = null;
+            _attackRerouteToDoorActive = false;
             state = EnemyState.Patrol;
             PickNextPatrolTarget(force: true);
         }
     }
 
-    private void MoveTowards(Vector3 worldTarget, float speed)
+    private bool NavigateTo(Vector3 destination, float speed)
+    {
+        RebuildRouteIfNeeded(destination);
+
+        while (_routeIndex < _routeNodes.Count && Reached2D(_routeNodes[_routeIndex], waypointReachDistance))
+        {
+            RegisterNodeVisit(_routeNodes[_routeIndex]);
+            _routeIndex++;
+        }
+
+        if (_routeIndex < _routeNodes.Count)
+        {
+            var stepTarget = _routeNodes[_routeIndex];
+            if (MoveTowards(stepTarget, speed))
+            {
+                RegisterNodeVisit(stepTarget);
+                _routeIndex++;
+            }
+            TrackProgress();
+
+            if (IsStuck())
+            {
+                _routeIndex = _routeNodes.Count;
+                _nextRepathAt = 0f;
+            }
+            return false;
+        }
+
+        var reached = MoveTowards(destination, speed);
+        TrackProgress();
+        return reached;
+    }
+
+    private void RebuildRouteIfNeeded(Vector3 destination)
+    {
+        var hasActiveRoute = _routeIndex < _routeNodes.Count;
+        var needsByTime = !hasActiveRoute && Time.time >= _nextRepathAt;
+        var needsByTargetShift = Distance2D(_routeDestination, destination) >= repathTargetDelta;
+        var needsByExhausted = !hasActiveRoute;
+        if (!needsByTime && !needsByTargetShift && !needsByExhausted) return;
+
+        _routeDestination = destination;
+        _nextRepathAt = Time.time + repathInterval;
+        _routeIndex = 0;
+        _routeNodes.Clear();
+
+        if (_generator == null) return;
+        _generator.TryBuildExplicitRoomDoorGraphPath(transform.position, destination, _routeNodes, preferredFloor: 0);
+    }
+
+    private bool MoveTowards(Vector3 worldTarget, float speed)
     {
         var pos = transform.position;
         var to = new Vector3(worldTarget.x - pos.x, 0f, worldTarget.z - pos.z);
         var len = to.magnitude;
-        if (len <= 0.0001f) return;
+        if (len <= 0.0001f) return true;
 
         var dir = to / len;
+        if (_generator != null && _generator.TryGetDoorPassAxisAtPosition(worldTarget, out var passAxis, maxDistance: 1.5f, preferredFloor: 0))
+        {
+            var axis = new Vector3(passAxis.x, 0f, passAxis.z);
+            if (axis.sqrMagnitude > 0.0001f)
+            {
+                axis.Normalize();
+                if (Vector3.Dot(axis, dir) < 0f) axis = -axis;
+                dir = Vector3.Lerp(dir, axis, Mathf.Clamp01(doorAxisSteer)).normalized;
+            }
+        }
+
         var desiredRot = Quaternion.LookRotation(dir, Vector3.up);
         transform.rotation = Quaternion.Slerp(transform.rotation, desiredRot, turnSpeed * Time.deltaTime);
 
@@ -149,19 +284,11 @@ public class EnemySimpleAI : SoundAgroListener
         if (step.sqrMagnitude > to.sqrMagnitude) step = to;
 
         var next = pos + step;
-        if (_generator != null && _generator.TryGetSafeSpawnPoint(next, out var safeNext, preferredFloor: 0))
-        {
-            next = safeNext;
-        }
 
-        if (_controller != null && _controller.enabled)
-        {
-            _controller.Move(next - pos);
-        }
-        else
-        {
-            transform.position = next;
-        }
+        if (_controller != null && _controller.enabled) _controller.Move(next - pos);
+        else transform.position = next;
+
+        return Distance2D(transform.position, worldTarget) <= waypointReachDistance;
     }
 
     private void PickNextPatrolTarget(bool force)
@@ -169,27 +296,43 @@ public class EnemySimpleAI : SoundAgroListener
         if (!force && Time.time < _nextPatrolResampleAt) return;
 
         var origin = transform.position;
-        var candidate = origin;
-        var found = false;
-
-        for (var i = 0; i < 12; i++)
+        if (_generator != null)
         {
-            var rnd = Random.insideUnitCircle * patrolSampleRadius;
-            var requested = new Vector3(origin.x + rnd.x, origin.y, origin.z + rnd.y);
-            if (_generator != null && _generator.TryGetSafeSpawnPoint(requested, out var safe, preferredFloor: 0))
+            _roomCenterNodes.Clear();
+            _generator.CollectRoomCenterNodes(_roomCenterNodes, preferredFloor: 0);
+
+            var totalWeight = 0f;
+            for (var i = 0; i < _roomCenterNodes.Count; i++)
             {
-                candidate = safe;
-                found = true;
-                break;
+                var p = _roomCenterNodes[i];
+                if (Distance2D(origin, p) > patrolSampleRadius) continue;
+                _nodeVisits.TryGetValue(NodeKey(p), out var visits);
+                totalWeight += Mathf.Max(0.001f, 1f / (1f + revisitPenalty * visits));
+            }
+
+            if (totalWeight > 0f)
+            {
+                var pick = Random.value * totalWeight;
+                var acc = 0f;
+                for (var i = 0; i < _roomCenterNodes.Count; i++)
+                {
+                    var p = _roomCenterNodes[i];
+                    if (Distance2D(origin, p) > patrolSampleRadius) continue;
+                    _nodeVisits.TryGetValue(NodeKey(p), out var visits);
+                    var w = Mathf.Max(0.001f, 1f / (1f + revisitPenalty * visits));
+                    acc += w;
+                    if (acc >= pick)
+                    {
+                        _patrolTarget = p;
+                        _nextPatrolResampleAt = Time.time + patrolResampleInterval;
+                        return;
+                    }
+                }
             }
         }
 
-        if (!found)
-        {
-            candidate = origin + new Vector3(Random.Range(-2f, 2f), 0f, Random.Range(-2f, 2f));
-        }
-
-        _patrolTarget = candidate;
+        var fallback = origin + new Vector3(Random.Range(-2f, 2f), 0f, Random.Range(-2f, 2f));
+        _patrolTarget = fallback;
         _nextPatrolResampleAt = Time.time + patrolResampleInterval;
     }
 
@@ -203,8 +346,7 @@ public class EnemySimpleAI : SoundAgroListener
         for (var i = 0; i < all.Length; i++)
         {
             var m = all[i];
-            if (m == null) continue;
-            if (!m.gameObject.activeInHierarchy) continue;
+            if (m == null || !m.gameObject.activeInHierarchy) continue;
             _knownMediums.Add(m);
         }
     }
@@ -213,12 +355,10 @@ public class EnemySimpleAI : SoundAgroListener
     {
         MediumController best = null;
         var bestDist = float.MaxValue;
-
         for (var i = 0; i < _knownMediums.Count; i++)
         {
             var m = _knownMediums[i];
-            if (m == null) continue;
-            if (!CanSeeMedium(m)) continue;
+            if (m == null || !CanSeeMedium(m)) continue;
 
             var d = Distance2D(transform.position, m.transform.position);
             if (d < bestDist)
@@ -227,13 +367,19 @@ public class EnemySimpleAI : SoundAgroListener
                 best = m;
             }
         }
-
         return best;
     }
 
     private bool CanSeeMedium(MediumController medium)
     {
         if (medium == null) return false;
+
+        if (requireSameRoomForVision && _generator != null)
+        {
+            var selfRoom = _generator.GetContainingRoomIndex(transform.position, preferredFloor: 0);
+            var targetRoom = _generator.GetContainingRoomIndex(medium.transform.position, preferredFloor: 0);
+            if (selfRoom >= 0 && targetRoom >= 0 && selfRoom != targetRoom) return false;
+        }
 
         var origin = transform.position + Vector3.up * 1.4f;
         var targetPos = medium.transform.position + Vector3.up * 1.2f;
@@ -248,12 +394,51 @@ public class EnemySimpleAI : SoundAgroListener
         if (angle > sightAngle * 0.5f) return false;
 
         if (!requireLineOfSight) return true;
+        return !Physics.Linecast(origin, targetPos, out _, sightBlockMask, QueryTriggerInteraction.Ignore);
+    }
 
-        if (Physics.Linecast(origin, targetPos, out _, sightBlockMask, QueryTriggerInteraction.Ignore))
+    private void TrackProgress()
+    {
+        var moved = Distance2D(transform.position, _lastProgressPos);
+        if (moved < progressDistance) return;
+        _lastProgressPos = transform.position;
+        _lastProgressAt = Time.time;
+    }
+
+    private bool IsStuck()
+    {
+        return Time.time - _lastProgressAt >= stuckTimeout;
+    }
+
+    private void RegisterNodeVisit(Vector3 pos)
+    {
+        var key = NodeKey(pos);
+        if (_nodeVisits.TryGetValue(key, out var count)) _nodeVisits[key] = count + 1;
+        else _nodeVisits[key] = 1;
+    }
+
+    private void ResetAttackTracking()
+    {
+        if (_attackTarget != null)
         {
-            return false;
+            _attackNoGainStartDist = Distance2D(transform.position, _attackTarget.transform.position);
         }
-        return true;
+        else
+        {
+            _attackNoGainStartDist = 0f;
+        }
+        _attackNoGainStartedAt = Time.time;
+        _attackRerouteToDoorActive = false;
+        _attackRerouteNodes.Clear();
+        _attackRerouteIndex = 0;
+    }
+
+    private static int NodeKey(Vector3 p)
+    {
+        var x = Mathf.RoundToInt(p.x * 5f);
+        var y = Mathf.RoundToInt(p.y * 5f);
+        var z = Mathf.RoundToInt(p.z * 5f);
+        unchecked { return (x * 73856093) ^ (y * 19349663) ^ (z * 83492791); }
     }
 
     private bool Reached2D(Vector3 target, float threshold)
