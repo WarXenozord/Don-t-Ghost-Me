@@ -10,6 +10,10 @@ public class SnapshotInterpolation : MonoBehaviour
     [Header("Smoothing")]
     public float lerpPos = 12f;
     public float lerpYaw = 12f;
+    public float smoothTimePos = 0.06f;
+    public float snapDistance = 6f;
+    public float maxExtrapolationTime = 0.12f;
+    public float maxEstimatedSpeed = 12f;
     public bool correctLocalWithSnapshots = false;
     public bool enableDebugLogs = true;
     public float debugLogInterval = 1f;
@@ -17,6 +21,10 @@ public class SnapshotInterpolation : MonoBehaviour
 
     private readonly Dictionary<string, Vector3> _targetPos = new Dictionary<string, Vector3>();
     private readonly Dictionary<string, float> _targetYaw = new Dictionary<string, float>();
+    private readonly Dictionary<string, Vector3> _lastSnapPos = new Dictionary<string, Vector3>();
+    private readonly Dictionary<string, float> _lastSnapAt = new Dictionary<string, float>();
+    private readonly Dictionary<string, Vector3> _estimatedVel = new Dictionary<string, Vector3>();
+    private readonly Dictionary<string, Vector3> _smoothVel = new Dictionary<string, Vector3>();
     private bool _bound;
     private float _nextSnapshotLogAt;
     private float _nextMotionLogAt;
@@ -47,7 +55,25 @@ public class SnapshotInterpolation : MonoBehaviour
             if (!spawner || !spawner.TryGet(userId, out var go)) continue;
 
             var targetPos = kv.Value;
-            go.transform.position = Vector3.Lerp(go.transform.position, targetPos, Time.deltaTime * lerpPos);
+            if (_lastSnapAt.TryGetValue(userId, out var lastAt) && _estimatedVel.TryGetValue(userId, out var estVel))
+            {
+                var sinceSnap = Mathf.Clamp(Time.unscaledTime - lastAt, 0f, maxExtrapolationTime);
+                targetPos += estVel * sinceSnap;
+            }
+
+            var current = go.transform.position;
+            var dist = Vector3.Distance(current, targetPos);
+            if (dist > snapDistance)
+            {
+                go.transform.position = targetPos;
+                _smoothVel[userId] = Vector3.zero;
+            }
+            else
+            {
+                var velRef = _smoothVel.TryGetValue(userId, out var v) ? v : Vector3.zero;
+                go.transform.position = Vector3.SmoothDamp(current, targetPos, ref velRef, smoothTimePos, Mathf.Infinity, Time.deltaTime);
+                _smoothVel[userId] = velRef;
+            }
 
             if (_targetYaw.TryGetValue(userId, out var targetYaw))
             {
@@ -107,9 +133,23 @@ public class SnapshotInterpolation : MonoBehaviour
                 sampleBefore = remoteGo.transform.position;
             }
 
-            // Apply immediately on snapshot so remotes still move even if Update smoothing path is disrupted.
-            spawner.ApplyAuthoritativePose(ps.id, pos, yaw);
-            if (capturedSample && sampleId == ps.id && spawner.TryGet(ps.id, out remoteGo))
+            if (_lastSnapPos.TryGetValue(ps.id, out var prevPos) && _lastSnapAt.TryGetValue(ps.id, out var prevAt))
+            {
+                var dt = Time.unscaledTime - prevAt;
+                if (dt > 0.0001f)
+                {
+                    var vel = (pos - prevPos) / dt;
+                    if (vel.sqrMagnitude > maxEstimatedSpeed * maxEstimatedSpeed)
+                    {
+                        vel = vel.normalized * maxEstimatedSpeed;
+                    }
+                    _estimatedVel[ps.id] = vel;
+                }
+            }
+            _lastSnapPos[ps.id] = pos;
+            _lastSnapAt[ps.id] = Time.unscaledTime;
+
+            if (capturedSample && sampleId == ps.id)
             {
                 sampleAfter = remoteGo.transform.position;
             }
