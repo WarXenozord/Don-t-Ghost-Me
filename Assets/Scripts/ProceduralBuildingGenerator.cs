@@ -268,14 +268,27 @@ public class ProceduralBuildingGenerator : MonoBehaviour
         }
     }
 
-    // Returns a split offset in [0, length] relative to the cell's own origin.
-    // BUG FIX: the original returned a value relative to world 0, breaking rooms at non-zero offsets.
+    // Returns a split offset relative to the cell's own origin.
+
+    // The split guarantees both resulting pieces are at least minRoomSize wide.
+
+    // We also nudge the split toward the centre when both sides would exceed maxRoomSize,
+
+    // so rooms don't grow unbounded — but we never let that prevent a split entirely.
     private float GetRelativeSplitOffset(float length)
     {
-        float lo = Mathf.Max(minRoomSize + wallThickness, maxRoomSize);
-        float hi = Mathf.Min(length - minRoomSize - wallThickness, length - maxRoomSize);
-        if (hi <= lo) return -1f;
-        return (float)(lo + (hi - lo) * random.NextDouble());
+        float margin = minRoomSize + wallThickness;
+        float lo     = margin;                  // left piece must be >= minRoomSize
+        float hi     = length - margin;         // right piece must be >= minRoomSize
+        if (hi <= lo) return -1f;               // cell too small to split at all
+
+        // Prefer splits that keep rooms <= maxRoomSize, but don't enforce it
+        float softLo = Mathf.Max(lo, length - maxRoomSize);
+        float softHi = Mathf.Min(hi, maxRoomSize);
+        if (softHi > softLo)                    // preferred range is valid — use it
+            return (float)(softLo + (softHi - softLo) * random.NextDouble());
+
+        return (float)(lo + (hi - lo) * random.NextDouble()); // fallback: any valid split
     }
 
     private bool TrySplitX(Vector3 pos, Vector3 sz, Queue<(Vector3, Vector3)> q)

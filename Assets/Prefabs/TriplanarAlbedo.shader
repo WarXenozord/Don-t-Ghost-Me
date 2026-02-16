@@ -67,7 +67,7 @@ Shader "Custom/TriplanarAlbedo"
                 nY * blend.y +
                 nZ * blend.z;
 
-            o.Normal = normalize(blendedNormal);
+            //o.Normal = normalize(blendedNormal);
 
             o.Metallic = _Metallic;
             o.Smoothness = _Glossiness;
