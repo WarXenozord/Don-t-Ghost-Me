@@ -391,6 +391,8 @@ MonoBehaviour:
   isHost: 0
   inputSendHz: 30
   snapshotSendHz: 15
+  hostRemoteVisualLerp: 16
+  hostRemoteMaxExtrapolation: 0.12
   enableDebugLogs: 1
   debugLogInterval: 1
 --- !u!114 &302446470
@@ -427,10 +429,10 @@ MonoBehaviour:
   spawner: {fileID: 0}
   interpolationBackTime: 0.1
   maxExtrapolationTime: 0.6
-  snapDistance: 5
-  positionLerpGain: 40
+  snapDistance: 4
+  positionLerpGain: 30
   yawLerpGain: 25
-  maxSamplesPerPlayer: 15
+  maxSamplesPerPlayer: 12
   correctLocalWithSnapshots: 0
   enableDebugLogs: 0
   debugLogInterval: 1
