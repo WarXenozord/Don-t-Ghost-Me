@@ -266,10 +266,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   m_AspectMode: 3
   m_AspectRatio: 1
---- !u!4 &522708135 stripped
+--- !u!4 &563108593 stripped
 Transform:
-  m_CorrespondingSourceObject: {fileID: 8307503184249558993, guid: c9bbaba696bdecb4f81e61a5f1d77782, type: 3}
-  m_PrefabInstance: {fileID: 1883023662}
+  m_CorrespondingSourceObject: {fileID: 8307503184249558993, guid: 471d28b91db188e4b9691095125224f5, type: 3}
+  m_PrefabInstance: {fileID: 382630602}
   m_PrefabAsset: {fileID: 0}
 --- !u!1 &793674895
 GameObject:
@@ -893,7 +893,7 @@ MonoBehaviour:
   ceilingPrefab: {fileID: 1182786263916851811, guid: d98640697ca1ae24aaeeba6d2a30451b, type: 3}
   floorplanRenderer: {fileID: 1793691408}
   minimapController: {fileID: 1793691409}
-  player: {fileID: 522708135}
+  player: {fileID: 563108593}
   playerHeightOffset: 1.1
 --- !u!4 &1793691407
 Transform:
@@ -931,6 +931,7 @@ MonoBehaviour:
   wallSpriteThickness: 0.3
   doorSpriteSize: 1.2
   playerMarkerSize: 1.5
+  isHidden: 0
 --- !u!114 &1793691409
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -943,7 +944,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 343bad8c56680d143b862213f4fd6340, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  player: {fileID: 522708135}
+  player: {fileID: 563108593}
   floorplanRenderer: {fileID: 1793691408}
   minimapRawImage: {fileID: 1971851830}
   minimapCamera: {fileID: 1673759882}
