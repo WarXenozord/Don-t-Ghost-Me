@@ -34,6 +34,9 @@ public class FloorplanRenderer : MonoBehaviour
     [Tooltip("Shader used for wall quads. Leave null to use Unlit/Color.")]
     public Shader wallShader;
 
+    [Tooltip("Optional override material for wall quads. Recommended for WebGL to avoid shader stripping.")]
+    public Material wallMaterialOverride;
+
     [Tooltip("Door arc/opening symbol. The arc should open toward +X in the source PNG.")]
     public GameObject doorSpritePrefab;
 
@@ -119,7 +122,26 @@ public class FloorplanRenderer : MonoBehaviour
     private Material GetWallMaterial()
     {
         if (_wallMaterial != null) return _wallMaterial;
-        var shader = wallShader != null ? wallShader : Shader.Find("Unlit/Color");
+
+        if (wallMaterialOverride != null)
+        {
+            _wallMaterial = new Material(wallMaterialOverride) { color = wallColor };
+            return _wallMaterial;
+        }
+
+        Shader shader = wallShader;
+        if (shader == null) shader = Shader.Find("Unlit/Color");
+        if (shader == null) shader = Shader.Find("Sprites/Default");
+        if (shader == null) shader = Shader.Find("UI/Default");
+        if (shader == null) shader = Shader.Find("Standard");
+
+        if (shader == null)
+        {
+            Debug.LogError("[FloorplanRenderer] Could not find a shader for minimap wall quads. " +
+                           "Assign wallShader or wallMaterialOverride.");
+            return null;
+        }
+
         _wallMaterial = new Material(shader) { color = wallColor };
         return _wallMaterial;
     }
@@ -134,6 +156,7 @@ public class FloorplanRenderer : MonoBehaviour
         // No axis-swap, no sprite rotation tricks, just direct world-unit sizes.
 
         var mat = GetWallMaterial();
+        if (mat == null) return;
 
         foreach (var wall in walls)
         {
