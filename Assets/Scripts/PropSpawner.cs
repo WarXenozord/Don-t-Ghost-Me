@@ -61,18 +61,29 @@ public class PropSpawner : MonoBehaviour
     /// buildingParents[buildingIndex] = parent Transform for that building section.
     /// </summary>
     public void Furnish(
-        List<BuildingRoom>                       rooms,
-        List<BuildingWall>                       walls,
-        Dictionary<int, Transform>               buildingParents,
+        List<BuildingRoom>                           rooms,
+        List<BuildingWall>                           walls,
+        Dictionary<int, Transform>                   buildingParents,
         List<(GameObject floor, GameObject ceiling)> roomGeometry,
-        int seed)
+        int                                          seed,
+        List<GameObject>                             wallGameObjects = null)
     {
-        _rng    = new System.Random(seed ^ 0xBEEF); // XOR seed so props differ from layout
+        _rng    = new System.Random(seed ^ 0xBEEF);
         _rooms  = rooms;
         _walls  = walls;
 
         BuildLookups();
-        ApplyWallMaterials(rooms, walls);
+
+        Debug.Log($"[PropSpawner] Furnish called — {rooms.Count} rooms, {walls.Count} walls, " +
+                  $"{roomGeometry.Count} room GOs, {(wallGameObjects != null ? wallGameObjects.Count : 0)} wall GOs, " +
+                  $"{_furnishLookup.Count} furnish profiles, {_matLookup.Count} material profiles.");
+
+        // Log what profile each room type maps to
+        foreach (var kv in _matLookup)
+            Debug.Log($"[PropSpawner] Material profile: {kv.Key} → floor={kv.Value.floorMaterial?.name ?? "null"}, " +
+                      $"ceil={kv.Value.ceilingMaterial?.name ?? "null"}, wall={kv.Value.wallMaterial?.name ?? "null"}");
+
+        ApplyWallMaterials(rooms, walls, wallGameObjects);
 
         for (int i = 0; i < rooms.Count; i++)
         {
@@ -346,29 +357,39 @@ public class PropSpawner : MonoBehaviour
 
     // ── Material application ───────────────────────────────────────────────
 
-    private void ApplyWallMaterials(List<BuildingRoom> rooms, List<BuildingWall> walls)
+    private void ApplyWallMaterials(List<BuildingRoom> rooms, List<BuildingWall> walls,
+                                     List<GameObject> wallGOs)
     {
-        // Build priority map: roomIndex → priority (lower index in materialProfiles = higher priority)
-        var roomPriority = new Dictionary<int, int>();
-        for (int i = 0; i < rooms.Count; i++)
+        if (wallGOs == null || wallGOs.Count == 0)
         {
-            for (int p = 0; p < materialProfiles.Length; p++)
-            {
-                if (materialProfiles[p].roomType == rooms[i].roomType)
-                {
-                    roomPriority[i] = p;
-                    break;
-                }
-            }
+            Debug.LogWarning("[PropSpawner] No wall GameObjects passed — wall materials skipped. " +
+                             "Make sure the generator passes wallGameObjects to Furnish().");
+            return;
         }
 
-        // For each wall GO, find the highest-priority bordering room with a wall material
-        // Walls store roomA/roomB — if those are -1 we skip (exterior walls keep default)
-        foreach (var wall in walls)
+        if (walls.Count != wallGOs.Count)
         {
-            // Pick the bordering room with highest priority (lowest index)
-            int bestRoom     = -1;
-            int bestPriority = int.MaxValue;
+            Debug.LogWarning($"[PropSpawner] walls.Count ({walls.Count}) != wallGOs.Count ({wallGOs.Count}). " +
+                             "Wall materials skipped — lists must be parallel.");
+            return;
+        }
+
+        // Build priority map: roomIndex → profile array index (lower = higher priority)
+        var roomPriority = new Dictionary<int, int>();
+        for (int i = 0; i < rooms.Count; i++)
+            for (int p = 0; p < materialProfiles.Length; p++)
+                if (materialProfiles[p] != null && materialProfiles[p].roomType == rooms[i].roomType)
+                { roomPriority[i] = p; break; }
+
+        int applied = 0;
+        for (int wi = 0; wi < walls.Count; wi++)
+        {
+            var wall = walls[wi];
+            var go   = wallGOs[wi];
+            if (go == null) continue;
+
+            // Pick whichever bordering room has the highest-priority profile
+            int bestRoom = -1, bestPriority = int.MaxValue;
 
             if (wall.roomA >= 0 && roomPriority.TryGetValue(wall.roomA, out int pA) && pA < bestPriority)
             { bestRoom = wall.roomA; bestPriority = pA; }
@@ -377,13 +398,14 @@ public class PropSpawner : MonoBehaviour
 
             if (bestRoom < 0) continue;
 
-            var matProfile = materialProfiles[roomPriority[bestRoom]];
-            if (matProfile.wallMaterial == null) continue;
+            var mat = materialProfiles[roomPriority[bestRoom]].wallMaterial;
+            if (mat == null) continue;
 
-            // Wall GO references are not stored — find by position
-            // (This is a limitation; for full wall material control store GO refs in generator)
-            // We log a note here — see generator patch notes below
+            var mr = go.GetComponentInChildren<MeshRenderer>();
+            if (mr != null) { mr.sharedMaterial = mat; applied++; }
         }
+
+        Debug.Log($"[PropSpawner] Wall materials applied to {applied}/{walls.Count} walls.");
     }
 
     // ── Wall geometry helpers ──────────────────────────────────────────────

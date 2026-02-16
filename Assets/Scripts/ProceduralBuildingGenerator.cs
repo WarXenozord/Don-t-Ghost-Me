@@ -1,3 +1,4 @@
+
 using UnityEngine;
 using System;
 using System.Collections.Generic;
@@ -129,6 +130,8 @@ public class ProceduralBuildingGenerator : MonoBehaviour
         = new List<(GameObject, GameObject)>();
     // Building parent Transforms by buildingIndex for PropSpawner
     private Dictionary<int, Transform> buildingParentMap = new Dictionary<int, Transform>();
+        // Parallel to walls[] — instantiated wall GOs for PropSpawner material application
+    private List<GameObject> wallGameObjects = new List<GameObject>();
 
     [Header("Player")]
     [Tooltip("For spawning")]
@@ -312,12 +315,35 @@ public class ProceduralBuildingGenerator : MonoBehaviour
 
     private RoomType ClassifyRoom(Vector3 sz)
     {
-        float mn = Mathf.Min(sz.x, sz.z), mx = Mathf.Max(sz.x, sz.z), ratio = mx / mn;
-        if (mn < 1.5f && ratio > 3f)         return RoomType.Hallway;
-        if (mn < 2.5f && mx < 4f)             return RoomType.Bathroom;
-        if (mn > 2f  && mx < 7f && ratio < 2f) return RoomType.Kitchen;
-        if (mn > 5f)                           return RoomType.LivingRoom;
-        if (mn > 3f  && mx < 8f)               return RoomType.Bedroom;
+        float area  = sz.x * sz.z;
+        float mn    = Mathf.Min(sz.x, sz.z);
+        float mx    = Mathf.Max(sz.x, sz.z);
+        float ratio = mx / mn;
+
+        // Hallway: very narrow and elongated
+        if (mn < 2f && ratio > 2.5f)
+            return RoomType.Hallway;
+
+        // Bathroom: small in both dimensions
+        if (area < 9f)
+            return RoomType.Bathroom;
+
+        // Kitchen: squarish, medium area
+        if (area < 20f && ratio < 1.8f)
+            return RoomType.Kitchen;
+
+        // Storage: elongated medium room
+        if (ratio > 2.5f && area < 30f)
+            return RoomType.Storage;
+
+        // Bedroom: medium area, reasonably square
+        if (area < 35f && ratio < 2f)
+            return RoomType.Bedroom;
+
+        // Living room: large open area
+        if (area >= 35f)
+            return RoomType.LivingRoom;
+
         return RoomType.General;
     }
 
@@ -797,11 +823,14 @@ public class ProceduralBuildingGenerator : MonoBehaviour
             // Store for PropSpawner
             roomGeometry.Add((floor, ceil));
         }
+            wallGameObjects.Clear();
 
         foreach (var wall in walls)
         {
             var w = Instantiate(wallPrefab, wall.position, Quaternion.identity, parent);
             w.transform.localScale = wall.size;
+                        wallGameObjects.Add(w);
+
         }
 
         foreach (var door in doors)
@@ -861,6 +890,8 @@ public class ProceduralBuildingGenerator : MonoBehaviour
     {
         rooms.Clear(); walls.Clear(); doors.Clear(); stairs.Clear(); buildings.Clear();
         roomGeometry.Clear(); buildingParentMap.Clear();
+                roomGeometry.Clear(); buildingParentMap.Clear(); wallGameObjects.Clear();
+
         sharedWallLookup = null;
 
         // Destroy previously generated geometry
@@ -1832,7 +1863,8 @@ public class ProceduralBuildingGenerator : MonoBehaviour
     private void BuildProps()
     {
         if (propSpawner == null) return;
-        propSpawner.Furnish(rooms, walls, buildingParentMap, roomGeometry, seed);
+                propSpawner.Furnish(rooms, walls, buildingParentMap, roomGeometry, seed, wallGameObjects);
+
         Debug.Log("[Props] Furnishing complete.");
     }
 }

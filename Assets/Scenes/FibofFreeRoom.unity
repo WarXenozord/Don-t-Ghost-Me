@@ -1137,8 +1137,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e8f2e89fb7a609248a3a27784a6d4ebe, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  seed: 1414
-  targetNumRooms: 10
+  seed: 12
+  targetNumRooms: 15
   numFloors: 1
   floorHeight: 3.5
   buildingsPerRow: 2

@@ -1,4 +1,4 @@
-Shader "Custom/Triplanar"
+Shader "Custom/TriplanarAlbedo"
 {
    Properties
     {
@@ -6,7 +6,8 @@ Shader "Custom/Triplanar"
         _NormalMap ("Normal Map", 2D) = "bump" {}
         _Tiling ("Tiling", Float) = 1
         _Sharpness ("Blend Sharpness", Float) = 4
-        _NormalStrength ("Normal Strength", Range(0,2)) = 1
+        _Metallic ("Metallic", Range(0,1)) = 0
+        _Glossiness ("Smoothness", Range(0,1)) = 0.5
     }
 
     SubShader
@@ -20,62 +21,59 @@ Shader "Custom/Triplanar"
 
         sampler2D _MainTex;
         sampler2D _NormalMap;
+
         float _Tiling;
         float _Sharpness;
-        float _NormalStrength;
+        half _Metallic;
+        half _Glossiness;
 
         struct Input
         {
             float3 worldPos;
             float3 worldNormal;
-            float3 viewDir;
+            INTERNAL_DATA
         };
 
         void surf (Input IN, inout SurfaceOutputStandard o)
         {
-            float3 worldNormal = normalize(IN.worldNormal);
+            float3 n = normalize(IN.worldNormal);
 
             // Blend weights
-            float3 blend = abs(worldNormal);
+            float3 blend = abs(n);
             blend = pow(blend, _Sharpness);
             blend /= (blend.x + blend.y + blend.z + 0.0001);
 
-            // UV projections
-            float2 xUV = IN.worldPos.yz * _Tiling;
-            float2 yUV = IN.worldPos.xz * _Tiling;
-            float2 zUV = IN.worldPos.xy * _Tiling;
+            // UVs
+            float2 uvX = IN.worldPos.yz * _Tiling;
+            float2 uvY = IN.worldPos.xz * _Tiling;
+            float2 uvZ = IN.worldPos.xy * _Tiling;
 
-            // Albedo
-            float3 xCol = tex2D(_MainTex, xUV).rgb;
-            float3 yCol = tex2D(_MainTex, yUV).rgb;
-            float3 zCol = tex2D(_MainTex, zUV).rgb;
+            // Albedo samples
+            float3 colX = tex2D(_MainTex, uvX).rgb;
+            float3 colY = tex2D(_MainTex, uvY).rgb;
+            float3 colZ = tex2D(_MainTex, uvZ).rgb;
 
-            o.Albedo = xCol * blend.x +
-                       yCol * blend.y +
-                       zCol * blend.z;
+            o.Albedo = colX * blend.x +
+                       colY * blend.y +
+                       colZ * blend.z;
 
-            // ---- NORMALS ----
-            // Sample tangent normals
-            float3 xN = UnpackNormal(tex2D(_NormalMap, xUV));
-            float3 yN = UnpackNormal(tex2D(_NormalMap, yUV));
-            float3 zN = UnpackNormal(tex2D(_NormalMap, zUV));
-
-            // Re-orient them into world space manually
-            float3 worldXN = float3( xN.z, xN.y, xN.x );
-            float3 worldYN = float3( yN.x, yN.z, yN.y );
-            float3 worldZN = float3( zN.x, zN.y, zN.z );
+            // NORMALS (simple & safe blend)
+            float3 nX = UnpackNormal(tex2D(_NormalMap, uvX));
+            float3 nY = UnpackNormal(tex2D(_NormalMap, uvY));
+            float3 nZ = UnpackNormal(tex2D(_NormalMap, uvZ));
 
             float3 blendedNormal =
-                worldXN * blend.x +
-                worldYN * blend.y +
-                worldZN * blend.z;
+                nX * blend.x +
+                nY * blend.y +
+                nZ * blend.z;
 
-            blendedNormal = normalize(blendedNormal);
+            o.Normal = normalize(blendedNormal);
 
-            // Convert back to tangent space for surface shader
-            o.Normal = normalize(blendedNormal) * _NormalStrength;
+            o.Metallic = _Metallic;
+            o.Smoothness = _Glossiness;
         }
         ENDCG
     }
+
     FallBack "Standard"
 }
