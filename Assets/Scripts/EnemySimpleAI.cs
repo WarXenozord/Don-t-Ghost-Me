@@ -46,6 +46,9 @@ public class EnemySimpleAI : SoundAgroListener
     [Header("Target Refresh")]
     [Min(0.05f)] public float mediumRefreshInterval = 0.5f;
 
+    [Header("Authority")]
+    public bool hostAuthoritativeMechanics = true;
+
     private CharacterController _controller;
     private ProceduralBuildingGenerator _generator;
     private readonly List<MediumController> _knownMediums = new List<MediumController>();
@@ -70,6 +73,7 @@ public class EnemySimpleAI : SoundAgroListener
     private bool _attackRerouteToDoorActive;
     private readonly List<Vector3> _attackRerouteNodes = new List<Vector3>();
     private int _attackRerouteIndex;
+    private bool _isAuthoritativeInstance = true;
 
     void Awake()
     {
@@ -115,6 +119,22 @@ public class EnemySimpleAI : SoundAgroListener
     {
         _investigateTarget = evt.worldPosition;
         if (state != EnemyState.Attack) state = EnemyState.Investigate;
+    }
+
+    public void SetAuthoritativeInstance(bool isAuthoritative)
+    {
+        _isAuthoritativeInstance = isAuthoritative;
+    }
+
+    public bool CanApplyGameplayEffects()
+    {
+        return !hostAuthoritativeMechanics || _isAuthoritativeInstance;
+    }
+
+    public void ApplyHostState(int rawState)
+    {
+        var clamped = Mathf.Clamp(rawState, (int)EnemyState.Patrol, (int)EnemyState.Attack);
+        state = (EnemyState)clamped;
     }
 
     private void TickPatrol()
