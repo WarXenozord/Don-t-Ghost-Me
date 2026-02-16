@@ -4,35 +4,44 @@ using UnityEngine;
 public class SnapshotInterpolation : MonoBehaviour
 {
     public MatchTransport transport;
-    public GameObject playerProxyPrefab;
+    public NakamaConnection conn;
+    public PlayerSpawnManager spawner;
 
     [Header("Smoothing")]
     public float lerpPos = 12f;
     public float lerpYaw = 12f;
+    public bool correctLocalWithSnapshots = false;
 
-    private readonly Dictionary<string, GameObject> _proxies = new();
-    private readonly Dictionary<string, Vector3> _targetPos = new();
-    private readonly Dictionary<string, float> _targetYaw = new();
+    private readonly Dictionary<string, Vector3> _targetPos = new Dictionary<string, Vector3>();
+    private readonly Dictionary<string, float> _targetYaw = new Dictionary<string, float>();
 
     void Awake()
     {
-        if (!transport) transport = GetComponent<MatchTransport>();
-        transport.OnSnapshot += OnSnapshot;
+        if (!transport) transport = FindObjectOfType<MatchTransport>();
+        if (!conn) conn = FindObjectOfType<NakamaConnection>();
+        if (!spawner) spawner = FindObjectOfType<PlayerSpawnManager>();
+
+        if (transport) transport.OnSnapshot += OnSnapshot;
+    }
+
+    void OnDestroy()
+    {
+        if (transport) transport.OnSnapshot -= OnSnapshot;
     }
 
     void Update()
     {
-        foreach (var kv in _proxies)
+        foreach (var kv in _targetPos)
         {
-            var id = kv.Key;
-            var go = kv.Value;
+            var userId = kv.Key;
+            if (!spawner || !spawner.TryGet(userId, out var go)) continue;
 
-            if (_targetPos.TryGetValue(id, out var tp))
-                go.transform.position = Vector3.Lerp(go.transform.position, tp, Time.deltaTime * lerpPos);
+            var targetPos = kv.Value;
+            go.transform.position = Vector3.Lerp(go.transform.position, targetPos, Time.deltaTime * lerpPos);
 
-            if (_targetYaw.TryGetValue(id, out var ty))
+            if (_targetYaw.TryGetValue(userId, out var targetYaw))
             {
-                var rot = Quaternion.Euler(0f, ty, 0f);
+                var rot = Quaternion.Euler(0f, targetYaw, 0f);
                 go.transform.rotation = Quaternion.Slerp(go.transform.rotation, rot, Time.deltaTime * lerpYaw);
             }
         }
@@ -40,19 +49,37 @@ public class SnapshotInterpolation : MonoBehaviour
 
     private void OnSnapshot(MatchTransport.SnapshotMsg snap)
     {
-        if (snap.players == null) return;
+        if (snap == null || snap.players == null) return;
+        if (!spawner) spawner = FindObjectOfType<PlayerSpawnManager>();
+        if (!conn) conn = FindObjectOfType<NakamaConnection>();
+        if (!spawner || conn == null) return;
 
-        foreach (var ps in snap.players)
+        var selfId = conn.SelfUserId;
+        for (var i = 0; i < snap.players.Length; i++)
         {
-            if (!_proxies.ContainsKey(ps.id))
+            var ps = snap.players[i];
+            if (ps == null || string.IsNullOrEmpty(ps.id)) continue;
+
+            var pos = new Vector3(ps.x, ps.y, ps.z);
+            var yaw = ps.yaw;
+
+            if (!string.IsNullOrEmpty(selfId) && ps.id == selfId)
             {
-                var go = Instantiate(playerProxyPrefab);
-                go.name = $"PlayerProxy_{ps.id.Substring(0, 6)}";
-                _proxies[ps.id] = go;
+                // Optional: local correction can fight collision and feel like teleports through walls.
+                if (correctLocalWithSnapshots)
+                {
+                    spawner.ApplyAuthoritativePose(ps.id, pos, yaw);
+                }
+                continue;
             }
 
-            _targetPos[ps.id] = new Vector3(ps.x, ps.y, ps.z);
-            _targetYaw[ps.id] = ps.yaw;
+            if (!spawner.TryGet(ps.id, out _))
+            {
+                spawner.SpawnRemote(ps.id, pos, yaw);
+            }
+
+            _targetPos[ps.id] = pos;
+            _targetYaw[ps.id] = yaw;
         }
     }
 }

@@ -6,6 +6,7 @@ public class GameBootstrap : MonoBehaviour
     public NakamaConnection conn;
     public HostAuthority hostAuthority;
     public ProceduralBuildingGenerator buildingGenerator;
+    public PlayerSpawnManager spawner;
 
     [Header("Prefabs")]
     public GameObject localPlayerPrefab;
@@ -16,6 +17,7 @@ public class GameBootstrap : MonoBehaviour
         if (!conn) conn = NakamaConnection.Instance != null ? NakamaConnection.Instance : FindObjectOfType<NakamaConnection>();
         if (!hostAuthority) hostAuthority = FindObjectOfType<HostAuthority>();
         if (!buildingGenerator) buildingGenerator = FindObjectOfType<ProceduralBuildingGenerator>();
+        if (!spawner) spawner = FindObjectOfType<PlayerSpawnManager>();
     }
 
     void Start()
@@ -35,6 +37,13 @@ public class GameBootstrap : MonoBehaviour
         var init = context.lastInit;
 
         if (buildingGenerator) buildingGenerator.GenerateBuildingFromSeed(init.seed);
+        if (!spawner) spawner = FindObjectOfType<PlayerSpawnManager>();
+
+        if (spawner != null)
+        {
+            if (!spawner.localPlayerPrefab && localPlayerPrefab) spawner.localPlayerPrefab = localPlayerPrefab;
+            if (!spawner.remoteProxyPrefab && proxyPlayerPrefab) spawner.remoteProxyPrefab = proxyPlayerPrefab;
+        }
 
         var selfId = conn != null ? conn.SelfUserId : string.Empty;
         if (string.IsNullOrEmpty(selfId))
@@ -75,6 +84,12 @@ public class GameBootstrap : MonoBehaviour
 
     private void SpawnLocalPlayer(string userId, Vector3 pos)
     {
+        if (spawner)
+        {
+            spawner.SpawnLocal(userId, pos, 0f);
+            return;
+        }
+
         if (localPlayerPrefab)
         {
             var go = Instantiate(localPlayerPrefab, pos, Quaternion.identity);
@@ -94,6 +109,12 @@ public class GameBootstrap : MonoBehaviour
         {
             if (spawn == null || string.IsNullOrEmpty(spawn.userId)) continue;
             if (spawn.userId == selfId) continue;
+
+            if (spawner)
+            {
+                spawner.SpawnRemote(spawn.userId, spawn.position, 0f);
+                continue;
+            }
 
             if (proxyPlayerPrefab)
             {
