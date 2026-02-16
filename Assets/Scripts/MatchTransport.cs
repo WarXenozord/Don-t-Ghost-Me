@@ -13,6 +13,7 @@ public class MatchTransport : MonoBehaviour
     public const long OPCODE_READY = 11;
     public const long OPCODE_START = 12;
     public const long OPCODE_ENEMY_SPAWN = 20;
+    public const long OPCODE_ENEMY_SNAPSHOT = 21;
 
     public NakamaConnection conn;
 
@@ -22,6 +23,7 @@ public class MatchTransport : MonoBehaviour
     public event Action<ReadyMsg> OnReady;
     public event Action<StartMsg> OnStart;
     public event Action<EnemySpawnMsg> OnEnemySpawn;
+    public event Action<EnemySnapshotMsg> OnEnemySnapshot;
     private bool _isBound;
     private NakamaConnection _boundConn;
 
@@ -125,6 +127,11 @@ public class MatchTransport : MonoBehaviour
             msg.senderUserId = state.UserPresence.UserId;
             OnEnemySpawn?.Invoke(msg);
         }
+        else if (state.OpCode == OPCODE_ENEMY_SNAPSHOT)
+        {
+            var msg = JsonUtility.FromJson<EnemySnapshotMsg>(json);
+            OnEnemySnapshot?.Invoke(msg);
+        }
     }
 
     public async void SendInput(InputMsg msg)
@@ -172,6 +179,13 @@ public class MatchTransport : MonoBehaviour
         if (conn?.Socket == null || conn.Match == null) return;
         var bytes = Encoding.UTF8.GetBytes(JsonUtility.ToJson(msg));
         await conn.Socket.SendMatchStateAsync(conn.Match.Id, OPCODE_ENEMY_SPAWN, bytes);
+    }
+
+    public async void BroadcastEnemySnapshot(EnemySnapshotMsg msg)
+    {
+        if (conn?.Socket == null || conn.Match == null) return;
+        var bytes = Encoding.UTF8.GetBytes(JsonUtility.ToJson(msg));
+        await conn.Socket.SendMatchStateAsync(conn.Match.Id, OPCODE_ENEMY_SNAPSHOT, bytes);
     }
 
     [Serializable]
@@ -233,6 +247,22 @@ public class MatchTransport : MonoBehaviour
         public float x, y, z;
         public float yaw;
         [NonSerialized] public string senderUserId;
+    }
+
+    [Serializable]
+    public class EnemySnapshotMsg
+    {
+        public int tick;
+        public EnemyNetState[] enemies;
+    }
+
+    [Serializable]
+    public class EnemyNetState
+    {
+        public string spawnId;
+        public float x, y, z;
+        public float yaw;
+        public int aiState;
     }
 
     [Serializable]
