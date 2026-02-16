@@ -12,6 +12,7 @@ public class EnemySpawnManager : MonoBehaviour
 
     [Header("Debug")]
     public bool enableDebugLogs = true;
+    public float debugMetricsInterval = 1f;
 
     [Header("Enemy Snapshot")]
     [Min(1f)] public float enemySnapshotSendHz = 15f;
@@ -28,6 +29,11 @@ public class EnemySpawnManager : MonoBehaviour
     private int _enemyTick;
     private float _enemySnapTimer;
     private float _nextEnemyDebugLogAt;
+    private int _recvSnapshotCount;
+    private int _recvEnemyStates;
+    private int _appliedEnemyStates;
+    private int _hardSnapCount;
+    private int _createdFromSnapshotCount;
 
     void Awake()
     {
@@ -57,6 +63,7 @@ public class EnemySpawnManager : MonoBehaviour
             transport.OnEnemySpawn -= OnEnemySpawnReceived;
             transport.OnEnemySnapshot -= OnEnemySnapshotReceived;
             transport.OnEnemyTeleport -= OnEnemyTeleportReceived;
+            transport.OnEnemyFx -= OnEnemyFxReceived;
             _bound = false;
         }
     }
@@ -119,11 +126,14 @@ public class EnemySpawnManager : MonoBehaviour
     {
         if (msg == null || msg.enemies == null) return;
         if (conn != null && conn.IsCurrentPlayerMatchCreator) return;
+        _recvSnapshotCount++;
+        _recvEnemyStates += msg.enemies.Length;
 
         for (var i = 0; i < msg.enemies.Length; i++)
         {
             var e = msg.enemies[i];
             if (e == null || string.IsNullOrEmpty(e.spawnId)) continue;
+            EnsureEnemyExistsFromNetState(e.spawnId, e.x, e.y, e.z, e.yaw);
             _targetPosBySpawnId[e.spawnId] = new Vector3(e.x, e.y, e.z);
             _targetYawBySpawnId[e.spawnId] = e.yaw;
             _targetStateBySpawnId[e.spawnId] = e.aiState;
@@ -137,6 +147,7 @@ public class EnemySpawnManager : MonoBehaviour
                 {
                     go.transform.position = targetPos;
                     go.transform.rotation = Quaternion.Euler(0f, e.yaw, 0f);
+                    _hardSnapCount++;
 
                     var aiImmediate = go.GetComponent<EnemySimpleAI>();
                     if (aiImmediate != null)
@@ -146,18 +157,19 @@ public class EnemySpawnManager : MonoBehaviour
                     }
                 }
             }
+            _appliedEnemyStates++;
         }
 
         if (enableDebugLogs && Time.unscaledTime >= _nextEnemyDebugLogAt)
         {
-            _nextEnemyDebugLogAt = Time.unscaledTime + 1f;
-            Debug.Log("[EnemySpawn] RECV_SNAPSHOT count=" + msg.enemies.Length);
+            FlushEnemyMetricsLog();
         }
     }
 
     private void OnEnemyTeleportReceived(MatchTransport.EnemyTeleportMsg msg)
     {
         if (msg == null || string.IsNullOrEmpty(msg.spawnId)) return;
+        EnsureEnemyExistsFromNetState(msg.spawnId, msg.x, msg.y, msg.z, msg.yaw);
         if (!TryGet(msg.spawnId, out var go) || go == null) return;
 
         var pos = new Vector3(msg.x, msg.y, msg.z);
@@ -166,6 +178,22 @@ public class EnemySpawnManager : MonoBehaviour
 
         _targetPosBySpawnId[msg.spawnId] = pos;
         _targetYawBySpawnId[msg.spawnId] = msg.yaw;
+    }
+
+    private void OnEnemyFxReceived(MatchTransport.EnemyFxMsg msg)
+    {
+        if (msg == null || string.IsNullOrEmpty(msg.spawnId)) return;
+        if (!TryGet(msg.spawnId, out var go) || go == null) return;
+
+        var ai = go.GetComponent<EnemySimpleAI>();
+        if (ai == null) return;
+
+        ai.PlaySyncedTouchFx(msg.fxId);
+
+        if (enableDebugLogs)
+        {
+            Debug.Log("[EnemySpawn] RECV_FX id=" + msg.spawnId + " fx=" + msg.fxId);
+        }
     }
 
     private void ApplySpawn(MatchTransport.EnemySpawnMsg msg)
@@ -226,6 +254,7 @@ public class EnemySpawnManager : MonoBehaviour
         transport.OnEnemySpawn += OnEnemySpawnReceived;
         transport.OnEnemySnapshot += OnEnemySnapshotReceived;
         transport.OnEnemyTeleport += OnEnemyTeleportReceived;
+        transport.OnEnemyFx += OnEnemyFxReceived;
         _bound = true;
     }
 
@@ -254,6 +283,24 @@ public class EnemySpawnManager : MonoBehaviour
         {
             transport.BroadcastEnemySnapshot(snap);
         }
+        return true;
+    }
+
+    public bool HostBroadcastEnemyFx(string spawnId, int fxId)
+    {
+        ResolveRefs();
+        if (conn == null || transport == null || conn.Match == null) return false;
+        if (!conn.IsCurrentPlayerMatchCreator) return false;
+        if (string.IsNullOrEmpty(spawnId)) return false;
+
+        var msg = new MatchTransport.EnemyFxMsg
+        {
+            spawnId = spawnId,
+            fxId = fxId
+        };
+
+        OnEnemyFxReceived(msg);
+        transport.BroadcastEnemyFx(msg);
         return true;
     }
 
@@ -315,11 +362,11 @@ public class EnemySpawnManager : MonoBehaviour
                     ai.ApplyHostState(aiState);
                 }
             }
+            _appliedEnemyStates++;
 
             if (enableDebugLogs && Time.unscaledTime >= _nextEnemyDebugLogAt)
             {
-                _nextEnemyDebugLogAt = Time.unscaledTime + 1f;
-                Debug.Log("[EnemySpawn] APPLY_SNAPSHOT id=" + spawnId + " dist=" + dist.ToString("F2"));
+                FlushEnemyMetricsLog();
             }
         }
     }
@@ -361,5 +408,43 @@ public class EnemySpawnManager : MonoBehaviour
     {
         if (string.IsNullOrEmpty(id)) return "------";
         return id.Length <= 6 ? id : id.Substring(0, 6);
+    }
+
+    private void EnsureEnemyExistsFromNetState(string spawnId, float x, float y, float z, float yaw)
+    {
+        if (string.IsNullOrEmpty(spawnId)) return;
+        if (TryGet(spawnId, out _)) return;
+        if (!enemyPrefab) return;
+
+        var go = Instantiate(enemyPrefab, new Vector3(x, y, z), Quaternion.Euler(0f, yaw, 0f));
+        go.name = "Enemy_" + ShortId(spawnId);
+        _enemiesBySpawnId[spawnId] = go;
+
+        var id = go.GetComponent<EnemyNetIdentity>();
+        if (id == null) id = go.AddComponent<EnemyNetIdentity>();
+        id.spawnId = spawnId;
+
+        var ai = go.GetComponent<EnemySimpleAI>();
+        if (ai != null) ai.SetAuthoritativeInstance(false);
+
+        _createdFromSnapshotCount++;
+    }
+
+    private void FlushEnemyMetricsLog()
+    {
+        _nextEnemyDebugLogAt = Time.unscaledTime + Mathf.Max(0.1f, debugMetricsInterval);
+        Debug.Log(
+            "[EnemySpawn] METRICS recvSnaps=" + _recvSnapshotCount +
+            " recvStates=" + _recvEnemyStates +
+            " applied=" + _appliedEnemyStates +
+            " hardSnaps=" + _hardSnapCount +
+            " createdFromSnapshot=" + _createdFromSnapshotCount +
+            " trackedEnemies=" + _enemiesBySpawnId.Count
+        );
+        _recvSnapshotCount = 0;
+        _recvEnemyStates = 0;
+        _appliedEnemyStates = 0;
+        _hardSnapCount = 0;
+        _createdFromSnapshotCount = 0;
     }
 }

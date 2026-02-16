@@ -15,6 +15,7 @@ public class MatchTransport : MonoBehaviour
     public const long OPCODE_ENEMY_SPAWN = 20;
     public const long OPCODE_ENEMY_SNAPSHOT = 21;
     public const long OPCODE_ENEMY_TELEPORT = 22;
+    public const long OPCODE_ENEMY_FX = 23;
 
     public NakamaConnection conn;
 
@@ -26,6 +27,7 @@ public class MatchTransport : MonoBehaviour
     public event Action<EnemySpawnMsg> OnEnemySpawn;
     public event Action<EnemySnapshotMsg> OnEnemySnapshot;
     public event Action<EnemyTeleportMsg> OnEnemyTeleport;
+    public event Action<EnemyFxMsg> OnEnemyFx;
     private bool _isBound;
     private NakamaConnection _boundConn;
 
@@ -147,6 +149,16 @@ public class MatchTransport : MonoBehaviour
             msg.senderUserId = state.UserPresence.UserId;
             OnEnemyTeleport?.Invoke(msg);
         }
+        else if (state.OpCode == OPCODE_ENEMY_FX)
+        {
+            var msg = JsonUtility.FromJson<EnemyFxMsg>(json);
+            msg.senderUserId = state.UserPresence.UserId;
+            OnEnemyFx?.Invoke(msg);
+            if (enableDebugLogs)
+            {
+                Debug.Log("[MatchTransport] RECV_ENEMY_FX id=" + msg.spawnId + " fx=" + msg.fxId);
+            }
+        }
     }
 
     public async void SendInput(InputMsg msg)
@@ -213,6 +225,17 @@ public class MatchTransport : MonoBehaviour
         if (conn?.Socket == null || conn.Match == null) return;
         var bytes = Encoding.UTF8.GetBytes(JsonUtility.ToJson(msg));
         await conn.Socket.SendMatchStateAsync(conn.Match.Id, OPCODE_ENEMY_TELEPORT, bytes);
+    }
+
+    public async void BroadcastEnemyFx(EnemyFxMsg msg)
+    {
+        if (conn?.Socket == null || conn.Match == null) return;
+        var bytes = Encoding.UTF8.GetBytes(JsonUtility.ToJson(msg));
+        await conn.Socket.SendMatchStateAsync(conn.Match.Id, OPCODE_ENEMY_FX, bytes);
+        if (enableDebugLogs)
+        {
+            Debug.Log("[MatchTransport] SEND_ENEMY_FX id=" + msg.spawnId + " fx=" + msg.fxId);
+        }
     }
 
     [Serializable]
@@ -299,6 +322,14 @@ public class MatchTransport : MonoBehaviour
         public float x, y, z;
         public float yaw;
         public int reason;
+        [NonSerialized] public string senderUserId;
+    }
+
+    [Serializable]
+    public class EnemyFxMsg
+    {
+        public string spawnId;
+        public int fxId;
         [NonSerialized] public string senderUserId;
     }
 
