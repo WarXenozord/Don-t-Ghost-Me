@@ -395,7 +395,7 @@ MonoBehaviour:
   hostRemoteVisualLerp: 16
   hostRemoteMaxExtrapolation: 0.12
   startEnemyCount: 1
-  enemyMinDistanceFromPlayers: 30
+  enemyMinDistanceFromPlayers: 20
   enableDebugLogs: 1
   debugLogInterval: 1
 --- !u!114 &302446470
