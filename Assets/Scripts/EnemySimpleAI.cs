@@ -620,24 +620,37 @@ public class EnemySimpleAI : SoundAgroListener
         AudioClip clip = null;
         if (fxId == 1) clip = firstTouchClip;
         else if (fxId == 2) clip = secondTouchClip;
-        if (clip == null || contactAudioSource == null) return;
-        contactAudioSource.PlayOneShot(clip);
+        if (clip == null) return;
+
+        // Prefer configured source, but keep a robust fallback so FX is never silent.
+        if (contactAudioSource == null)
+        {
+            contactAudioSource = GetComponent<AudioSource>();
+        }
+
+        if (contactAudioSource != null)
+        {
+            AudioSource.PlayClipAtPoint(clip, transform.position, 1f);
+            return;
+        }
+
+        AudioSource.PlayClipAtPoint(clip, transform.position, 1f);
     }
 
     private void TriggerSyncedTouchFx(int fxId)
     {
+        // Always play immediately on the authority that triggered the contact.
+        PlaySyncedTouchFx(fxId);
+
         if (_netIdentity == null) _netIdentity = GetComponent<EnemyNetIdentity>();
         if (_netIdentity == null || string.IsNullOrEmpty(_netIdentity.spawnId))
         {
-            PlaySyncedTouchFx(fxId);
             return;
         }
 
         var mgr = EnemySpawnManager.Instance != null ? EnemySpawnManager.Instance : FindObjectOfType<EnemySpawnManager>();
-        if (mgr == null || !mgr.HostBroadcastEnemyFx(_netIdentity.spawnId, fxId))
-        {
-            PlaySyncedTouchFx(fxId);
-        }
+        if (mgr == null) return;
+        mgr.HostBroadcastEnemyFx(_netIdentity.spawnId, fxId);
     }
 
     private void TeleportAfterFirstTouch(Vector3 mediumPos)

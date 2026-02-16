@@ -183,6 +183,7 @@ public class EnemySpawnManager : MonoBehaviour
     private void OnEnemyFxReceived(MatchTransport.EnemyFxMsg msg)
     {
         if (msg == null || string.IsNullOrEmpty(msg.spawnId)) return;
+        if (conn != null && !string.IsNullOrEmpty(msg.senderUserId) && msg.senderUserId == conn.SelfUserId) return;
         if (!TryGet(msg.spawnId, out var go) || go == null) return;
 
         var ai = go.GetComponent<EnemySimpleAI>();
@@ -299,7 +300,6 @@ public class EnemySpawnManager : MonoBehaviour
             fxId = fxId
         };
 
-        OnEnemyFxReceived(msg);
         transport.BroadcastEnemyFx(msg);
         return true;
     }
