@@ -45,6 +45,13 @@ public class MinimapController : MonoBehaviour
     private Rect mapBoundsXZ;
     private bool boundsReady = false;
 
+    /// <summary>World-space XZ bounds of the entire map. Valid after SetMapBounds() is called.</summary>
+    public Rect  MapBoundsXZ  => mapBoundsXZ;
+    public bool  BoundsReady  => boundsReady;
+
+    /// <summary>The RenderTexture shared by the minimap camera. Assign to any RawImage to reuse it.</summary>
+    public RenderTexture MinimapRT => renderTexture;
+
     // ?? Room data ??????????????????????????????????????????????????????????
     private List<BuildingRoom> _rooms;
     private int _lastRoomIndex  = -1;
@@ -206,14 +213,20 @@ public class MinimapController : MonoBehaviour
         renderTexture = new RenderTexture(rtW, rtH, 16)
         {
             name         = "MinimapRT",
-            filterMode   = FilterMode.Bilinear,
+            // Point filtering keeps lines sharp — Bilinear blurs thin wall quads
+            filterMode   = FilterMode.Point,
             antiAliasing = 1
         };
         renderTexture.Create();
         minimapCamera.targetTexture = renderTexture;
 
         if (minimapRawImage != null)
+        {
             minimapRawImage.texture = renderTexture;
+            // Match filtering on the RawImage itself so the GPU doesn't re-blur on display
+            minimapRawImage.material = null; // use default UI material
+            minimapRawImage.texture.filterMode = FilterMode.Point;
+        }
         else
             Debug.LogError("[MinimapController] minimapRawImage not assigned.");
 
