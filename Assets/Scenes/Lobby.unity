@@ -335,6 +335,7 @@ GameObject:
   - component: {fileID: 302446469}
   - component: {fileID: 302446468}
   - component: {fileID: 302446470}
+  - component: {fileID: 302446471}
   m_Layer: 0
   m_Name: NetBootStrap
   m_TagString: Untagged
@@ -390,7 +391,6 @@ MonoBehaviour:
   isHost: 0
   inputSendHz: 30
   snapshotSendHz: 15
-  moveSpeed: 2
   enableDebugLogs: 1
   debugLogInterval: 1
 --- !u!114 &302446470
@@ -410,6 +410,31 @@ MonoBehaviour:
   port: 443
   serverKey: 6a990ac72bd7bf85414160d6cd207e1b45f56535ddf71566af85e6b217aa850b
   createMatchIfNone: 1
+--- !u!114 &302446471
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 302446464}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f02a588728393784cb1585cd20522f25, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  transport: {fileID: 302446468}
+  conn: {fileID: 0}
+  spawner: {fileID: 0}
+  lerpPos: 40
+  lerpYaw: 40
+  smoothTimePos: 0.3
+  snapDistance: 6
+  maxExtrapolationTime: 0.12
+  maxEstimatedSpeed: 12
+  correctLocalWithSnapshots: 0
+  enableDebugLogs: 0
+  debugLogInterval: 1
+  verboseMotionDebug: 1
 --- !u!1 &351290260
 GameObject:
   m_ObjectHideFlags: 0
