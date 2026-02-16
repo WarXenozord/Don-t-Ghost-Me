@@ -83,10 +83,26 @@ public class PropSpawner : MonoBehaviour
             // ── Materials ─────────────────────────────────────────────────
             if (_matLookup.TryGetValue(room.roomType, out var matProfile))
             {
-                if (matProfile.floorMaterial   != null && floorGO   != null)
-                    floorGO.GetComponent<MeshRenderer>()?.SetMaterial(matProfile.floorMaterial);
+                if (matProfile.floorMaterial != null && floorGO != null)
+                {
+                    // GetComponentInChildren so it works whether the MeshRenderer
+                    // is on the root or a child of the prefab
+                    var mr = floorGO.GetComponentInChildren<MeshRenderer>();
+                    if (mr != null) mr.sharedMaterial = matProfile.floorMaterial;
+                    else Debug.LogWarning($"[PropSpawner] Floor GO '{floorGO.name}' has no MeshRenderer.");
+                }
                 if (matProfile.ceilingMaterial != null && ceilingGO != null)
-                    ceilingGO.GetComponent<MeshRenderer>()?.SetMaterial(matProfile.ceilingMaterial);
+                {
+                    var mr = ceilingGO.GetComponentInChildren<MeshRenderer>();
+                    if (mr != null) mr.sharedMaterial = matProfile.ceilingMaterial;
+                    else Debug.LogWarning($"[PropSpawner] Ceiling GO '{ceilingGO.name}' has no MeshRenderer.");
+                }
+            }
+            else
+            {
+                // Only log once per missing type to avoid spam
+                if (i == 0 || rooms[i-1].roomType != room.roomType)
+                    Debug.Log($"[PropSpawner] No material profile for RoomType.{room.roomType} — using default material.");
             }
 
             // ── Props ─────────────────────────────────────────────────────
