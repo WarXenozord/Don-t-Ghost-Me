@@ -1050,7 +1050,7 @@ MonoBehaviour:
   stairWidth: 1.5
   stairDepth: 3
   stairPrefab: {fileID: 0}
-  wallPrefab: {fileID: 4316525582638928304, guid: 70605147838c20e458f51e5b096442d4, type: 3}
+  wallPrefab: {fileID: 0}
   doorPrefab: {fileID: 7209226886201637402, guid: 50cd8b5378ce2984d8b546de4c164981, type: 3}
   doorwayPrefab: {fileID: 2889030233283407942, guid: b1d743e9b3d0427438c562aa37b0d7d0, type: 3}
   floorPrefab: {fileID: 2936626781115102207, guid: f4a79324f08aba047a7ecfce965a6823, type: 3}
