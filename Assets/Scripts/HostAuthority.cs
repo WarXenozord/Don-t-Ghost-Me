@@ -14,7 +14,10 @@ public class HostAuthority : MonoBehaviour
     [Header("Tick Rates")]
     public float inputSendHz = 20f;
     public float snapshotSendHz = 10f;
-    public float moveSpeed = 3f;
+
+    [Header("Debug")]
+    public bool enableDebugLogs = true;
+    public float debugLogInterval = 1f;
 
     private float _inputTimer;
     private float _snapTimer;
@@ -40,32 +43,36 @@ public class HostAuthority : MonoBehaviour
     private readonly Dictionary<string, Vector3> _pos = new Dictionary<string, Vector3>();
     private readonly Dictionary<string, float> _yaw = new Dictionary<string, float>();
     private readonly Dictionary<string, MatchTransport.InputMsg> _lastInput = new Dictionary<string, MatchTransport.InputMsg>();
+    private bool _transportBound;
+    private bool _presenceBound;
+    private readonly Dictionary<string, float> _nextInputLogAt = new Dictionary<string, float>();
+    private float _nextSnapshotLogAt;
+    private float _nextSnapshotPayloadLogAt;
 
     void Awake()
     {
-        if (!conn) conn = GetComponent<NakamaConnection>();
-        if (!transport) transport = GetComponent<MatchTransport>();
-        if (!spawner) spawner = FindObjectOfType<PlayerSpawnManager>();
-
-        transport.OnInput += HandleInputFromClient;
-        transport.OnInit += OnInitReceived;
-        transport.OnReady += OnReadyReceived;
-        transport.OnStart += OnStartReceived;
-
-        if (conn) conn.MatchPresenceReceived += OnPresenceChanged;
+        ResolveRefs();
+        if (!spawner) spawner = PlayerSpawnManager.Instance != null ? PlayerSpawnManager.Instance : FindObjectOfType<PlayerSpawnManager>();
+        EnsureBindings();
     }
 
     void OnDestroy()
     {
-        if (transport)
+        if (transport && _transportBound)
         {
             transport.OnInput -= HandleInputFromClient;
+            transport.OnSnapshot -= OnSnapshotReceived;
             transport.OnInit -= OnInitReceived;
             transport.OnReady -= OnReadyReceived;
             transport.OnStart -= OnStartReceived;
+            _transportBound = false;
         }
 
-        if (conn) conn.MatchPresenceReceived -= OnPresenceChanged;
+        if (conn && _presenceBound)
+        {
+            conn.MatchPresenceReceived -= OnPresenceChanged;
+            _presenceBound = false;
+        }
     }
 
     void Start()
@@ -77,8 +84,17 @@ public class HostAuthority : MonoBehaviour
 
     void Update()
     {
+        ResolveRefs();
+        EnsureBindings();
         TryApplyInitFromContext();
         TrySpawnPass();
+
+        // Fallback for scene/focus timing: if START was already recorded in context,
+        // make sure this authority instance enters gameplay even if it missed the event callback.
+        if (!_gameplayStarted && conn != null && conn.Match != null && MatchContext.Instance.started)
+        {
+            _gameplayStarted = true;
+        }
 
         if (conn?.Match == null || conn.Socket == null)
         {
@@ -144,6 +160,8 @@ public class HostAuthority : MonoBehaviour
 
         transport.BroadcastInit(initMsg);
         TrySendStartIfEveryoneReady();
+
+        LogDebug($"BEGIN_INIT | host={isHost} initId={_activeInitId} match={conn.Match.Id} players={GetPresentUserIds().Count}");
     }
 
     public void EnableGameplayAfterBootstrap()
@@ -191,10 +209,12 @@ public class HostAuthority : MonoBehaviour
         if (_processedInitId == msg.initId && _processedInitMatchId == conn?.Match?.Id) return;
 
         ApplyInitOnce(msg);
+        LogDebug($"RECV_INIT | initId={msg.initId} spawns={(msg.spawns == null ? 0 : msg.spawns.Length)} self={conn?.SelfUserId}");
 
         if (conn != null && !conn.IsCurrentPlayerMatchCreator)
         {
             transport.SendReady(new MatchTransport.ReadyMsg { initId = msg.initId });
+            LogDebug($"SEND_READY | initId={msg.initId} self={conn.SelfUserId}");
         }
     }
 
@@ -240,6 +260,7 @@ public class HostAuthority : MonoBehaviour
         if (string.IsNullOrEmpty(msg.senderUserId)) return;
 
         _readyUserIds.Add(msg.senderUserId);
+        LogDebug($"RECV_READY | from={msg.senderUserId} initId={msg.initId} ready={_readyUserIds.Count}");
         TrySendStartIfEveryoneReady();
     }
 
@@ -248,6 +269,7 @@ public class HostAuthority : MonoBehaviour
         if (msg == null || msg.initId != _activeInitId) return;
         MatchContext.Instance.started = true;
         _gameplayStarted = true;
+        LogDebug($"RECV_START | initId={msg.initId} gameplayStarted={_gameplayStarted}");
     }
 
     private void ResetMatchRuntimeState()
@@ -267,10 +289,30 @@ public class HostAuthority : MonoBehaviour
         _yaw.Clear();
         _lastInput.Clear();
         _tick = 0;
+
+        if (!spawner) spawner = PlayerSpawnManager.Instance != null ? PlayerSpawnManager.Instance : FindObjectOfType<PlayerSpawnManager>();
+        if (spawner) spawner.ClearAll();
     }
 
     private void OnPresenceChanged(IMatchPresenceEvent e)
     {
+        if (e != null && e.Joins != null)
+        {
+            foreach (var join in e.Joins)
+            {
+                if (join == null || string.IsNullOrEmpty(join.UserId)) continue;
+                if (_spawnByUserId.ContainsKey(join.UserId)) continue;
+
+                var spawn = ResolveSpawnForUser(join.UserId);
+                _spawnByUserId[join.UserId] = spawn;
+
+                if (join.UserId != conn?.SelfUserId && spawner != null && !spawner.TryGet(join.UserId, out _))
+                {
+                    spawner.SpawnRemote(join.UserId, spawn, 0f);
+                }
+            }
+        }
+
         isHost = conn != null && conn.IsCurrentPlayerMatchCreator;
         if (!isHost || !_initSent || _startSent) return;
         TrySendStartIfEveryoneReady();
@@ -293,6 +335,7 @@ public class HostAuthority : MonoBehaviour
         MatchContext.Instance.started = true;
         _gameplayStarted = true;
         transport.BroadcastStart(new MatchTransport.StartMsg { initId = _activeInitId });
+        LogDebug($"SEND_START | initId={_activeInitId} ready={_readyUserIds.Count} present={presentUserIds.Count}");
     }
 
     private List<string> GetPresentUserIds()
@@ -326,9 +369,9 @@ public class HostAuthority : MonoBehaviour
         var h = Input.GetAxisRaw("Horizontal");
         var v = Input.GetAxisRaw("Vertical");
 
-        float yaw = 0f;
-        if (Input.GetMouseButton(1))
-            yaw = transform.eulerAngles.y + Input.GetAxis("Mouse X") * 3f;
+        var yaw = GetLocalYaw();
+        var vel = GetLocalNetworkVelocity();
+        var pos = GetLocalNetworkPosition();
 
         return new MatchTransport.InputMsg
         {
@@ -336,28 +379,53 @@ public class HostAuthority : MonoBehaviour
             moveX = h,
             moveZ = v,
             yaw = yaw,
+            posX = pos.x,
+            posY = pos.y,
+            posZ = pos.z,
+            velX = vel.x,
+            velY = vel.y,
+            velZ = vel.z,
             buttons = 0
         };
     }
 
     private void HandleInputFromClient(MatchTransport.InputMsg msg)
     {
-        if (!isHost || !_gameplayStarted) return;
+        if (!isHost || !_gameplayStarted)
+        {
+            if (msg != null && !string.IsNullOrEmpty(msg.senderUserId))
+            {
+                LogInputDebug(msg.senderUserId, $"DROP_INPUT | isHost={isHost} gameplayStarted={_gameplayStarted}");
+            }
+            return;
+        }
+        if (msg == null || string.IsNullOrEmpty(msg.senderUserId)) return;
 
         if (!_pos.ContainsKey(msg.senderUserId))
         {
-            if (!_spawnByUserId.TryGetValue(msg.senderUserId, out var spawn))
-            {
-                spawn = Vector3.zero;
-            }
-            if (!spawner) spawner = FindObjectOfType<PlayerSpawnManager>();
-            if (spawner) spawn = spawner.ClampInsideMapBounds(spawn);
+            var spawn = ResolveSpawnForUser(msg.senderUserId);
+            _spawnByUserId[msg.senderUserId] = spawn;
             _pos[msg.senderUserId] = spawn;
             _yaw[msg.senderUserId] = 0f;
+
+            if (spawner != null && msg.senderUserId != conn?.SelfUserId && !spawner.TryGet(msg.senderUserId, out _))
+            {
+                spawner.SpawnRemote(msg.senderUserId, spawn, 0f);
+            }
+
+            LogInputDebug(msg.senderUserId, $"FIRST_INPUT | spawn=({spawn.x:F2},{spawn.y:F2},{spawn.z:F2})");
         }
 
         _lastInput[msg.senderUserId] = msg;
-        if (msg.yaw != 0f) _yaw[msg.senderUserId] = msg.yaw;
+        _pos[msg.senderUserId] = new Vector3(msg.posX, msg.posY, msg.posZ);
+        _yaw[msg.senderUserId] = msg.yaw;
+        if (_pos.TryGetValue(msg.senderUserId, out var p))
+        {
+            LogInputDebug(
+                msg.senderUserId,
+                $"RECV_INPUT | move=({msg.moveX:F2},{msg.moveZ:F2}) pos=({msg.posX:F2},{msg.posY:F2},{msg.posZ:F2}) vel=({msg.velX:F2},{msg.velY:F2},{msg.velZ:F2}) yaw={msg.yaw:F1} authPos=({p.x:F2},{p.y:F2},{p.z:F2})"
+            );
+        }
     }
 
     private void SimulateHost(float dt)
@@ -365,12 +433,7 @@ public class HostAuthority : MonoBehaviour
         var selfId = conn.SelfUserId;
         if (!string.IsNullOrEmpty(selfId) && !_pos.ContainsKey(selfId))
         {
-            if (!_spawnByUserId.TryGetValue(selfId, out var selfSpawn))
-            {
-                selfSpawn = new Vector3(0f, 0.5f, 0f);
-            }
-            if (!spawner) spawner = FindObjectOfType<PlayerSpawnManager>();
-            if (spawner) selfSpawn = spawner.ClampInsideMapBounds(selfSpawn);
+            var selfSpawn = ResolveSpawnForUser(selfId);
             _pos[selfId] = selfSpawn;
             _yaw[selfId] = 0f;
         }
@@ -379,17 +442,27 @@ public class HostAuthority : MonoBehaviour
 
         var selfInput = BuildLocalInput();
         _lastInput[selfId] = selfInput;
-        if (selfInput.yaw != 0f) _yaw[selfId] = selfInput.yaw;
+        _yaw[selfId] = selfInput.yaw;
+        _pos[selfId] = new Vector3(selfInput.posX, selfInput.posY, selfInput.posZ);
 
-        foreach (var kv in _lastInput)
+        // Host-side visual update for remotes, so host doesn't depend on receiving its own snapshots.
+        if (!spawner) spawner = PlayerSpawnManager.Instance != null ? PlayerSpawnManager.Instance : FindObjectOfType<PlayerSpawnManager>();
+        if (spawner != null)
         {
-            var id = kv.Key;
-            var inp = kv.Value;
+            foreach (var kv in _pos)
+            {
+                var id = kv.Key;
+                if (id == selfId) continue;
+                var p = kv.Value;
+                var y = _yaw.TryGetValue(id, out var yy) ? yy : 0f;
+                spawner.ApplyAuthoritativePose(id, p, y);
+            }
+        }
 
-            var dir = new Vector3(inp.moveX, 0f, inp.moveZ);
-            if (dir.sqrMagnitude > 1f) dir.Normalize();
-
-            _pos[id] += dir * moveSpeed * dt;
+        if (enableDebugLogs && Time.unscaledTime >= _nextSnapshotLogAt)
+        {
+            _nextSnapshotLogAt = Time.unscaledTime + Mathf.Max(0.1f, debugLogInterval);
+            LogDebug($"HOST_SIM | trackedPlayers={_pos.Count} inputs={_lastInput.Count} tick={_tick}");
         }
 
         _tick++;
@@ -414,6 +487,28 @@ public class HostAuthority : MonoBehaviour
             };
         }
 
+        if (enableDebugLogs && Time.unscaledTime >= _nextSnapshotPayloadLogAt)
+        {
+            _nextSnapshotPayloadLogAt = Time.unscaledTime + Mathf.Max(0.1f, debugLogInterval);
+            MatchTransport.PlayerState sample = null;
+            for (var s = 0; s < players.Length; s++)
+            {
+                if (players[s] == null) continue;
+                if (players[s].id == conn?.SelfUserId) continue;
+                sample = players[s];
+                break;
+            }
+
+            if (sample != null)
+            {
+                LogDebug($"SNAPSHOT_PAYLOAD | count={players.Length} sampleUser={sample.id} samplePos=({sample.x:F2},{sample.y:F2},{sample.z:F2}) sampleYaw={sample.yaw:F1}");
+            }
+            else
+            {
+                LogDebug($"SNAPSHOT_PAYLOAD | count={players.Length} sampleUser=selfOnly");
+            }
+        }
+
         return new MatchTransport.SnapshotMsg { tick = _tick, players = players };
     }
 
@@ -426,7 +521,7 @@ public class HostAuthority : MonoBehaviour
 
     private void SpawnLocalPlayerAtAssignedSpawn(Vector3 spawnPos)
     {
-        if (!spawner) spawner = FindObjectOfType<PlayerSpawnManager>();
+        if (!spawner) spawner = PlayerSpawnManager.Instance != null ? PlayerSpawnManager.Instance : FindObjectOfType<PlayerSpawnManager>();
         if (spawner == null || string.IsNullOrEmpty(conn?.SelfUserId)) return;
 
         var safeSpawn = spawner.ClampInsideMapBounds(spawnPos);
@@ -440,7 +535,7 @@ public class HostAuthority : MonoBehaviour
     private void SpawnProxiesForOthersAtAssignedSpawns(MatchTransport.SpawnPoint[] spawns)
     {
         if (spawns == null) return;
-        if (!spawner) spawner = FindObjectOfType<PlayerSpawnManager>();
+        if (!spawner) spawner = PlayerSpawnManager.Instance != null ? PlayerSpawnManager.Instance : FindObjectOfType<PlayerSpawnManager>();
 
         var selfId = conn != null ? conn.SelfUserId : string.Empty;
         for (var i = 0; i < spawns.Length; i++)
@@ -489,7 +584,7 @@ public class HostAuthority : MonoBehaviour
         if (_spawnPassComplete) return;
         if (!conn || string.IsNullOrEmpty(conn.SelfUserId)) return;
 
-        if (!spawner) spawner = FindObjectOfType<PlayerSpawnManager>();
+        if (!spawner) spawner = PlayerSpawnManager.Instance != null ? PlayerSpawnManager.Instance : FindObjectOfType<PlayerSpawnManager>();
         if (!spawner) return;
         if (!FindObjectOfType<ProceduralBuildingGenerator>()) return;
 
@@ -515,5 +610,137 @@ public class HostAuthority : MonoBehaviour
             }
         }
         _spawnPassComplete = true;
+    }
+
+    private Vector3 ResolveSpawnForUser(string userId)
+    {
+        if (!string.IsNullOrEmpty(userId) && _spawnByUserId.TryGetValue(userId, out var known))
+        {
+            return known;
+        }
+
+        var baseSpawn = new Vector3(0f, 0.5f, 0f);
+        var hash = string.IsNullOrEmpty(userId) ? 0 : Mathf.Abs(userId.GetHashCode());
+        var ring = (hash % 5) + 1;
+        var angle = (hash % 360) * Mathf.Deg2Rad;
+        var candidate = new Vector3(Mathf.Cos(angle) * ring * 1.5f, 0.5f, Mathf.Sin(angle) * ring * 1.5f);
+
+        if (!spawner) spawner = PlayerSpawnManager.Instance != null ? PlayerSpawnManager.Instance : FindObjectOfType<PlayerSpawnManager>();
+        if (spawner != null)
+        {
+            return spawner.ClampInsideMapBounds(candidate);
+        }
+
+        return baseSpawn;
+    }
+
+    private void ResolveRefs()
+    {
+        if (!conn) conn = NakamaConnection.Instance != null ? NakamaConnection.Instance : GetComponent<NakamaConnection>();
+        if (!conn) conn = FindObjectOfType<NakamaConnection>();
+        if (!transport) transport = MatchTransport.Instance != null ? MatchTransport.Instance : GetComponent<MatchTransport>();
+        if (!transport) transport = FindObjectOfType<MatchTransport>();
+    }
+
+    private void EnsureBindings()
+    {
+        if (transport && !_transportBound)
+        {
+            transport.OnInput += HandleInputFromClient;
+            transport.OnSnapshot += OnSnapshotReceived;
+            transport.OnInit += OnInitReceived;
+            transport.OnReady += OnReadyReceived;
+            transport.OnStart += OnStartReceived;
+            _transportBound = true;
+        }
+
+        if (conn && !_presenceBound)
+        {
+            conn.MatchPresenceReceived += OnPresenceChanged;
+            _presenceBound = true;
+        }
+    }
+
+    private void LogDebug(string message)
+    {
+        if (!enableDebugLogs) return;
+        Debug.Log("[HostAuthority] " + message);
+    }
+
+    private void LogInputDebug(string userId, string message)
+    {
+        if (!enableDebugLogs) return;
+        var now = Time.unscaledTime;
+        if (_nextInputLogAt.TryGetValue(userId, out var nextAt) && now < nextAt) return;
+        _nextInputLogAt[userId] = now + Mathf.Max(0.1f, debugLogInterval);
+        Debug.Log("[HostAuthority] " + message + " | user=" + userId);
+    }
+
+    private float GetLocalYaw()
+    {
+        var selfId = conn != null ? conn.SelfUserId : string.Empty;
+        if (!string.IsNullOrEmpty(selfId))
+        {
+            if (!spawner) spawner = PlayerSpawnManager.Instance != null ? PlayerSpawnManager.Instance : FindObjectOfType<PlayerSpawnManager>();
+            if (spawner != null && spawner.TryGet(selfId, out var localGo) && localGo != null)
+            {
+                return localGo.transform.eulerAngles.y;
+            }
+        }
+
+        return transform.eulerAngles.y;
+    }
+
+    private Vector3 GetLocalNetworkVelocity()
+    {
+        var selfId = conn != null ? conn.SelfUserId : string.Empty;
+        if (!string.IsNullOrEmpty(selfId))
+        {
+            if (!spawner) spawner = PlayerSpawnManager.Instance != null ? PlayerSpawnManager.Instance : FindObjectOfType<PlayerSpawnManager>();
+            if (spawner != null && spawner.TryGet(selfId, out var localGo) && localGo != null)
+            {
+                var controller = localGo.GetComponentInChildren<MediumController>(true);
+                if (controller != null) return controller.NetworkVelocity;
+            }
+        }
+
+        return Vector3.zero;
+    }
+
+    private Vector3 GetLocalNetworkPosition()
+    {
+        var selfId = conn != null ? conn.SelfUserId : string.Empty;
+        if (!string.IsNullOrEmpty(selfId))
+        {
+            if (!spawner) spawner = PlayerSpawnManager.Instance != null ? PlayerSpawnManager.Instance : FindObjectOfType<PlayerSpawnManager>();
+            if (spawner != null && spawner.TryGet(selfId, out var localGo) && localGo != null)
+            {
+                return localGo.transform.position;
+            }
+        }
+
+        return transform.position;
+    }
+
+    private void OnSnapshotReceived(MatchTransport.SnapshotMsg snap)
+    {
+        if (snap == null || snap.players == null) return;
+        if (!spawner) spawner = PlayerSpawnManager.Instance != null ? PlayerSpawnManager.Instance : FindObjectOfType<PlayerSpawnManager>();
+        if (spawner == null) return;
+
+        var selfId = conn != null ? conn.SelfUserId : string.Empty;
+        for (var i = 0; i < snap.players.Length; i++)
+        {
+            var ps = snap.players[i];
+            if (ps == null || string.IsNullOrEmpty(ps.id)) continue;
+            if (!string.IsNullOrEmpty(selfId) && ps.id == selfId) continue;
+
+            var pos = new Vector3(ps.x, ps.y, ps.z);
+            if (!spawner.TryGet(ps.id, out _))
+            {
+                spawner.SpawnRemote(ps.id, pos, ps.yaw);
+            }
+            spawner.ApplyAuthoritativePose(ps.id, pos, ps.yaw);
+        }
     }
 }

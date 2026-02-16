@@ -20,6 +20,14 @@ public class MatchTransport : MonoBehaviour
     public event Action<InitMsg> OnInit;
     public event Action<ReadyMsg> OnReady;
     public event Action<StartMsg> OnStart;
+    private bool _isBound;
+    private NakamaConnection _boundConn;
+
+    [Header("Debug")]
+    public bool enableDebugLogs = true;
+    public float debugLogInterval = 1f;
+    private float _nextRecvSnapshotLogAt;
+    private float _nextSendSnapshotLogAt;
 
     void Awake()
     {
@@ -32,18 +40,46 @@ public class MatchTransport : MonoBehaviour
         Instance = this;
         DontDestroyOnLoad(gameObject);
 
-        if (!conn) conn = GetComponent<NakamaConnection>();
-        if (!conn) conn = FindObjectOfType<NakamaConnection>();
-        if (conn == null) return;
-        conn.MatchStateReceived += HandleMatchState;
+        ResolveConn();
+        EnsureBound();
+    }
+
+    void Update()
+    {
+        ResolveConn();
+        EnsureBound();
     }
 
     void OnDestroy()
     {
-        if (conn != null)
+        if (_boundConn != null && _isBound)
         {
-            conn.MatchStateReceived -= HandleMatchState;
+            _boundConn.MatchStateReceived -= HandleMatchState;
+            _isBound = false;
+            _boundConn = null;
         }
+    }
+
+    private void ResolveConn()
+    {
+        if (!conn) conn = NakamaConnection.Instance != null ? NakamaConnection.Instance : GetComponent<NakamaConnection>();
+        if (!conn) conn = FindObjectOfType<NakamaConnection>();
+    }
+
+    private void EnsureBound()
+    {
+        if (conn == null) return;
+        if (_isBound && _boundConn == conn) return;
+
+        if (_isBound && _boundConn != null)
+        {
+            _boundConn.MatchStateReceived -= HandleMatchState;
+            _isBound = false;
+        }
+
+        conn.MatchStateReceived += HandleMatchState;
+        _boundConn = conn;
+        _isBound = true;
     }
 
     private void HandleMatchState(IMatchState state)
@@ -59,6 +95,11 @@ public class MatchTransport : MonoBehaviour
         {
             var msg = JsonUtility.FromJson<SnapshotMsg>(json);
             OnSnapshot?.Invoke(msg);
+            if (enableDebugLogs && Time.unscaledTime >= _nextRecvSnapshotLogAt)
+            {
+                _nextRecvSnapshotLogAt = Time.unscaledTime + Mathf.Max(0.1f, debugLogInterval);
+                Debug.Log("[MatchTransport] RECV_SNAPSHOT players=" + (msg.players == null ? 0 : msg.players.Length));
+            }
         }
         else if (state.OpCode == OPCODE_INIT)
         {
@@ -90,6 +131,11 @@ public class MatchTransport : MonoBehaviour
         if (conn?.Socket == null || conn.Match == null) return;
         var bytes = Encoding.UTF8.GetBytes(JsonUtility.ToJson(msg));
         await conn.Socket.SendMatchStateAsync(conn.Match.Id, OPCODE_SNAPSHOT, bytes);
+        if (enableDebugLogs && Time.unscaledTime >= _nextSendSnapshotLogAt)
+        {
+            _nextSendSnapshotLogAt = Time.unscaledTime + Mathf.Max(0.1f, debugLogInterval);
+            Debug.Log("[MatchTransport] SEND_SNAPSHOT players=" + (msg.players == null ? 0 : msg.players.Length));
+        }
     }
 
     public async void BroadcastInit(InitMsg msg)
@@ -120,6 +166,12 @@ public class MatchTransport : MonoBehaviour
         public float moveX;
         public float moveZ;
         public float yaw;
+        public float posX;
+        public float posY;
+        public float posZ;
+        public float velX;
+        public float velY;
+        public float velZ;
         public int buttons;
         [NonSerialized] public string senderUserId;
     }

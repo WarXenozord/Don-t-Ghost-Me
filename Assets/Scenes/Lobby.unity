@@ -370,6 +370,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   conn: {fileID: 0}
+  enableDebugLogs: 1
+  debugLogInterval: 1
 --- !u!114 &302446469
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -384,10 +386,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   conn: {fileID: 0}
   transport: {fileID: 0}
+  spawner: {fileID: 0}
   isHost: 0
-  inputSendHz: 20
-  snapshotSendHz: 10
-  moveSpeed: 3
+  inputSendHz: 30
+  snapshotSendHz: 15
+  moveSpeed: 2
+  enableDebugLogs: 1
+  debugLogInterval: 1
 --- !u!114 &302446470
 MonoBehaviour:
   m_ObjectHideFlags: 0

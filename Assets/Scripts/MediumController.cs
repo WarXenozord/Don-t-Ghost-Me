@@ -9,6 +9,8 @@ public class MediumController : MonoBehaviour
     private Vector2 PlayerMouseInput;
     private bool Sneaking = false;
     private float xRotation;
+    private Vector3 _lastWorldPos;
+    public Vector3 NetworkVelocity { get; private set; }
 
     [Header("Components Needed")]
     [SerializeField] private Transform PlayerCamera;
@@ -27,7 +29,8 @@ public class MediumController : MonoBehaviour
 
     void Start()
     {
-        Cursor.lockState = CursorLockMode.Locked; 
+        Cursor.lockState = CursorLockMode.Locked;
+        _lastWorldPos = transform.position;
     }
 
     // Update is called once per frame
@@ -50,6 +53,17 @@ public class MediumController : MonoBehaviour
             Player.localScale = new Vector3(1f, 1f, 1f);
             Sneaking = false;
         }
+
+        var dt = Time.deltaTime;
+        if (dt > 0f)
+        {
+            NetworkVelocity = (transform.position - _lastWorldPos) / dt;
+        }
+        else
+        {
+            NetworkVelocity = Vector3.zero;
+        }
+        _lastWorldPos = transform.position;
     }
     private void MovePlayer()
     {
