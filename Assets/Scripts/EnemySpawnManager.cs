@@ -17,6 +17,7 @@ public class EnemySpawnManager : MonoBehaviour
     [Min(1f)] public float enemySnapshotSendHz = 10f;
     [Min(0f)] public float enemyLerpPos = 14f;
     [Min(0f)] public float enemyLerpYaw = 14f;
+    [Min(0f)] public float enemyHardSnapDistance = 1.5f;
 
     private readonly Dictionary<string, GameObject> _enemiesBySpawnId = new Dictionary<string, GameObject>();
     private readonly Dictionary<string, Vector3> _targetPosBySpawnId = new Dictionary<string, Vector3>();
@@ -26,6 +27,7 @@ public class EnemySpawnManager : MonoBehaviour
     private int _spawnSeq;
     private int _enemyTick;
     private float _enemySnapTimer;
+    private float _nextEnemyDebugLogAt;
 
     void Awake()
     {
@@ -125,6 +127,12 @@ public class EnemySpawnManager : MonoBehaviour
             _targetYawBySpawnId[e.spawnId] = e.yaw;
             _targetStateBySpawnId[e.spawnId] = e.aiState;
         }
+
+        if (enableDebugLogs && Time.unscaledTime >= _nextEnemyDebugLogAt)
+        {
+            _nextEnemyDebugLogAt = Time.unscaledTime + 1f;
+            Debug.Log("[EnemySpawn] RECV_SNAPSHOT count=" + msg.enemies.Length);
+        }
     }
 
     private void ApplySpawn(MatchTransport.EnemySpawnMsg msg)
@@ -216,7 +224,15 @@ public class EnemySpawnManager : MonoBehaviour
 
             var currentPos = go.transform.position;
             var targetPos = kv.Value;
-            go.transform.position = Vector3.Lerp(currentPos, targetPos, tPos);
+            var dist = Vector3.Distance(currentPos, targetPos);
+            if (dist >= enemyHardSnapDistance)
+            {
+                go.transform.position = targetPos;
+            }
+            else
+            {
+                go.transform.position = Vector3.Lerp(currentPos, targetPos, tPos);
+            }
 
             if (_targetYawBySpawnId.TryGetValue(spawnId, out var yaw))
             {
@@ -233,6 +249,12 @@ public class EnemySpawnManager : MonoBehaviour
                     ai.SetAuthoritativeInstance(false);
                     ai.ApplyHostState(aiState);
                 }
+            }
+
+            if (enableDebugLogs && Time.unscaledTime >= _nextEnemyDebugLogAt)
+            {
+                _nextEnemyDebugLogAt = Time.unscaledTime + 1f;
+                Debug.Log("[EnemySpawn] APPLY_SNAPSHOT id=" + spawnId + " dist=" + dist.ToString("F2"));
             }
         }
     }

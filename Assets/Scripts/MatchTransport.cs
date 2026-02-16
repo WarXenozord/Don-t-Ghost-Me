@@ -32,6 +32,8 @@ public class MatchTransport : MonoBehaviour
     public float debugLogInterval = 1f;
     private float _nextRecvSnapshotLogAt;
     private float _nextSendSnapshotLogAt;
+    private float _nextRecvEnemySnapshotLogAt;
+    private float _nextSendEnemySnapshotLogAt;
 
     void Awake()
     {
@@ -131,6 +133,11 @@ public class MatchTransport : MonoBehaviour
         {
             var msg = JsonUtility.FromJson<EnemySnapshotMsg>(json);
             OnEnemySnapshot?.Invoke(msg);
+            if (enableDebugLogs && Time.unscaledTime >= _nextRecvEnemySnapshotLogAt)
+            {
+                _nextRecvEnemySnapshotLogAt = Time.unscaledTime + Mathf.Max(0.1f, debugLogInterval);
+                Debug.Log("[MatchTransport] RECV_ENEMY_SNAPSHOT enemies=" + (msg.enemies == null ? 0 : msg.enemies.Length));
+            }
         }
     }
 
@@ -186,6 +193,11 @@ public class MatchTransport : MonoBehaviour
         if (conn?.Socket == null || conn.Match == null) return;
         var bytes = Encoding.UTF8.GetBytes(JsonUtility.ToJson(msg));
         await conn.Socket.SendMatchStateAsync(conn.Match.Id, OPCODE_ENEMY_SNAPSHOT, bytes);
+        if (enableDebugLogs && Time.unscaledTime >= _nextSendEnemySnapshotLogAt)
+        {
+            _nextSendEnemySnapshotLogAt = Time.unscaledTime + Mathf.Max(0.1f, debugLogInterval);
+            Debug.Log("[MatchTransport] SEND_ENEMY_SNAPSHOT enemies=" + (msg.enemies == null ? 0 : msg.enemies.Length));
+        }
     }
 
     [Serializable]
