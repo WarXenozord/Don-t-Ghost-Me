@@ -86,6 +86,20 @@ public class PlayerSpawnManager : MonoBehaviour
         spawnedLocal = false;
     }
 
+    public bool Despawn(string userId)
+    {
+        if (string.IsNullOrEmpty(userId)) return false;
+        if (!_playersById.TryGetValue(userId, out var go)) return false;
+        _playersById.Remove(userId);
+        if (go) Destroy(go);
+        if (_localUserId == userId)
+        {
+            _localUserId = null;
+            spawnedLocal = false;
+        }
+        return true;
+    }
+
     public bool SpawnRemote(string userId, Vector3 pos, float yaw)
     {
         if (string.IsNullOrEmpty(userId)) return false;
@@ -139,6 +153,25 @@ public class PlayerSpawnManager : MonoBehaviour
 
         go = found;
         return true;
+    }
+
+    public bool TryGetUserIdByObject(GameObject candidate, out string userId)
+    {
+        userId = null;
+        if (candidate == null) return false;
+
+        foreach (var kv in _playersById)
+        {
+            var root = kv.Value;
+            if (root == null) continue;
+            if (candidate == root || candidate.transform.IsChildOf(root.transform))
+            {
+                userId = kv.Key;
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public void ApplyAuthoritativePose(string userId, Vector3 pos, float yaw)

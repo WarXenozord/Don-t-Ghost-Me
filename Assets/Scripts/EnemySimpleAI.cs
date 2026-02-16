@@ -86,6 +86,7 @@ public class EnemySimpleAI : SoundAgroListener
     private readonly List<Vector3> _attackRerouteNodes = new List<Vector3>();
     private int _attackRerouteIndex;
     private EnemyNetIdentity _netIdentity;
+    private GhostSpawner _ghostSpawner;
     private bool _isAuthoritativeInstance = true;
 
     void Awake()
@@ -93,6 +94,7 @@ public class EnemySimpleAI : SoundAgroListener
         _controller = GetComponent<CharacterController>();
         _generator = FindObjectOfType<ProceduralBuildingGenerator>();
         _netIdentity = GetComponent<EnemyNetIdentity>();
+        _ghostSpawner = GhostSpawner.Instance != null ? GhostSpawner.Instance : FindObjectOfType<GhostSpawner>();
     }
 
     void Start()
@@ -612,7 +614,29 @@ public class EnemySimpleAI : SoundAgroListener
         if (count == 2)
         {
             TriggerSyncedTouchFx(2);
+            SpawnGhostOnSecondTouch(medium);
+            TeleportAfterFirstTouch(medium.transform.position);
         }
+    }
+
+    private void SpawnGhostOnSecondTouch(MediumController medium)
+    {
+        if (!CanApplyGameplayEffects() || medium == null) return;
+
+        if (_ghostSpawner == null)
+        {
+            _ghostSpawner = GhostSpawner.Instance != null ? GhostSpawner.Instance : FindObjectOfType<GhostSpawner>();
+        }
+        if (_ghostSpawner == null) return;
+
+        var playerSpawner = PlayerSpawnManager.Instance != null ? PlayerSpawnManager.Instance : FindObjectOfType<PlayerSpawnManager>();
+        if (playerSpawner == null) return;
+
+        if (!playerSpawner.TryGetUserIdByObject(medium.gameObject, out var victimUserId)) return;
+
+        var pos = medium.transform.position;
+        var yaw = medium.transform.eulerAngles.y;
+        _ghostSpawner.HostKillMediumAndSpawnGhost(victimUserId, pos, yaw);
     }
 
     public void PlaySyncedTouchFx(int fxId)
