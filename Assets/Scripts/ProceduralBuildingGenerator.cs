@@ -3,9 +3,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-// ?????????????????????????????????????????????????????????????????????????????
+// ─────────────────────────────────────────────────────────────────────────────
 //  DATA STRUCTURES
-// ?????????????????????????????????????????????????????????????????????????????
+// ─────────────────────────────────────────────────────────────────────────────
 
 [System.Serializable]
 public class BuildingRoom
@@ -25,7 +25,7 @@ public class BuildingDoor
     public Vector3 size;
     public int roomA = -1;
     public int roomB = -1;
-    public int wallIndex = -1;       // Direct reference into walls list � used for O(1) splitting
+    public int wallIndex = -1;       // Direct reference into walls list — used for O(1) splitting
     public bool wallFacingX = false; // Cached from source wall (wall is removed after splitting)
 }
 
@@ -34,9 +34,9 @@ public class BuildingWall
 {
     public Vector3 position;
     public Vector3 size;
-    // facingX = true  ? wall normal points along X; wall runs along Z (left/right walls)
+    // facingX = true  → wall normal points along X; wall runs along Z (left/right walls)
     //                    size = (wallThickness, height, length)
-    // facingX = false ? wall normal points along Z; wall runs along X (front/back walls)
+    // facingX = false → wall normal points along Z; wall runs along X (front/back walls)
     //                    size = (length, height, wallThickness)
     public bool facingX;
     public int roomA = -1; // -1 = exterior
@@ -67,9 +67,9 @@ public enum RoomType
     General, Bathroom, Kitchen, Hallway, LivingRoom, Bedroom, Storage, Stairwell
 }
 
-// ?????????????????????????????????????????????????????????????????????????????
+// ─────────────────────────────────────────────────────────────────────────────
 //  GENERATOR
-// ?????????????????????????????????????????????????????????????????????????????
+// ─────────────────────────────────────────────────────────────────────────────
 
 public class ProceduralBuildingGenerator : MonoBehaviour
 {
@@ -114,25 +114,32 @@ public class ProceduralBuildingGenerator : MonoBehaviour
     [Tooltip("Assign the MinimapController component. Can be on any GameObject.")]
     [SerializeField] private MinimapController minimapController;
 
+    [Header("Props & Materials")]
+    [Tooltip("Assign the PropSpawner component. Leave null to skip prop generation.")]
+    [SerializeField] private PropSpawner propSpawner;
+
     private List<BuildingRoom>    rooms     = new List<BuildingRoom>();
     private List<BuildingWall>    walls     = new List<BuildingWall>();
     private List<BuildingDoor>    doors     = new List<BuildingDoor>();
     private List<BuildingStairs>  stairs    = new List<BuildingStairs>();
     private List<BuildingSection> buildings = new List<BuildingSection>();
 
-    [Header("Player")]
-    [Tooltip("For spawning")]
-    [SerializeField] private Transform player;
-    [SerializeField] private float playerHeightOffset = 1.1f;
+    // Parallel to rooms[] — stores the instantiated floor/ceiling GOs per room
+    // so PropSpawner can apply materials and use them as spawn anchors.
+    private List<(GameObject floor, GameObject ceiling)> roomGeometry
+        = new List<(GameObject, GameObject)>();
 
-    // (min(roomA,roomB), max(roomA,roomB)) ? list of wall indices for those two rooms
+    // Building parent transforms indexed by buildingIndex (populated in InstantiateGeometry)
+    private Dictionary<int, Transform> buildingParentMap = new Dictionary<int, Transform>();
+
+    // (min(roomA,roomB), max(roomA,roomB)) → list of wall indices for those two rooms
     private Dictionary<(int, int), List<int>> sharedWallLookup;
 
     private System.Random random;
 
-    // ?????????????????????????????????????????????????????????????????????????
+    // ─────────────────────────────────────────────────────────────────────────
     //  ENTRY POINT
-    // ?????????????????????????????????????????????????????????????????????????
+    // ─────────────────────────────────────────────────────────────────────────
 
     void Start() => GenerateBuilding();
 
@@ -146,7 +153,7 @@ public class ProceduralBuildingGenerator : MonoBehaviour
         numFloors = Mathf.Min(numFloors, calculatedFloors);
         Debug.Log($"Generating {numFloors} floors, targeting ~{targetNumRooms} rooms total");
 
-        // ?? Phase 1: generate room layout ???????????????????????????????????
+        // ── Phase 1: generate room layout ───────────────────────────────────
         int buildingIndex = 0, buildingCountInRow = 0;
         Vector3 currentOffset = Vector3.zero;
         float maxDepthInRow = 0f;
@@ -179,35 +186,35 @@ public class ProceduralBuildingGenerator : MonoBehaviour
             }
             buildingIndex++;
         }
-        Debug.Log($"\n? {rooms.Count} rooms across {buildingIndex} buildings");
+        Debug.Log($"\n✓ {rooms.Count} rooms across {buildingIndex} buildings");
 
-        // ?? Phase 2: derive all walls from room adjacency (no duplicates) ???
+        // ── Phase 2: derive all walls from room adjacency (no duplicates) ───
         DeriveWallsFromRooms();
-        Debug.Log($"? {walls.Count} walls derived from adjacency");
+        Debug.Log($"✓ {walls.Count} walls derived from adjacency");
 
-        // ?? Phase 3: place doors (stores direct wallIndex) ??????????????????
+        // ── Phase 3: place doors (stores direct wallIndex) ──────────────────
         ConnectRoomsWithinBuildings();
         ConnectAdjacentBuildings();
-        Debug.Log($"? {doors.Count} doors placed");
+        Debug.Log($"✓ {doors.Count} doors placed");
 
-        // ?? Phase 4: cut door openings in walls (O(1) per door) ?????????????
+        // ── Phase 4: cut door openings in walls (O(1) per door) ─────────────
         SplitWallsForAllDoors();
-        Debug.Log($"? {walls.Count} wall segments after splitting");
+        Debug.Log($"✓ {walls.Count} wall segments after splitting");
 
-        // ?? Phase 5: stairs ??????????????????????????????????????????????????
+        // ── Phase 5: stairs ──────────────────────────────────────────────────
         if (numFloors > 1) GenerateStairs();
-        Debug.Log($"? {stairs.Count} stairs");
+        Debug.Log($"✓ {stairs.Count} stairs");
 
-        // ?? Phase 6: instantiate ?????????????????????????????????????????????
+        // ── Phase 6: instantiate ─────────────────────────────────────────────
         InstantiateGeometry();
-        SpawnPlayerInRandomRoom();
         BuildMinimap();
+        BuildProps();
         Debug.Log("Building generation complete!");
     }
 
-    // ?????????????????????????????????????????????????????????????????????????
-    //  ROOM GENERATION  (BSP split � same logic as before, split-position bug fixed)
-    // ?????????????????????????????????????????????????????????????????????????
+    // ─────────────────────────────────────────────────────────────────────────
+    //  ROOM GENERATION  (BSP split — same logic as before, split-position bug fixed)
+    // ─────────────────────────────────────────────────────────────────────────
 
     private void GenerateBuildingSection(int buildingIndex, Vector3 offset, Vector3 sectionSize)
     {
@@ -309,37 +316,22 @@ public class ProceduralBuildingGenerator : MonoBehaviour
         if (mn > 3f  && mx < 8f)               return RoomType.Bedroom;
         return RoomType.General;
     }
-    private void SpawnPlayerInRandomRoom()
-{
-    if (rooms.Count == 0 || player == null)
-        return;
 
-    int index = random.Next(rooms.Count);
-    BuildingRoom room = rooms[index];
-
-    Vector3 spawnPos = new Vector3(
-        room.position.x + room.size.x / 2f,
-        room.position.y + playerHeightOffset,
-        room.position.z + room.size.z / 2f
-    );
-
-    player.position = spawnPos;
-}
-    // ?????????????????????????????????????????????????????????????????????????
+    // ─────────────────────────────────────────────────────────────────────────
     //  WALL DERIVATION  (the core refactor)
     //
     //  Instead of 4 walls per room (doubles every shared wall), we:
-    //   1. Iterate all room pairs � if adjacent, create ONE shared wall.
+    //   1. Iterate all room pairs — if adjacent, create ONE shared wall.
     //   2. For each room side not fully covered by shared walls, create an exterior wall.
     //
     //  Result: no duplicate walls, each wall knows its two neighbouring rooms.
-    // ?????????????????????????????????????????????????????????????????????????
+    // ─────────────────────────────────────────────────────────────────────────
 
     private void DeriveWallsFromRooms()
     {
         sharedWallLookup = new Dictionary<(int, int), List<int>>();
 
-        // side coverage: (roomIdx, side 0=x- 1=x+ 2=z- 3=z+) ? covered intervals
+        // side coverage: (roomIdx, side 0=x- 1=x+ 2=z- 3=z+) → covered intervals
         var coverage = new Dictionary<(int, int), List<(float, float)>>();
         for (int i = 0; i < rooms.Count; i++)
             for (int s = 0; s < 4; s++)
@@ -464,14 +456,14 @@ public class ProceduralBuildingGenerator : MonoBehaviour
         return result;
     }
 
-    // ?????????????????????????????????????????????????????????????????????????
+    // ─────────────────────────────────────────────────────────────────────────
     //  DOOR PLACEMENT
-    // ?????????????????????????????????????????????????????????????????????????
+    // ─────────────────────────────────────────────────────────────────────────
 
     private void ConnectRoomsWithinBuildings()
     {
         int count = 0;
-        // Group by (floor, building), pass room indices directly � no IndexOf needed
+        // Group by (floor, building), pass room indices directly — no IndexOf needed
         var groups = rooms
             .Select((r, i) => (r, i))
             .GroupBy(x => (x.r.floorIndex, x.r.buildingIndex));
@@ -559,7 +551,7 @@ public class ProceduralBuildingGenerator : MonoBehaviour
         var (roomA, roomB) = candidates[random.Next(candidates.Count)];
         bool placed = TryAddDoor(roomA, roomB);
         if (placed)
-            Debug.Log($"? Connected Building {nearIdx} ? Building {farIdx} ({(isXAxis ? "X" : "Z")} axis)");
+            Debug.Log($"✓ Connected Building {nearIdx} ↔ Building {farIdx} ({(isXAxis ? "X" : "Z")} axis)");
         return placed;
     }
 
@@ -600,12 +592,12 @@ public class ProceduralBuildingGenerator : MonoBehaviour
         return false;
     }
 
-    // ?????????????????????????????????????????????????????????????????????????
-    //  WALL SPLITTING  (O(1) per door � direct wallIndex reference)
+    // ─────────────────────────────────────────────────────────────────────────
+    //  WALL SPLITTING  (O(1) per door — direct wallIndex reference)
     //
     //  Process doors in descending wallIndex order so that RemoveAt on a higher
     //  index never invalidates a lower index we still need to process.
-    // ?????????????????????????????????????????????????????????????????????????
+    // ─────────────────────────────────────────────────────────────────────────
 
     private void SplitWallsForAllDoors()
     {
@@ -632,7 +624,7 @@ public class ProceduralBuildingGenerator : MonoBehaviour
 
         if (door.wallFacingX)
         {
-            // Wall runs along Z � cut a doorWidth slot on the Z axis
+            // Wall runs along Z — cut a doorWidth slot on the Z axis
             float wallZMin = wall.position.z - wall.size.z * 0.5f;
             float wallZMax = wall.position.z + wall.size.z * 0.5f;
             float gapMin   = door.position.z  - doorWidth * 0.5f;
@@ -665,7 +657,7 @@ public class ProceduralBuildingGenerator : MonoBehaviour
         }
         else
         {
-            // Wall runs along X � cut a doorWidth slot on the X axis
+            // Wall runs along X — cut a doorWidth slot on the X axis
             float wallXMin = wall.position.x - wall.size.x * 0.5f;
             float wallXMax = wall.position.x + wall.size.x * 0.5f;
             float gapMin   = door.position.x  - doorWidth * 0.5f;
@@ -696,9 +688,9 @@ public class ProceduralBuildingGenerator : MonoBehaviour
     private BuildingWall WallSegment(BuildingWall src, Vector3 pos, Vector3 sz) =>
         new BuildingWall { position = pos, size = sz, facingX = src.facingX, roomA = src.roomA, roomB = src.roomB };
 
-    // ?????????????????????????????????????????????????????????????????????????
+    // ─────────────────────────────────────────────────────────────────────────
     //  STAIRS
-    // ?????????????????????????????????????????????????????????????????????????
+    // ─────────────────────────────────────────────────────────────────────────
 
     private void GenerateStairs()
     {
@@ -745,26 +737,27 @@ public class ProceduralBuildingGenerator : MonoBehaviour
         return list.Count > 0 ? list[random.Next(list.Count)] : null;
     }
 
-    // ?????????????????????????????????????????????????????????????????????????
+    // ─────────────────────────────────────────────────────────────────────────
     //  INSTANTIATION
-    // ?????????????????????????????????????????????????????????????????????????
+    // ─────────────────────────────────────────────────────────────────────────
 
     private void InstantiateGeometry()
     {
         Transform parent = transform;
 
-        var buildingParents = new Dictionary<int, Transform>();
+        buildingParentMap.Clear();
         foreach (var b in buildings)
         {
             var go = new GameObject($"Building_{b.buildingIndex} ({b.roomsInSection} rooms)");
             go.transform.parent   = parent;
             go.transform.position = b.position;
-            buildingParents[b.buildingIndex] = go.transform;
+            buildingParentMap[b.buildingIndex] = go.transform;
         }
 
+        roomGeometry.Clear();
         foreach (var room in rooms)
         {
-            var bp = buildingParents[room.buildingIndex];
+            var bp = buildingParentMap[room.buildingIndex];
 
             var floorPos = room.position + new Vector3(room.size.x * 0.5f, floorCeilThickness * 0.5f, room.size.z * 0.5f);
             var floor = Instantiate(floorPrefab, floorPos, Quaternion.identity, bp);
@@ -778,6 +771,9 @@ public class ProceduralBuildingGenerator : MonoBehaviour
             var ceil = Instantiate(ceilingPrefab, ceilPos, Quaternion.identity, bp);
             ceil.name = $"Ceiling_{room.roomType}";
             ceil.transform.localScale = new Vector3(room.size.x, floorCeilThickness, room.size.z);
+
+            // Store for PropSpawner (material application + ceiling prop anchoring)
+            roomGeometry.Add((floor, ceil));
         }
 
         foreach (var wall in walls)
@@ -835,13 +831,14 @@ public class ProceduralBuildingGenerator : MonoBehaviour
         return mesh;
     }
 
-    // ?????????????????????????????????????????????????????????????????????????
+    // ─────────────────────────────────────────────────────────────────────────
     //  CLEANUP
-    // ?????????????????????????????????????????????????????????????????????????
+    // ─────────────────────────────────────────────────────────────────────────
 
     private void ClearBuilding()
     {
         rooms.Clear(); walls.Clear(); doors.Clear(); stairs.Clear(); buildings.Clear();
+        roomGeometry.Clear(); buildingParentMap.Clear();
         sharedWallLookup = null;
 
         // Destroy previously generated geometry
@@ -849,93 +846,11 @@ public class ProceduralBuildingGenerator : MonoBehaviour
             DestroyImmediate(transform.GetChild(i).gameObject);
     }
 
-    public void GenerateBuildingFromSeed(int newSeed)
-    {
-        seed = newSeed;
-        GenerateBuilding();
-    }
-    public bool TryGetSafeSpawnPoint(Vector3 requestedPos, out Vector3 safePos, int preferredFloor = 0, float margin = 0.35f)
-    {
-        safePos = requestedPos;
-        if (rooms == null || rooms.Count == 0) return false;
-
-        var bestIndex = -1;
-        var bestScore = float.MaxValue;
-        var foundPreferredFloor = false;
-
-        for (var i = 0; i < rooms.Count; i++)
-        {
-            var room = rooms[i];
-            if (room == null) continue;
-            if (room.floorIndex == preferredFloor) foundPreferredFloor = true;
-        }
-
-        for (var i = 0; i < rooms.Count; i++)
-        {
-            var room = rooms[i];
-            if (room == null) continue;
-            if (foundPreferredFloor && room.floorIndex != preferredFloor) continue;
-
-            var minX = room.position.x + margin;
-            var maxX = room.position.x + room.size.x - margin;
-            var minZ = room.position.z + margin;
-            var maxZ = room.position.z + room.size.z - margin;
-
-            if (minX > maxX)
-            {
-                minX = room.position.x;
-                maxX = room.position.x + room.size.x;
-            }
-            if (minZ > maxZ)
-            {
-                minZ = room.position.z;
-                maxZ = room.position.z + room.size.z;
-            }
-
-            var clampedX = Mathf.Clamp(requestedPos.x, minX, maxX);
-            var clampedZ = Mathf.Clamp(requestedPos.z, minZ, maxZ);
-            var dx = requestedPos.x - clampedX;
-            var dz = requestedPos.z - clampedZ;
-            var score = dx * dx + dz * dz;
-
-            if (score < bestScore)
-            {
-                bestScore = score;
-                bestIndex = i;
-            }
-        }
-
-        if (bestIndex < 0) return false;
-
-        var bestRoom = rooms[bestIndex];
-        var rMinX = bestRoom.position.x + margin;
-        var rMaxX = bestRoom.position.x + bestRoom.size.x - margin;
-        var rMinZ = bestRoom.position.z + margin;
-        var rMaxZ = bestRoom.position.z + bestRoom.size.z - margin;
-
-        if (rMinX > rMaxX)
-        {
-            rMinX = bestRoom.position.x;
-            rMaxX = bestRoom.position.x + bestRoom.size.x;
-        }
-        if (rMinZ > rMaxZ)
-        {
-            rMinZ = bestRoom.position.z;
-            rMaxZ = bestRoom.position.z + bestRoom.size.z;
-        }
-
-        safePos = new Vector3(
-            Mathf.Clamp(requestedPos.x, rMinX, rMaxX),
-            bestRoom.position.y + 0.5f,
-            Mathf.Clamp(requestedPos.z, rMinZ, rMaxZ)
-        );
-        return true;
-    }
     [ContextMenu("Generate Building")]
     public void RegenerateBuilding() => GenerateBuilding();
-    // ?????????????????????????????????????????????????????????????????????????
+    // ─────────────────────────────────────────────────────────────────────────
     //  MINIMAP
-    // ?????????????????????????????????????????????????????????????????????????
+    // ─────────────────────────────────────────────────────────────────────────
 
     private void BuildMinimap()
     {
@@ -945,12 +860,18 @@ public class ProceduralBuildingGenerator : MonoBehaviour
         if (minimapController != null)
             minimapController.SetMapBounds(rooms);
         else
-            Debug.LogWarning("[Minimap] MinimapController not assigned � " +
+            Debug.LogWarning("[Minimap] MinimapController not assigned — " +
                              "drag it into the MinimapController field on the generator.");
 
         Debug.Log("[Minimap] Floorplan sprites built.");
     }
 
+    private void BuildProps()
+    {
+        if (propSpawner == null) return;
+        propSpawner.Furnish(rooms, walls, buildingParentMap, roomGeometry, seed);
+        Debug.Log("[Props] Furnishing complete.");
+    }
+
 
 }
-
