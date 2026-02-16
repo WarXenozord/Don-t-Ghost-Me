@@ -120,6 +120,11 @@ public class ProceduralBuildingGenerator : MonoBehaviour
     private List<BuildingStairs>  stairs    = new List<BuildingStairs>();
     private List<BuildingSection> buildings = new List<BuildingSection>();
 
+    [Header("Player")]
+    [Tooltip("For spawning")]
+    [SerializeField] private Transform player;
+    [SerializeField] private float playerHeightOffset = 1.1f;
+
     // (min(roomA,roomB), max(roomA,roomB)) ? list of wall indices for those two rooms
     private Dictionary<(int, int), List<int>> sharedWallLookup;
 
@@ -195,6 +200,7 @@ public class ProceduralBuildingGenerator : MonoBehaviour
 
         // ?? Phase 6: instantiate ?????????????????????????????????????????????
         InstantiateGeometry();
+        SpawnPlayerInRandomRoom();
         BuildMinimap();
         Debug.Log("Building generation complete!");
     }
@@ -303,7 +309,22 @@ public class ProceduralBuildingGenerator : MonoBehaviour
         if (mn > 3f  && mx < 8f)               return RoomType.Bedroom;
         return RoomType.General;
     }
+    private void SpawnPlayerInRandomRoom()
+{
+    if (rooms.Count == 0 || player == null)
+        return;
 
+    int index = random.Next(rooms.Count);
+    BuildingRoom room = rooms[index];
+
+    Vector3 spawnPos = new Vector3(
+        room.position.x + room.size.x / 2f,
+        room.position.y + playerHeightOffset,
+        room.position.z + room.size.z / 2f
+    );
+
+    player.position = spawnPos;
+}
     // ?????????????????????????????????????????????????????????????????????????
     //  WALL DERIVATION  (the core refactor)
     //
