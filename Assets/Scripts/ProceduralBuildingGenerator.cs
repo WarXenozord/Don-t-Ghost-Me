@@ -111,6 +111,8 @@ public class ProceduralBuildingGenerator : MonoBehaviour
     [Header("Minimap")]
     [Tooltip("Assign the FloorplanRenderer component. Leave null to skip minimap generation.")]
     [SerializeField] private FloorplanRenderer floorplanRenderer;
+    [Tooltip("Assign the MinimapController component. Can be on any GameObject.")]
+    [SerializeField] private MinimapController minimapController;
 
     private List<BuildingRoom>    rooms     = new List<BuildingRoom>();
     private List<BuildingWall>    walls     = new List<BuildingWall>();
@@ -836,6 +838,13 @@ public class ProceduralBuildingGenerator : MonoBehaviour
     {
         if (floorplanRenderer == null) return;
         floorplanRenderer.Build(walls, doors, rooms, floorHeight);
+
+        if (minimapController != null)
+            minimapController.SetMapBounds(rooms);
+        else
+            Debug.LogWarning("[Minimap] MinimapController not assigned — " +
+                             "drag it into the MinimapController field on the generator.");
+
         Debug.Log("[Minimap] Floorplan sprites built.");
     }
 
