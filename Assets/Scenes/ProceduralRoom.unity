@@ -641,13 +641,29 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 700502250674933459, guid: 3e707070d4901ed4da8f1da255e6baa8, type: 3}
+      propertyPath: attackSpeed
+      value: 3
+      objectReference: {fileID: 0}
+    - target: {fileID: 700502250674933459, guid: 3e707070d4901ed4da8f1da255e6baa8, type: 3}
+      propertyPath: patrolSpeed
+      value: 0.7
+      objectReference: {fileID: 0}
+    - target: {fileID: 700502250674933459, guid: 3e707070d4901ed4da8f1da255e6baa8, type: 3}
+      propertyPath: investigateSpeed
+      value: 1.2
+      objectReference: {fileID: 0}
+    - target: {fileID: 700502250674933459, guid: 3e707070d4901ed4da8f1da255e6baa8, type: 3}
+      propertyPath: patrolSampleRadius
+      value: 20
+      objectReference: {fileID: 0}
     - target: {fileID: 2431784559735447993, guid: 3e707070d4901ed4da8f1da255e6baa8, type: 3}
       propertyPath: m_LocalPosition.x
       value: 18.101652
       objectReference: {fileID: 0}
     - target: {fileID: 2431784559735447993, guid: 3e707070d4901ed4da8f1da255e6baa8, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 1.4
+      value: 1.2
       objectReference: {fileID: 0}
     - target: {fileID: 2431784559735447993, guid: 3e707070d4901ed4da8f1da255e6baa8, type: 3}
       propertyPath: m_LocalPosition.z

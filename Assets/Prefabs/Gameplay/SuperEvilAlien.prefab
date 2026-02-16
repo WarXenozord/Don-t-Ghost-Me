@@ -121,7 +121,7 @@ AudioSource:
   OutputAudioMixerGroup: {fileID: 0}
   m_audioClip: {fileID: 8300000, guid: c06ab841851028d4687393cf8ff5e8ce, type: 3}
   m_PlayOnAwake: 1
-  m_Volume: 1
+  m_Volume: 0.113
   m_Pitch: 1
   Loop: 1
   Mute: 0
@@ -225,11 +225,21 @@ MonoBehaviour:
   attackSpeed: 4
   turnSpeed: 7
   waypointReachDistance: 0.5
-  patrolSampleRadius: 12
-  patrolResampleInterval: 8
+  patrolSampleRadius: 20
+  patrolResampleInterval: 20
+  revisitPenalty: 1
+  repathInterval: 0.35
+  repathTargetDelta: 1
+  stuckTimeout: 1.25
+  progressDistance: 0.2
+  doorAxisSteer: 0.45
+  attackNoGainTimeout: 1
+  attackGainEpsilon: 0.1
+  attackRerouteMinPlayerDistance: 1
   sightDistance: 14
   sightAngle: 70
   loseTargetDistance2D: 20
+  requireSameRoomForVision: 1
   requireLineOfSight: 0
   sightBlockMask:
     serializedVersion: 2
