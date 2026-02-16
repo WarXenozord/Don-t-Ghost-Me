@@ -102,7 +102,7 @@ GameObject:
   m_Component:
   - component: {fileID: 7751150998117572996}
   - component: {fileID: 7187557600696894711}
-  m_Layer: 0
+  m_Layer: 8
   m_Name: face
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -118,7 +118,7 @@ Transform:
   m_GameObject: {fileID: 3082515894741005269}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0.51, z: 0.511}
+  m_LocalPosition: {x: 0, y: 0.51, z: 0.505}
   m_LocalScale: {x: 0.21511, y: 0.21511, z: 0.21511}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -192,7 +192,7 @@ GameObject:
   - component: {fileID: 5799300709077669421}
   m_Layer: 0
   m_Name: Medium
-  m_TagString: Untagged
+  m_TagString: Medium
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -330,6 +330,7 @@ MonoBehaviour:
   PlayerCamera: {fileID: 412409998115839473}
   Controller: {fileID: 7748105258055757119}
   Player: {fileID: 8307503184249558993}
+  health: 100
   Speed: 2
   JumpForce: 8
   Sensetivity: 2

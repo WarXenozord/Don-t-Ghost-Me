@@ -10,6 +10,7 @@ public class GhostController : MonoBehaviour
     [Header("Components")]
     [SerializeField] private Transform playerCamera;
     private Rigidbody rb;
+    [SerializeField] private float energy = 100f;
 
     [Header("Movement")]
     [SerializeField] private float moveSpeed = 8f;
