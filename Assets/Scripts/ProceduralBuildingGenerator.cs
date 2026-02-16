@@ -1,6 +1,11 @@
 using UnityEngine;
+using System;
 using System.Collections.Generic;
 using System.Linq;
+
+// ?????????????????????????????????????????????????????????????????????????????
+//  DATA STRUCTURES
+// ?????????????????????????????????????????????????????????????????????????????
 
 [System.Serializable]
 public class BuildingRoom
@@ -20,8 +25,8 @@ public class BuildingDoor
     public Vector3 size;
     public int roomA = -1;
     public int roomB = -1;
-    public bool dim = false;
-    public bool dir = false;
+    public int wallIndex = -1;       // Direct reference into walls list — used for O(1) splitting
+    public bool wallFacingX = false; // Cached from source wall (wall is removed after splitting)
 }
 
 [System.Serializable]
@@ -29,7 +34,13 @@ public class BuildingWall
 {
     public Vector3 position;
     public Vector3 size;
-    public int dimension;
+    // facingX = true  ? wall normal points along X; wall runs along Z (left/right walls)
+    //                    size = (wallThickness, height, length)
+    // facingX = false ? wall normal points along Z; wall runs along X (front/back walls)
+    //                    size = (length, height, wallThickness)
+    public bool facingX;
+    public int roomA = -1; // -1 = exterior
+    public int roomB = -1; // -1 = exterior
 }
 
 [System.Serializable]
@@ -53,33 +64,30 @@ public class BuildingSection
 
 public enum RoomType
 {
-    General,
-    Bathroom,
-    Kitchen,
-    Hallway,
-    LivingRoom,
-    Bedroom,
-    Storage,
-    Stairwell
+    General, Bathroom, Kitchen, Hallway, LivingRoom, Bedroom, Storage, Stairwell
 }
+
+// ?????????????????????????????????????????????????????????????????????????????
+//  GENERATOR
+// ?????????????????????????????????????????????????????????????????????????????
 
 public class ProceduralBuildingGenerator : MonoBehaviour
 {
     [Header("Seed")]
     [SerializeField] private int seed = 12345;
-    
+
     [Header("Building Parameters")]
     [SerializeField] private int targetNumRooms = 20;
     [SerializeField] private int numFloors = 2;
     [SerializeField] private float floorHeight = 3.5f;
-    
+
     [Header("Building Layout")]
     [SerializeField] private int buildingsPerRow = 2;
     [SerializeField] private float buildingSpacingX = 0.5f;
     [SerializeField] private float buildingSpacingZ = 0.5f;
     [SerializeField] private Vector3 minBuildingSize = new Vector3(12, 12, 12);
     [SerializeField] private Vector3 maxBuildingSize = new Vector3(25, 12, 25);
-    
+
     [Header("Room Generation")]
     [SerializeField] private float minRoomSize = 3f;
     [SerializeField] private float maxRoomSize = 8f;
@@ -87,797 +95,749 @@ public class ProceduralBuildingGenerator : MonoBehaviour
     [SerializeField] private float doorHeight = 2.2f;
     [SerializeField] private float wallThickness = 0.2f;
     [SerializeField] private float floorCeilThickness = 0.15f;
-    
+
     [Header("Stairs")]
     [SerializeField] private float stairWidth = 1.2f;
     [SerializeField] private float stairDepth = 2f;
     [SerializeField] public GameObject stairPrefab;
-    
+
     [Header("Prefabs")]
     [SerializeField] private GameObject wallPrefab;
     [SerializeField] private GameObject doorPrefab;
+    [SerializeField] private GameObject doorwayPrefab;
     [SerializeField] private GameObject floorPrefab;
     [SerializeField] private GameObject ceilingPrefab;
-    
-    private List<BuildingRoom> rooms = new List<BuildingRoom>();
-    private List<BuildingWall> walls = new List<BuildingWall>();
-    private List<BuildingDoor> doors = new List<BuildingDoor>();
-    private List<BuildingStairs> stairs = new List<BuildingStairs>();
+
+    [Header("Minimap")]
+    [Tooltip("Assign the FloorplanRenderer component. Leave null to skip minimap generation.")]
+    [SerializeField] private FloorplanRenderer floorplanRenderer;
+
+    private List<BuildingRoom>    rooms     = new List<BuildingRoom>();
+    private List<BuildingWall>    walls     = new List<BuildingWall>();
+    private List<BuildingDoor>    doors     = new List<BuildingDoor>();
+    private List<BuildingStairs>  stairs    = new List<BuildingStairs>();
     private List<BuildingSection> buildings = new List<BuildingSection>();
-    
+
+    // (min(roomA,roomB), max(roomA,roomB)) ? list of wall indices for those two rooms
+    private Dictionary<(int, int), List<int>> sharedWallLookup;
+
     private System.Random random;
 
-    void Start()
-    {
-        GenerateBuilding();
-    }
+    // ?????????????????????????????????????????????????????????????????????????
+    //  ENTRY POINT
+    // ?????????????????????????????????????????????????????????????????????????
+
+    void Start() => GenerateBuilding();
 
     public void GenerateBuilding()
     {
         ClearBuilding();
         Debug.Log($"Starting building generation with seed: {seed}");
-        
         random = new System.Random(seed);
-        
+
         int calculatedFloors = Mathf.Max(1, Mathf.FloorToInt(floorHeight * numFloors));
         numFloors = Mathf.Min(numFloors, calculatedFloors);
         Debug.Log($"Generating {numFloors} floors, targeting ~{targetNumRooms} rooms total");
-        
-        int buildingIndex = 0;
-        int buildingCountInRow = 0;
+
+        // ?? Phase 1: generate room layout ???????????????????????????????????
+        int buildingIndex = 0, buildingCountInRow = 0;
         Vector3 currentOffset = Vector3.zero;
-        float maxHeightInRow = 0f;
-        
+        float maxDepthInRow = 0f;
+
         while (rooms.Count < targetNumRooms)
         {
-            Debug.Log($"\n=== Creating Building Section {buildingIndex} ===");
-            
             Vector3 sectionSize = new Vector3(
                 (float)(minBuildingSize.x + (maxBuildingSize.x - minBuildingSize.x) * random.NextDouble()),
                 floorHeight * numFloors,
                 (float)(minBuildingSize.z + (maxBuildingSize.z - minBuildingSize.z) * random.NextDouble())
             );
-            
+
             int roomsBefore = rooms.Count;
             GenerateBuildingSection(buildingIndex, currentOffset, sectionSize);
-            int roomsAdded = rooms.Count - roomsBefore;
-            
-            Debug.Log($"Building {buildingIndex}: Added {roomsAdded} rooms at {currentOffset} (Total: {rooms.Count}/{targetNumRooms})");
-            
-            maxHeightInRow = Mathf.Max(maxHeightInRow, sectionSize.z);
+            Debug.Log($"Building {buildingIndex}: +{rooms.Count - roomsBefore} rooms at {currentOffset} (total {rooms.Count}/{targetNumRooms})");
+
+            maxDepthInRow = Mathf.Max(maxDepthInRow, sectionSize.z);
             buildingCountInRow++;
-            
+
             if (buildingCountInRow >= buildingsPerRow)
             {
                 currentOffset.x = 0;
-                currentOffset.z += maxHeightInRow + buildingSpacingZ;
+                currentOffset.z += maxDepthInRow + buildingSpacingZ;
                 buildingCountInRow = 0;
-                maxHeightInRow = 0f;
+                maxDepthInRow = 0f;
             }
             else
             {
                 currentOffset.x += sectionSize.x + buildingSpacingX;
             }
-            
             buildingIndex++;
         }
-        
-        Debug.Log($"\n? Generated {rooms.Count} rooms across {buildingIndex} buildings");
-        
-        CreateWallsForAllRooms();
+        Debug.Log($"\n? {rooms.Count} rooms across {buildingIndex} buildings");
+
+        // ?? Phase 2: derive all walls from room adjacency (no duplicates) ???
+        DeriveWallsFromRooms();
+        Debug.Log($"? {walls.Count} walls derived from adjacency");
+
+        // ?? Phase 3: place doors (stores direct wallIndex) ??????????????????
         ConnectRoomsWithinBuildings();
         ConnectAdjacentBuildings();
-        
-        if (numFloors > 1)
-        {
-            Debug.Log("Generating stairs...");
-            GenerateStairs();
-        }
-        
-        Debug.Log($"? Generated {walls.Count} walls, {doors.Count} doors, {stairs.Count} stairs");
+        Debug.Log($"? {doors.Count} doors placed");
+
+        // ?? Phase 4: cut door openings in walls (O(1) per door) ?????????????
+        SplitWallsForAllDoors();
+        Debug.Log($"? {walls.Count} wall segments after splitting");
+
+        // ?? Phase 5: stairs ??????????????????????????????????????????????????
+        if (numFloors > 1) GenerateStairs();
+        Debug.Log($"? {stairs.Count} stairs");
+
+        // ?? Phase 6: instantiate ?????????????????????????????????????????????
         InstantiateGeometry();
+        BuildMinimap();
         Debug.Log("Building generation complete!");
     }
+
+    // ?????????????????????????????????????????????????????????????????????????
+    //  ROOM GENERATION  (BSP split — same logic as before, split-position bug fixed)
+    // ?????????????????????????????????????????????????????????????????????????
 
     private void GenerateBuildingSection(int buildingIndex, Vector3 offset, Vector3 sectionSize)
     {
         var section = new BuildingSection
         {
-            position = offset,
-            size = sectionSize,
-            buildingIndex = buildingIndex,
-            roomsInSection = 0
+            position = offset, size = sectionSize, buildingIndex = buildingIndex
         };
         buildings.Add(section);
-        
-        int roomsBeforeBuilding = rooms.Count;
-        
-        for (int floorIdx = 0; floorIdx < numFloors; floorIdx++)
-        {
-            float floorY = offset.y + (floorIdx * floorHeight);
-            GenerateFloor(floorY, floorIdx, buildingIndex, offset, sectionSize);
-        }
-        
-        section.roomsInSection = rooms.Count - roomsBeforeBuilding;
+
+        int before = rooms.Count;
+        for (int f = 0; f < numFloors; f++)
+            GenerateFloor(offset.y + f * floorHeight, f, buildingIndex, offset, sectionSize);
+        section.roomsInSection = rooms.Count - before;
     }
 
-    private void GenerateFloor(float floorY, int floorIndex, int buildingIndex, Vector3 offset, Vector3 sectionSize)
+    private void GenerateFloor(float floorY, int floorIndex, int buildingIndex,
+                               Vector3 offset, Vector3 sectionSize)
     {
-        var toSplit = new Queue<(Vector3 pos, Vector3 size)>();
-        
-        Vector3 floorOrigin = new Vector3(offset.x, floorY, offset.z);
-        Vector3 floorSize = new Vector3(sectionSize.x, floorHeight, sectionSize.z);
-        
-        toSplit.Enqueue((floorOrigin, floorSize));
-        
-        int iterations = 0;
-        int maxIterations = 1000;
-        
-        while (toSplit.Count > 0 && iterations < maxIterations)
+        var queue = new Queue<(Vector3 pos, Vector3 size)>();
+        queue.Enqueue((new Vector3(offset.x, floorY, offset.z),
+                       new Vector3(sectionSize.x, floorHeight, sectionSize.z)));
+
+        for (int iter = 0; queue.Count > 0 && iter < 1000; iter++)
         {
-            iterations++;
-            var (position, size) = toSplit.Dequeue();
-            
-            if (size.x <= 0.1f || size.z <= 0.1f)
-                continue;
-            
-            float minTotalToSplit = (minRoomSize * 2) + (wallThickness * 2);
-            bool canSplitX = size.x >= minTotalToSplit;
-            bool canSplitZ = size.z >= minTotalToSplit;
-            
-            if (!canSplitX && !canSplitZ)
+            var (pos, sz) = queue.Dequeue();
+            if (sz.x <= 0.1f || sz.z <= 0.1f) continue;
+
+            float minTotal = minRoomSize * 2 + wallThickness * 2;
+            bool canX = sz.x >= minTotal;
+            bool canZ = sz.z >= minTotal;
+
+            if (!canX && !canZ) { CreateRoom(pos, sz, floorIndex, buildingIndex); continue; }
+
+            bool split = false;
+            if (canX && canZ)
             {
-                CreateRoom(position, size, floorIndex, buildingIndex);
-                continue;
+                split = random.Next(2) == 0 ? TrySplitX(pos, sz, queue) : TrySplitZ(pos, sz, queue);
+                if (!split) split = TrySplitX(pos, sz, queue) || TrySplitZ(pos, sz, queue);
             }
-            
-            bool splitSuccess = false;
-            
-            if (canSplitX && canSplitZ)
-            {
-                if (random.Next(0, 2) == 0)
-                {
-                    float splitX = GetRandomSplitPosition(size.x);
-                    if (splitX > position.x && splitX < position.x + size.x)
-                    {
-                        SplitRoomOnX(position, size, splitX, toSplit);
-                        splitSuccess = true;
-                    }
-                }
-                else
-                {
-                    float splitZ = GetRandomSplitPosition(size.z);
-                    if (splitZ > position.z && splitZ < position.z + size.z)
-                    {
-                        SplitRoomOnZ(position, size, splitZ, toSplit);
-                        splitSuccess = true;
-                    }
-                }
-                
-                if (!splitSuccess)
-                {
-                    float splitX = GetRandomSplitPosition(size.x);
-                    if (splitX > position.x && splitX < position.x + size.x)
-                    {
-                        SplitRoomOnX(position, size, splitX, toSplit);
-                        splitSuccess = true;
-                    }
-                }
-            }
-            else if (canSplitX)
-            {
-                float splitX = GetRandomSplitPosition(size.x);
-                if (splitX > position.x && splitX < position.x + size.x)
-                {
-                    SplitRoomOnX(position, size, splitX, toSplit);
-                    splitSuccess = true;
-                }
-            }
-            else if (canSplitZ)
-            {
-                float splitZ = GetRandomSplitPosition(size.z);
-                if (splitZ > position.z && splitZ < position.z + size.z)
-                {
-                    SplitRoomOnZ(position, size, splitZ, toSplit);
-                    splitSuccess = true;
-                }
-            }
-            
-            if (!splitSuccess)
-            {
-                CreateRoom(position, size, floorIndex, buildingIndex);
-            }
+            else if (canX) split = TrySplitX(pos, sz, queue);
+            else            split = TrySplitZ(pos, sz, queue);
+
+            if (!split) CreateRoom(pos, sz, floorIndex, buildingIndex);
         }
     }
 
-    private float GetRandomSplitPosition(float dimensionLength)
+    // Returns a split offset in [0, length] relative to the cell's own origin.
+    // BUG FIX: the original returned a value relative to world 0, breaking rooms at non-zero offsets.
+    private float GetRelativeSplitOffset(float length)
     {
-        float minSplit = minRoomSize + wallThickness;
-        float maxSplit = dimensionLength - minRoomSize - wallThickness;
-        
-        float minByMax = maxRoomSize;
-        float maxByMin = dimensionLength - maxRoomSize;
-        
-        minSplit = Mathf.Max(minSplit, minByMax);
-        maxSplit = Mathf.Min(maxSplit, maxByMin);
-        
-        if (maxSplit <= minSplit)
-            return -1f;
-        
-        return (float)(minSplit + (maxSplit - minSplit) * random.NextDouble());
+        float lo = Mathf.Max(minRoomSize + wallThickness, maxRoomSize);
+        float hi = Mathf.Min(length - minRoomSize - wallThickness, length - maxRoomSize);
+        if (hi <= lo) return -1f;
+        return (float)(lo + (hi - lo) * random.NextDouble());
     }
 
-    private void SplitRoomOnX(Vector3 position, Vector3 size, float splitX, Queue<(Vector3, Vector3)> toSplit)
+    private bool TrySplitX(Vector3 pos, Vector3 sz, Queue<(Vector3, Vector3)> q)
     {
-        float leftSize = splitX - position.x;
-        float rightSize = position.x + size.x - splitX;
-        
-        if (leftSize > 0.1f && rightSize > 0.1f)
+        float offset = GetRelativeSplitOffset(sz.x);
+        if (offset < 0) return false;
+        float splitX = pos.x + offset;
+        float lw = splitX - pos.x, rw = pos.x + sz.x - splitX;
+        if (lw <= 0.1f || rw <= 0.1f) return false;
+        q.Enqueue((pos,                                       new Vector3(lw, sz.y, sz.z)));
+        q.Enqueue((new Vector3(splitX, pos.y, pos.z),         new Vector3(rw, sz.y, sz.z)));
+        return true;
+    }
+
+    private bool TrySplitZ(Vector3 pos, Vector3 sz, Queue<(Vector3, Vector3)> q)
+    {
+        float offset = GetRelativeSplitOffset(sz.z);
+        if (offset < 0) return false;
+        float splitZ = pos.z + offset;
+        float fd = splitZ - pos.z, bd = pos.z + sz.z - splitZ;
+        if (fd <= 0.1f || bd <= 0.1f) return false;
+        q.Enqueue((pos,                                       new Vector3(sz.x, sz.y, fd)));
+        q.Enqueue((new Vector3(pos.x, pos.y, splitZ),         new Vector3(sz.x, sz.y, bd)));
+        return true;
+    }
+
+    private void CreateRoom(Vector3 pos, Vector3 sz, int floorIndex, int buildingIndex)
+    {
+        if (sz.x <= 0.1f || sz.z <= 0.1f) return;
+        rooms.Add(new BuildingRoom
         {
-            Vector3 size1 = size;
-            Vector3 size2 = size;
-            size1.x = leftSize;
-            size2.x = rightSize;
-            
-            Vector3 pos2 = position;
-            pos2.x = splitX;
-            
-            toSplit.Enqueue((position, size1));
-            toSplit.Enqueue((pos2, size2));
-        }
+            position = pos, size = sz,
+            roomType = ClassifyRoom(sz),
+            floorIndex = floorIndex, buildingIndex = buildingIndex
+        });
     }
 
-    private void SplitRoomOnZ(Vector3 position, Vector3 size, float splitZ, Queue<(Vector3, Vector3)> toSplit)
+    private RoomType ClassifyRoom(Vector3 sz)
     {
-        float frontSize = splitZ - position.z;
-        float backSize = position.z + size.z - splitZ;
-        
-        if (frontSize > 0.1f && backSize > 0.1f)
-        {
-            Vector3 size1 = size;
-            Vector3 size2 = size;
-            size1.z = frontSize;
-            size2.z = backSize;
-            
-            Vector3 pos2 = position;
-            pos2.z = splitZ;
-            
-            toSplit.Enqueue((position, size1));
-            toSplit.Enqueue((pos2, size2));
-        }
-    }
-
-    private void CreateRoom(Vector3 position, Vector3 size, int floorIndex, int buildingIndex)
-    {
-        if (size.x <= 0.1f || size.z <= 0.1f)
-            return;
-        
-        RoomType type = ClassifyRoom(size);
-        
-        var room = new BuildingRoom
-        {
-            position = position,
-            size = size,
-            roomType = type,
-            floorIndex = floorIndex,
-            buildingIndex = buildingIndex
-        };
-        
-        rooms.Add(room);
-    }
-
-    private RoomType ClassifyRoom(Vector3 size)
-    {
-        float minDim = Mathf.Min(size.x, size.z);
-        float maxDim = Mathf.Max(size.x, size.z);
-        float ratio = maxDim / minDim;
-        
-        if (minDim < 1.5f && ratio > 3f)
-            return RoomType.Hallway;
-        
-        if (minDim < 2.5f && maxDim < 4f)
-            return RoomType.Bathroom;
-        
-        if (minDim > 2f && maxDim < 7f && ratio < 2f)
-            return RoomType.Kitchen;
-        
-        if (minDim > 5f)
-            return RoomType.LivingRoom;
-        
-        if (minDim > 3f && maxDim < 8f)
-            return RoomType.Bedroom;
-        
+        float mn = Mathf.Min(sz.x, sz.z), mx = Mathf.Max(sz.x, sz.z), ratio = mx / mn;
+        if (mn < 1.5f && ratio > 3f)         return RoomType.Hallway;
+        if (mn < 2.5f && mx < 4f)             return RoomType.Bathroom;
+        if (mn > 2f  && mx < 7f && ratio < 2f) return RoomType.Kitchen;
+        if (mn > 5f)                           return RoomType.LivingRoom;
+        if (mn > 3f  && mx < 8f)               return RoomType.Bedroom;
         return RoomType.General;
     }
 
-    private void CreateWallsForAllRooms()
+    // ?????????????????????????????????????????????????????????????????????????
+    //  WALL DERIVATION  (the core refactor)
+    //
+    //  Instead of 4 walls per room (doubles every shared wall), we:
+    //   1. Iterate all room pairs — if adjacent, create ONE shared wall.
+    //   2. For each room side not fully covered by shared walls, create an exterior wall.
+    //
+    //  Result: no duplicate walls, each wall knows its two neighbouring rooms.
+    // ?????????????????????????????????????????????????????????????????????????
+
+    private void DeriveWallsFromRooms()
     {
-        foreach (var room in rooms)
+        sharedWallLookup = new Dictionary<(int, int), List<int>>();
+
+        // side coverage: (roomIdx, side 0=x- 1=x+ 2=z- 3=z+) ? covered intervals
+        var coverage = new Dictionary<(int, int), List<(float, float)>>();
+        for (int i = 0; i < rooms.Count; i++)
+            for (int s = 0; s < 4; s++)
+                coverage[(i, s)] = new List<(float, float)>();
+
+        const float tol = 0.05f;
+
+        for (int i = 0; i < rooms.Count; i++)
         {
-            CreateWallsAroundRoom(room);
+            for (int j = i + 1; j < rooms.Count; j++)
+            {
+                var a = rooms[i]; var b = rooms[j];
+
+                // a-right touches b-left
+                if (Mathf.Abs((a.position.x + a.size.x) - b.position.x) < tol)
+                    TryMakeSharedWallX(i, j, a, b, coverage);
+                // b-right touches a-left
+                else if (Mathf.Abs((b.position.x + b.size.x) - a.position.x) < tol)
+                    TryMakeSharedWallX(j, i, b, a, coverage);
+                // a-back touches b-front
+                else if (Mathf.Abs((a.position.z + a.size.z) - b.position.z) < tol)
+                    TryMakeSharedWallZ(i, j, a, b, coverage);
+                // b-back touches a-front
+                else if (Mathf.Abs((b.position.z + b.size.z) - a.position.z) < tol)
+                    TryMakeSharedWallZ(j, i, b, a, coverage);
+            }
+        }
+
+        // Exterior walls for sides that have no (or partial) neighbour coverage
+        for (int i = 0; i < rooms.Count; i++)
+        {
+            var r = rooms[i];
+            float halfY = r.position.y + r.size.y * 0.5f;
+            float h = r.size.y;
+            float zMin = r.position.z, zMax = r.position.z + r.size.z;
+            float xMin = r.position.x, xMax = r.position.x + r.size.x;
+
+            // x- side  (facingX wall, runs along Z)
+            foreach (var (lo, hi) in UncoveredSegments(coverage[(i, 0)], zMin, zMax))
+                walls.Add(MakeWall(new Vector3(xMin, halfY, (lo + hi) * 0.5f),
+                                   new Vector3(wallThickness, h, hi - lo), facingX: true, i, -1));
+
+            // x+ side
+            foreach (var (lo, hi) in UncoveredSegments(coverage[(i, 1)], zMin, zMax))
+                walls.Add(MakeWall(new Vector3(xMax, halfY, (lo + hi) * 0.5f),
+                                   new Vector3(wallThickness, h, hi - lo), facingX: true, i, -1));
+
+            // z- side  (facingX=false wall, runs along X)
+            foreach (var (lo, hi) in UncoveredSegments(coverage[(i, 2)], xMin, xMax))
+                walls.Add(MakeWall(new Vector3((lo + hi) * 0.5f, halfY, zMin),
+                                   new Vector3(hi - lo, h, wallThickness), facingX: false, i, -1));
+
+            // z+ side
+            foreach (var (lo, hi) in UncoveredSegments(coverage[(i, 3)], xMin, xMax))
+                walls.Add(MakeWall(new Vector3((lo + hi) * 0.5f, halfY, zMax),
+                                   new Vector3(hi - lo, h, wallThickness), facingX: false, i, -1));
         }
     }
 
-    private void CreateWallsAroundRoom(BuildingRoom room)
+    // leftIdx's right edge touches rightIdx's left edge
+    private void TryMakeSharedWallX(int leftIdx, int rightIdx,
+                                    BuildingRoom left, BuildingRoom right,
+                                    Dictionary<(int, int), List<(float, float)>> coverage)
     {
-        float x1 = room.position.x;
-        float x2 = room.position.x + room.size.x;
-        float z1 = room.position.z;
-        float z2 = room.position.z + room.size.z;
-        float y1 = room.position.y;
-        float height = room.size.y;
-        
-        CreateWall(new Vector3(x1, y1 + height / 2, (z1 + z2) / 2),
-                  new Vector3(wallThickness, height, room.size.z), 0);
-        
-        CreateWall(new Vector3(x2, y1 + height / 2, (z1 + z2) / 2),
-                  new Vector3(wallThickness, height, room.size.z), 0);
-        
-        CreateWall(new Vector3((x1 + x2) / 2, y1 + height / 2, z1),
-                  new Vector3(room.size.x, height, wallThickness), 1);
-        
-        CreateWall(new Vector3((x1 + x2) / 2, y1 + height / 2, z2),
-                  new Vector3(room.size.x, height, wallThickness), 1);
+        float z1 = Mathf.Max(left.position.z, right.position.z);
+        float z2 = Mathf.Min(left.position.z + left.size.z, right.position.z + right.size.z);
+        if (z2 - z1 < 0.05f) return;
+
+        int wIdx = walls.Count;
+        walls.Add(MakeWall(
+            new Vector3(left.position.x + left.size.x, left.position.y + left.size.y * 0.5f, (z1 + z2) * 0.5f),
+            new Vector3(wallThickness, left.size.y, z2 - z1),
+            facingX: true, leftIdx, rightIdx));
+
+        RegisterSharedWall(leftIdx, rightIdx, wIdx);
+        coverage[(leftIdx, 1)].Add((z1, z2));
+        coverage[(rightIdx, 0)].Add((z1, z2));
     }
 
-    private void CreateWall(Vector3 position, Vector3 size, int dimension)
+    // frontIdx's back edge touches backIdx's front edge
+    private void TryMakeSharedWallZ(int frontIdx, int backIdx,
+                                    BuildingRoom front, BuildingRoom back,
+                                    Dictionary<(int, int), List<(float, float)>> coverage)
     {
-        walls.Add(new BuildingWall { position = position, size = size, dimension = dimension });
+        float x1 = Mathf.Max(front.position.x, back.position.x);
+        float x2 = Mathf.Min(front.position.x + front.size.x, back.position.x + back.size.x);
+        if (x2 - x1 < 0.05f) return;
+
+        int wIdx = walls.Count;
+        walls.Add(MakeWall(
+            new Vector3((x1 + x2) * 0.5f, front.position.y + front.size.y * 0.5f, front.position.z + front.size.z),
+            new Vector3(x2 - x1, front.size.y, wallThickness),
+            facingX: false, frontIdx, backIdx));
+
+        RegisterSharedWall(frontIdx, backIdx, wIdx);
+        coverage[(frontIdx, 3)].Add((x1, x2));
+        coverage[(backIdx, 2)].Add((x1, x2));
     }
+
+    private BuildingWall MakeWall(Vector3 pos, Vector3 sz, bool facingX, int roomA, int roomB) =>
+        new BuildingWall { position = pos, size = sz, facingX = facingX, roomA = roomA, roomB = roomB };
+
+    private void RegisterSharedWall(int a, int b, int wallIdx)
+    {
+        var key = (Math.Min(a, b), Math.Max(a, b));
+        if (!sharedWallLookup.ContainsKey(key)) sharedWallLookup[key] = new List<int>();
+        sharedWallLookup[key].Add(wallIdx);
+    }
+
+    // Returns segments of [rangeMin, rangeMax] NOT covered by any interval in `covered`.
+    private static List<(float, float)> UncoveredSegments(
+        List<(float min, float max)> covered, float rangeMin, float rangeMax)
+    {
+        var result = new List<(float, float)>();
+        float cur = rangeMin;
+        foreach (var (mn, mx) in covered.OrderBy(c => c.min))
+        {
+            if (mn > cur + 0.05f) result.Add((cur, mn));
+            cur = Mathf.Max(cur, mx);
+        }
+        if (cur < rangeMax - 0.05f) result.Add((cur, rangeMax));
+        return result;
+    }
+
+    // ?????????????????????????????????????????????????????????????????????????
+    //  DOOR PLACEMENT
+    // ?????????????????????????????????????????????????????????????????????????
 
     private void ConnectRoomsWithinBuildings()
     {
-        var groups = rooms.GroupBy(r => (r.floorIndex, r.buildingIndex));
-        
-        int internalDoorsAdded = 0;
-        
-        foreach (var floorRooms in groups)
+        int count = 0;
+        // Group by (floor, building), pass room indices directly — no IndexOf needed
+        var groups = rooms
+            .Select((r, i) => (r, i))
+            .GroupBy(x => (x.r.floorIndex, x.r.buildingIndex));
+
+        foreach (var group in groups)
         {
-            var roomList = floorRooms.ToList();
-            
-            for (int i = 0; i < roomList.Count; i++)
-            {
-                for (int j = i + 1; j < roomList.Count; j++)
-                {
-                    BuildingRoom r1 = roomList[i];
-                    BuildingRoom r2 = roomList[j];
-                    
-                    if (TryAddDoorBetweenRoomsOnX(r1, r2))
-                    {
-                        internalDoorsAdded++;
-                    }
-                    else if (TryAddDoorBetweenRoomsOnZ(r1, r2))
-                    {
-                        internalDoorsAdded++;
-                    }
-                }
-            }
+            var list = group.ToList();
+            for (int i = 0; i < list.Count; i++)
+                for (int j = i + 1; j < list.Count; j++)
+                    if (TryAddDoor(list[i].i, list[j].i)) count++;
         }
-        
-        Debug.Log($"Added {internalDoorsAdded} internal doors");
-    }
-
-    private bool TryAddDoorBetweenRoomsOnX(BuildingRoom r1, BuildingRoom r2)
-    {
-        // Check X-axis adjacency
-        if (!AreRoomsAdjacentOnX(r1, r2))
-            return false;
-        
-        // Calculate overlap in Z
-        float overlapZ1 = Mathf.Max(r1.position.z, r2.position.z);
-        float overlapZ2 = Mathf.Min(r1.position.z + r1.size.z, r2.position.z + r2.size.z);
-        float overlapZLength = overlapZ2 - overlapZ1;
-        
-        // Door must fit within overlap (need doorWidth space)
-        if (overlapZLength < doorWidth + 0.2f)
-            return false;
-        
-        // Calculate door position - centered in the overlap but with safety margin from edges
-        float safeMargin = 0.1f;
-        float overlapZMin = overlapZ1 + safeMargin;
-        float overlapZMax = overlapZ2 - safeMargin;
-        float overlapZUsable = overlapZMax - overlapZMin;
-        
-        if (overlapZUsable < doorWidth)
-            return false;
-        
-        // Center door in usable overlap
-        float doorZ = overlapZMin + overlapZUsable / 2;
-        float doorX = r1.position.x + r1.size.x;
-        
-        AddDoor(rooms.IndexOf(r1), rooms.IndexOf(r2), 
-               new Vector3(doorX, r1.position.y + 1f, doorZ), false, true);
-        
-        return true;
-    }
-
-    private bool TryAddDoorBetweenRoomsOnZ(BuildingRoom r1, BuildingRoom r2)
-    {
-        // Check Z-axis adjacency
-        if (!AreRoomsAdjacentOnZ(r1, r2))
-            return false;
-        
-        // Calculate overlap in X
-        float overlapX1 = Mathf.Max(r1.position.x, r2.position.x);
-        float overlapX2 = Mathf.Min(r1.position.x + r1.size.x, r2.position.x + r2.size.x);
-        float overlapXLength = overlapX2 - overlapX1;
-        
-        // Door must fit within overlap (need doorWidth space)
-        if (overlapXLength < doorWidth + 0.2f)
-            return false;
-        
-        // Calculate door position - centered in the overlap but with safety margin from edges
-        float safeMargin = 0.1f;
-        float overlapXMin = overlapX1 + safeMargin;
-        float overlapXMax = overlapX2 - safeMargin;
-        float overlapXUsable = overlapXMax - overlapXMin;
-        
-        if (overlapXUsable < doorWidth)
-            return false;
-        
-        // Center door in usable overlap
-        float doorX = overlapXMin + overlapXUsable / 2;
-        float doorZ = r1.position.z + r1.size.z;
-        
-        AddDoor(rooms.IndexOf(r1), rooms.IndexOf(r2), 
-               new Vector3(doorX, r1.position.y + 1f, doorZ), true, true);
-        
-        return true;
-    }
-
-    private bool AreRoomsAdjacentOnX(BuildingRoom r1, BuildingRoom r2)
-    {
-        bool r1_right_touches_r2_left = Mathf.Abs((r1.position.x + r1.size.x) - r2.position.x) < 0.5f;
-        
-        if (!r1_right_touches_r2_left)
-            return false;
-        
-        return r1.position.z < r2.position.z + r2.size.z &&
-               r1.position.z + r1.size.z > r2.position.z;
-    }
-
-    private bool AreRoomsAdjacentOnZ(BuildingRoom r1, BuildingRoom r2)
-    {
-        bool r1_back_touches_r2_front = Mathf.Abs((r1.position.z + r1.size.z) - r2.position.z) < 0.5f;
-        
-        if (!r1_back_touches_r2_front)
-            return false;
-        
-        return r1.position.x < r2.position.x + r2.size.x &&
-               r1.position.x + r1.size.x > r2.position.x;
+        Debug.Log($"Added {count} internal doors");
     }
 
     private void ConnectAdjacentBuildings()
     {
-        int buildingDoorsAdded = 0;
-        
+        int count = 0;
         for (int i = 0; i < buildings.Count; i++)
-        {
             for (int j = i + 1; j < buildings.Count; j++)
-            {
-                BuildingSection b1 = buildings[i];
-                BuildingSection b2 = buildings[j];
-                
-                // Check if buildings touch on X axis
-                float b1_right = b1.position.x + b1.size.x;
-                float b2_left = b2.position.x;
-                float xGap = b2_left - b1_right;
-                
-                if (Mathf.Abs(xGap) < 0.1f)
-                {
-                    int doorCount = ConnectBuildingsOnXAxis(i, j);
-                    buildingDoorsAdded += doorCount;
-                }
-                
-                // Check if buildings touch on Z axis
-                float b1_back = b1.position.z + b1.size.z;
-                float b2_front = b2.position.z;
-                float zGap = b2_front - b1_back;
-                
-                if (Mathf.Abs(zGap) < 0.1f)
-                {
-                    int doorCount = ConnectBuildingsOnZAxis(i, j);
-                    buildingDoorsAdded += doorCount;
-                }
-            }
-        }
-        
-        Debug.Log($"Added {buildingDoorsAdded} doors between adjacent (touching) buildings");
+                count += TryConnectBuildingPair(i, j);
+        Debug.Log($"Added {count} doors between adjacent buildings");
     }
 
-    private int ConnectBuildingsOnXAxis(int buildingAIdx, int buildingBIdx)
+    private int TryConnectBuildingPair(int aIdx, int bIdx)
     {
-        BuildingSection b1 = buildings[buildingAIdx];
-        BuildingSection b2 = buildings[buildingBIdx];
-        
-        int doorsCreated = 0;
-        float sharedWallX = b1.position.x + b1.size.x;
-        
-        var edgeRooms1 = rooms.Where(r => r.buildingIndex == buildingAIdx && 
-                                           r.floorIndex == 0 &&
-                                           Mathf.Abs((r.position.x + r.size.x) - sharedWallX) < 0.1f).ToList();
-        
-        var edgeRooms2 = rooms.Where(r => r.buildingIndex == buildingBIdx && 
-                                           r.floorIndex == 0 &&
-                                           Mathf.Abs(r.position.x - b2.position.x) < 0.1f).ToList();
-        
-        if (edgeRooms1.Count > 0 && edgeRooms2.Count > 0)
-        {
-            var overlappingPairs = new List<(BuildingRoom, BuildingRoom)>();
-            
-            foreach (var r1 in edgeRooms1)
-            {
-                foreach (var r2 in edgeRooms2)
-                {
-                    // Check if rooms overlap in Z AND have enough space for door
-                    if (r1.position.z < r2.position.z + r2.size.z &&
-                        r1.position.z + r1.size.z > r2.position.z)
-                    {
-                        float overlapZ1 = Mathf.Max(r1.position.z, r2.position.z);
-                        float overlapZ2 = Mathf.Min(r1.position.z + r1.size.z, r2.position.z + r2.size.z);
-                        
-                        // Only add if overlap is large enough for door
-                        if (overlapZ2 - overlapZ1 >= doorWidth + 0.2f)
-                        {
-                            overlappingPairs.Add((r1, r2));
-                        }
-                    }
-                }
-            }
-            
-            if (overlappingPairs.Count > 0)
-            {
-                var (r1, r2) = overlappingPairs[random.Next(overlappingPairs.Count)];
-                
-                // Calculate safe position in overlap
-                float overlapZ1 = Mathf.Max(r1.position.z, r2.position.z);
-                float overlapZ2 = Mathf.Min(r1.position.z + r1.size.z, r2.position.z + r2.size.z);
-                float safeMargin = 0.1f;
-                float doorZ = overlapZ1 + safeMargin + (overlapZ2 - overlapZ1 - 2 * safeMargin) / 2;
-                float doorX = sharedWallX;
-                
-                AddDoor(rooms.IndexOf(r1), rooms.IndexOf(r2), 
-                       new Vector3(doorX, r1.position.y + 1f, doorZ), false, true);
-                
-                Debug.Log($"? Connected Building {buildingAIdx} to Building {buildingBIdx} on X axis (TOUCHING)");
-                doorsCreated++;
-            }
-        }
-        
-        return doorsCreated;
+        var a = buildings[aIdx]; var b = buildings[bIdx];
+        int doors = 0;
+
+        if (Mathf.Abs((a.position.x + a.size.x) - b.position.x) < 0.1f)
+            doors += TryConnectBuildingsAlongAxis(aIdx, bIdx, isXAxis: true)  ? 1 : 0;
+        else if (Mathf.Abs((b.position.x + b.size.x) - a.position.x) < 0.1f)
+            doors += TryConnectBuildingsAlongAxis(bIdx, aIdx, isXAxis: true)  ? 1 : 0;
+
+        if (Mathf.Abs((a.position.z + a.size.z) - b.position.z) < 0.1f)
+            doors += TryConnectBuildingsAlongAxis(aIdx, bIdx, isXAxis: false) ? 1 : 0;
+        else if (Mathf.Abs((b.position.z + b.size.z) - a.position.z) < 0.1f)
+            doors += TryConnectBuildingsAlongAxis(bIdx, aIdx, isXAxis: false) ? 1 : 0;
+
+        return doors;
     }
 
-    private int ConnectBuildingsOnZAxis(int buildingAIdx, int buildingBIdx)
+    // nearIdx's far edge (right/back) touches farIdx's near edge (left/front)
+    private bool TryConnectBuildingsAlongAxis(int nearIdx, int farIdx, bool isXAxis)
     {
-        BuildingSection b1 = buildings[buildingAIdx];
-        BuildingSection b2 = buildings[buildingBIdx];
-        
-        int doorsCreated = 0;
-        float sharedWallZ = b1.position.z + b1.size.z;
-        
-        var edgeRooms1 = rooms.Where(r => r.buildingIndex == buildingAIdx && 
-                                           r.floorIndex == 0 &&
-                                           Mathf.Abs((r.position.z + r.size.z) - sharedWallZ) < 0.1f).ToList();
-        
-        var edgeRooms2 = rooms.Where(r => r.buildingIndex == buildingBIdx && 
-                                           r.floorIndex == 0 &&
-                                           Mathf.Abs(r.position.z - b2.position.z) < 0.1f).ToList();
-        
-        if (edgeRooms1.Count > 0 && edgeRooms2.Count > 0)
+        float boundary = isXAxis
+            ? buildings[nearIdx].position.x + buildings[nearIdx].size.x
+            : buildings[nearIdx].position.z + buildings[nearIdx].size.z;
+
+        // Rooms whose edge touches the shared boundary, ground floor only
+        var edgesNear = rooms
+            .Select((r, i) => (r, i))
+            .Where(x => x.r.buildingIndex == nearIdx && x.r.floorIndex == 0 &&
+                        (isXAxis
+                            ? Mathf.Abs((x.r.position.x + x.r.size.x) - boundary) < 0.1f
+                            : Mathf.Abs((x.r.position.z + x.r.size.z) - boundary) < 0.1f))
+            .ToList();
+
+        float farEdge = isXAxis ? buildings[farIdx].position.x : buildings[farIdx].position.z;
+        var edgesFar = rooms
+            .Select((r, i) => (r, i))
+            .Where(x => x.r.buildingIndex == farIdx && x.r.floorIndex == 0 &&
+                        (isXAxis
+                            ? Mathf.Abs(x.r.position.x - farEdge) < 0.1f
+                            : Mathf.Abs(x.r.position.z - farEdge) < 0.1f))
+            .ToList();
+
+        // Collect overlapping pairs wide enough for a door
+        var candidates = new List<(int, int)>();
+        foreach (var (rA, iA) in edgesNear)
         {
-            var overlappingPairs = new List<(BuildingRoom, BuildingRoom)>();
-            
-            foreach (var r1 in edgeRooms1)
+            foreach (var (rB, iB) in edgesFar)
             {
-                foreach (var r2 in edgeRooms2)
-                {
-                    // Check if rooms overlap in X AND have enough space for door
-                    if (r1.position.x < r2.position.x + r2.size.x &&
-                        r1.position.x + r1.size.x > r2.position.x)
-                    {
-                        float overlapX1 = Mathf.Max(r1.position.x, r2.position.x);
-                        float overlapX2 = Mathf.Min(r1.position.x + r1.size.x, r2.position.x + r2.size.x);
-                        
-                        // Only add if overlap is large enough for door
-                        if (overlapX2 - overlapX1 >= doorWidth + 0.2f)
-                        {
-                            overlappingPairs.Add((r1, r2));
-                        }
-                    }
-                }
-            }
-            
-            if (overlappingPairs.Count > 0)
-            {
-                var (r1, r2) = overlappingPairs[random.Next(overlappingPairs.Count)];
-                
-                // Calculate safe position in overlap
-                float overlapX1 = Mathf.Max(r1.position.x, r2.position.x);
-                float overlapX2 = Mathf.Min(r1.position.x + r1.size.x, r2.position.x + r2.size.x);
-                float safeMargin = 0.1f;
-                float doorX = overlapX1 + safeMargin + (overlapX2 - overlapX1 - 2 * safeMargin) / 2;
-                float doorZ = sharedWallZ;
-                
-                AddDoor(rooms.IndexOf(r1), rooms.IndexOf(r2), 
-                       new Vector3(doorX, r1.position.y + 1f, doorZ), true, true);
-                
-                Debug.Log($"? Connected Building {buildingAIdx} to Building {buildingBIdx} on Z axis (TOUCHING)");
-                doorsCreated++;
+                float overlapLen = isXAxis
+                    ? Mathf.Min(rA.position.z + rA.size.z, rB.position.z + rB.size.z)
+                      - Mathf.Max(rA.position.z, rB.position.z)
+                    : Mathf.Min(rA.position.x + rA.size.x, rB.position.x + rB.size.x)
+                      - Mathf.Max(rA.position.x, rB.position.x);
+                if (overlapLen >= doorWidth + 0.2f)
+                    candidates.Add((iA, iB));
             }
         }
-        
-        return doorsCreated;
+
+        if (candidates.Count == 0) return false;
+
+        var (roomA, roomB) = candidates[random.Next(candidates.Count)];
+        bool placed = TryAddDoor(roomA, roomB);
+        if (placed)
+            Debug.Log($"? Connected Building {nearIdx} ? Building {farIdx} ({(isXAxis ? "X" : "Z")} axis)");
+        return placed;
     }
 
-    private void AddDoor(int roomA, int roomB, Vector3 position, bool dim, bool dir)
+    // Core door-placement method. Finds the shared wall directly via lookup, no searching.
+    private bool TryAddDoor(int r1Idx, int r2Idx)
     {
-        Vector3 doorSize = dim ? 
-            new Vector3(doorWidth, doorHeight, wallThickness * 2) :
-            new Vector3(wallThickness * 2, doorHeight, doorWidth);
-        
-        doors.Add(new BuildingDoor
+        var key = (Math.Min(r1Idx, r2Idx), Math.Max(r1Idx, r2Idx));
+        if (!sharedWallLookup.TryGetValue(key, out var wallIndices)) return false;
+
+        foreach (int wIdx in wallIndices)
         {
-            position = position,
-            size = doorSize,
-            roomA = roomA,
-            roomB = roomB,
-            dim = dim,
-            dir = dir
-        });
+            var wall = walls[wIdx];
+            float wallLen = wall.facingX ? wall.size.z : wall.size.x;
+            if (wallLen < doorWidth + 0.2f) continue;
+
+            float doorY = rooms[r1Idx].position.y + 1f;
+            // Door is centred on the wall
+            Vector3 doorPos  = new Vector3(wall.position.x, doorY, wall.position.z);
+            Vector3 doorSize = wall.facingX
+                ? new Vector3(wallThickness * 2f, doorHeight, doorWidth)   // gap along Z
+                : new Vector3(doorWidth, doorHeight, wallThickness * 2f);  // gap along X
+
+            int doorIdx = doors.Count;
+            doors.Add(new BuildingDoor
+            {
+                position    = doorPos,
+                size        = doorSize,
+                roomA       = r1Idx,
+                roomB       = r2Idx,
+                wallIndex   = wIdx,
+                wallFacingX = wall.facingX
+            });
+
+            rooms[r1Idx].connectedDoorIndices.Add(doorIdx);
+            rooms[r2Idx].connectedDoorIndices.Add(doorIdx);
+            return true;
+        }
+        return false;
     }
+
+    // ?????????????????????????????????????????????????????????????????????????
+    //  WALL SPLITTING  (O(1) per door — direct wallIndex reference)
+    //
+    //  Process doors in descending wallIndex order so that RemoveAt on a higher
+    //  index never invalidates a lower index we still need to process.
+    // ?????????????????????????????????????????????????????????????????????????
+
+    private void SplitWallsForAllDoors()
+    {
+        foreach (var door in doors.OrderByDescending(d => d.wallIndex))
+        {
+            if (door.wallIndex < 0 || door.wallIndex >= walls.Count) continue;
+            SplitWallAtDoor(door);
+        }
+    }
+
+    private void SplitWallAtDoor(BuildingDoor door)
+    {
+        var wall = walls[door.wallIndex];
+
+        // Transom: the solid strip of wall above the door opening.
+        //   wallBottomY      = bottom of the full wall
+        //   wallBottomY + doorHeight = top of the door opening
+        //   wallTopY         = top of the full wall
+        float wallBottomY   = wall.position.y - wall.size.y * 0.5f;
+        float wallTopY      = wall.position.y + wall.size.y * 0.5f;
+        float transomHeight = wallTopY - (wallBottomY + doorHeight);
+        float transomCenterY = wallTopY - transomHeight * 0.5f;
+        bool hasTransom = transomHeight > 0.05f;
+
+        if (door.wallFacingX)
+        {
+            // Wall runs along Z — cut a doorWidth slot on the Z axis
+            float wallZMin = wall.position.z - wall.size.z * 0.5f;
+            float wallZMax = wall.position.z + wall.size.z * 0.5f;
+            float gapMin   = door.position.z  - doorWidth * 0.5f;
+            float gapMax   = door.position.z  + doorWidth * 0.5f;
+
+            // Bottom of wall cut to doorHeight only (the opening height, not the full wall height)
+            float openingHeight       = doorHeight;
+            float openingCenterY      = wallBottomY + openingHeight * 0.5f;
+            Vector3 openingSize       = new Vector3(wall.size.x, openingHeight, wall.size.z);
+
+            walls.RemoveAt(door.wallIndex);
+
+            // Left segment (full height)
+            if (gapMin > wallZMin + 0.05f)
+                walls.Add(WallSegment(wall,
+                    new Vector3(wall.position.x, wall.position.y, wallZMin + (gapMin - wallZMin) * 0.5f),
+                    new Vector3(wall.size.x, wall.size.y, gapMin - wallZMin)));
+
+            // Right segment (full height)
+            if (gapMax < wallZMax - 0.05f)
+                walls.Add(WallSegment(wall,
+                    new Vector3(wall.position.x, wall.position.y, gapMax + (wallZMax - gapMax) * 0.5f),
+                    new Vector3(wall.size.x, wall.size.y, wallZMax - gapMax)));
+
+            // Transom (above door, same Z span as the opening)
+            if (hasTransom)
+                walls.Add(WallSegment(wall,
+                    new Vector3(wall.position.x, transomCenterY, door.position.z),
+                    new Vector3(wall.size.x, transomHeight, doorWidth)));
+        }
+        else
+        {
+            // Wall runs along X — cut a doorWidth slot on the X axis
+            float wallXMin = wall.position.x - wall.size.x * 0.5f;
+            float wallXMax = wall.position.x + wall.size.x * 0.5f;
+            float gapMin   = door.position.x  - doorWidth * 0.5f;
+            float gapMax   = door.position.x  + doorWidth * 0.5f;
+
+            walls.RemoveAt(door.wallIndex);
+
+            // Left segment (full height)
+            if (gapMin > wallXMin + 0.05f)
+                walls.Add(WallSegment(wall,
+                    new Vector3(wallXMin + (gapMin - wallXMin) * 0.5f, wall.position.y, wall.position.z),
+                    new Vector3(gapMin - wallXMin, wall.size.y, wall.size.z)));
+
+            // Right segment (full height)
+            if (gapMax < wallXMax - 0.05f)
+                walls.Add(WallSegment(wall,
+                    new Vector3(gapMax + (wallXMax - gapMax) * 0.5f, wall.position.y, wall.position.z),
+                    new Vector3(wallXMax - gapMax, wall.size.y, wall.size.z)));
+
+            // Transom (above door, same X span as the opening)
+            if (hasTransom)
+                walls.Add(WallSegment(wall,
+                    new Vector3(door.position.x, transomCenterY, wall.position.z),
+                    new Vector3(doorWidth, transomHeight, wall.size.z)));
+        }
+    }
+
+    private BuildingWall WallSegment(BuildingWall src, Vector3 pos, Vector3 sz) =>
+        new BuildingWall { position = pos, size = sz, facingX = src.facingX, roomA = src.roomA, roomB = src.roomB };
+
+    // ?????????????????????????????????????????????????????????????????????????
+    //  STAIRS
+    // ?????????????????????????????????????????????????????????????????????????
 
     private void GenerateStairs()
     {
         foreach (var building in buildings)
         {
             if (building.roomsInSection == 0) continue;
-            
-            var buildingRooms = rooms.Where(r => r.buildingIndex == building.buildingIndex).ToList();
-            var floorIndices = buildingRooms.Select(r => r.floorIndex).Distinct().OrderBy(f => f).ToList();
-            
-            for (int i = 0; i < floorIndices.Count - 1; i++)
+            var bRooms  = rooms.Where(r => r.buildingIndex == building.buildingIndex).ToList();
+            var floors  = bRooms.Select(r => r.floorIndex).Distinct().OrderBy(f => f).ToList();
+
+            for (int i = 0; i < floors.Count - 1; i++)
             {
-                var roomsFloorA = buildingRooms.Where(r => r.floorIndex == floorIndices[i]).ToList();
-                var stairRoom = FindBestStairRoom(roomsFloorA);
-                
+                var floorRooms = bRooms.Where(r => r.floorIndex == floors[i]).ToList();
+                var stairRoom  = FindBestStairRoom(floorRooms);
                 if (stairRoom == null) continue;
-                
-                float padding = 0.2f;
-                float stairX = stairRoom.position.x + padding;
-                float stairZ = stairRoom.position.z + padding;
-                
-                if (stairX + stairDepth + padding > stairRoom.position.x + stairRoom.size.x)
-                    stairX = stairRoom.position.x + stairRoom.size.x - stairDepth - padding;
-                
-                if (stairZ + stairWidth + padding > stairRoom.position.z + stairRoom.size.z)
-                    stairZ = stairRoom.position.z + stairRoom.size.z - stairWidth - padding;
-                
-                bool dim = random.Next(0, 2) == 0;
-                
+
+                float pad = 0.2f;
+                float sx = Mathf.Clamp(stairRoom.position.x + pad,
+                                       stairRoom.position.x,
+                                       stairRoom.position.x + stairRoom.size.x - stairDepth - pad);
+                float sz = Mathf.Clamp(stairRoom.position.z + pad,
+                                       stairRoom.position.z,
+                                       stairRoom.position.z + stairRoom.size.z - stairWidth - pad);
+                bool dim = random.Next(2) == 0;
+
                 stairs.Add(new BuildingStairs
                 {
-                    position = new Vector3(stairX, stairRoom.position.y, stairZ),
-                    size = dim ? new Vector3(stairDepth, floorHeight, stairWidth) : 
-                               new Vector3(stairWidth, floorHeight, stairDepth),
-                    floorA = floorIndices[i],
-                    floorB = floorIndices[i + 1],
-                    dim = dim
+                    position = new Vector3(sx, stairRoom.position.y, sz),
+                    size     = dim ? new Vector3(stairDepth, floorHeight, stairWidth)
+                                   : new Vector3(stairWidth, floorHeight, stairDepth),
+                    floorA   = floors[i],
+                    floorB   = floors[i + 1],
+                    dim      = dim
                 });
             }
         }
     }
 
-    private BuildingRoom FindBestStairRoom(List<BuildingRoom> roomList)
+    private BuildingRoom FindBestStairRoom(List<BuildingRoom> list)
     {
-        var hallways = roomList.Where(r => r.roomType == RoomType.Hallway).ToList();
-        if (hallways.Count > 0) return hallways[random.Next(hallways.Count)];
-        
-        var large = roomList.Where(r => r.size.x > stairDepth + 1 && r.size.z > stairWidth + 1).ToList();
+        var hall  = list.Where(r => r.roomType == RoomType.Hallway).ToList();
+        if (hall.Count  > 0) return hall[random.Next(hall.Count)];
+        var large = list.Where(r => r.size.x > stairDepth + 1 && r.size.z > stairWidth + 1).ToList();
         if (large.Count > 0) return large[random.Next(large.Count)];
-        
-        return roomList.Count > 0 ? roomList[random.Next(roomList.Count)] : null;
+        return list.Count > 0 ? list[random.Next(list.Count)] : null;
     }
+
+    // ?????????????????????????????????????????????????????????????????????????
+    //  INSTANTIATION
+    // ?????????????????????????????????????????????????????????????????????????
 
     private void InstantiateGeometry()
     {
-        Transform parent = this.transform;
-        
+        Transform parent = transform;
+
         var buildingParents = new Dictionary<int, Transform>();
-        foreach (var building in buildings)
+        foreach (var b in buildings)
         {
-            var obj = new GameObject($"Building_{building.buildingIndex} ({building.roomsInSection} rooms)");
-            obj.transform.parent = parent;
-            obj.transform.position = building.position;
-            buildingParents[building.buildingIndex] = obj.transform;
+            var go = new GameObject($"Building_{b.buildingIndex} ({b.roomsInSection} rooms)");
+            go.transform.parent   = parent;
+            go.transform.position = b.position;
+            buildingParents[b.buildingIndex] = go.transform;
         }
-        
+
         foreach (var room in rooms)
         {
-            var buildingParent = buildingParents[room.buildingIndex];
-            
-            var floorPos = room.position + new Vector3(room.size.x / 2, floorCeilThickness / 2, room.size.z / 2);
-            var floor = Instantiate(floorPrefab, floorPos, Quaternion.identity, buildingParent);
+            var bp = buildingParents[room.buildingIndex];
+
+            var floorPos = room.position + new Vector3(room.size.x * 0.5f, floorCeilThickness * 0.5f, room.size.z * 0.5f);
+            var floor = Instantiate(floorPrefab, floorPos, Quaternion.identity, bp);
             floor.name = $"Floor_{room.roomType}";
             floor.transform.localScale = new Vector3(room.size.x, floorCeilThickness, room.size.z);
-            
-            var ceilPos = new Vector3(room.position.x + room.size.x / 2,
-                                     room.position.y + room.size.y - floorCeilThickness / 2,
-                                     room.position.z + room.size.z / 2);
-            var ceil = Instantiate(ceilingPrefab, ceilPos, Quaternion.identity, buildingParent);
+
+            var ceilPos = new Vector3(
+                room.position.x + room.size.x * 0.5f,
+                room.position.y + room.size.y - floorCeilThickness * 0.5f,
+                room.position.z + room.size.z * 0.5f);
+            var ceil = Instantiate(ceilingPrefab, ceilPos, Quaternion.identity, bp);
             ceil.name = $"Ceiling_{room.roomType}";
             ceil.transform.localScale = new Vector3(room.size.x, floorCeilThickness, room.size.z);
         }
-        
+
         foreach (var wall in walls)
         {
-            var wallObj = Instantiate(wallPrefab, wall.position, Quaternion.identity, parent);
-            wallObj.transform.localScale = wall.size;
+            var w = Instantiate(wallPrefab, wall.position, Quaternion.identity, parent);
+            w.transform.localScale = wall.size;
         }
-        
+
         foreach (var door in doors)
         {
-            var doorObj = Instantiate(doorPrefab, door.position, Quaternion.identity, parent);
-            doorObj.transform.localScale = door.size;
+            var d = Instantiate(doorPrefab, door.position, Quaternion.identity, parent);
+            d.transform.localScale = door.size;
         }
-        
+
         int stairCount = 0;
-        foreach (var staircase in stairs)
+        foreach (var s in stairs)
         {
-            GameObject stairObj = stairPrefab != null ? 
-                Instantiate(stairPrefab, staircase.position, Quaternion.identity, parent) :
-                CreateDefaultStairs(staircase, parent);
-            
-            stairObj.name = $"Stairs_{stairCount++}";
-            stairObj.transform.localScale = staircase.size;
+            var go = stairPrefab != null
+                ? Instantiate(stairPrefab, s.position, Quaternion.identity, parent)
+                : CreateDefaultStairs(s, parent);
+            go.name = $"Stairs_{stairCount++}";
+            go.transform.localScale = s.size;
         }
     }
 
-    private GameObject CreateDefaultStairs(BuildingStairs staircase, Transform parent)
+    private GameObject CreateDefaultStairs(BuildingStairs s, Transform parent)
     {
-        var obj = new GameObject("Stairs");
-        obj.transform.parent = parent;
-        obj.transform.position = staircase.position;
-        
-        var meshFilter = obj.AddComponent<MeshFilter>();
-        var meshRenderer = obj.AddComponent<MeshRenderer>();
-        meshFilter.mesh = CreateStairMesh();
-        meshRenderer.material = new Material(Shader.Find("Standard"));
-        meshRenderer.material.color = Color.gray;
-        obj.AddComponent<BoxCollider>();
-        
-        return obj;
+        var go = new GameObject("Stairs");
+        go.transform.parent   = parent;
+        go.transform.position = s.position;
+        go.AddComponent<MeshFilter>().mesh = CreateStairMesh();
+        go.AddComponent<MeshRenderer>().material =
+            new Material(Shader.Find("Standard")) { color = Color.gray };
+        go.AddComponent<BoxCollider>();
+        return go;
     }
 
     private Mesh CreateStairMesh()
     {
-        var mesh = new Mesh();
-        mesh.vertices = new Vector3[8]
+        var mesh = new Mesh
         {
-            new Vector3(0, 0, 0), new Vector3(1, 0, 0), new Vector3(1, 1, 0), new Vector3(0, 1, 0),
-            new Vector3(0, 0, 1), new Vector3(1, 0, 1), new Vector3(1, 1, 1), new Vector3(0, 1, 1)
-        };
-        mesh.triangles = new int[36]
-        {
-            0, 2, 1, 0, 3, 2, 4, 5, 6, 4, 6, 7,
-            0, 1, 5, 0, 5, 4, 2, 3, 7, 2, 7, 6,
-            0, 4, 7, 0, 7, 3, 1, 2, 6, 1, 6, 5
+            vertices = new[]
+            {
+                new Vector3(0,0,0), new Vector3(1,0,0), new Vector3(1,1,0), new Vector3(0,1,0),
+                new Vector3(0,0,1), new Vector3(1,0,1), new Vector3(1,1,1), new Vector3(0,1,1)
+            },
+            triangles = new[]
+            {
+                0,2,1, 0,3,2,  4,5,6, 4,6,7,
+                0,1,5, 0,5,4,  2,3,7, 2,7,6,
+                0,4,7, 0,7,3,  1,2,6, 1,6,5
+            }
         };
         mesh.RecalculateNormals();
         return mesh;
     }
 
+    // ?????????????????????????????????????????????????????????????????????????
+    //  CLEANUP
+    // ?????????????????????????????????????????????????????????????????????????
+
     private void ClearBuilding()
     {
-        rooms.Clear();
-        walls.Clear();
-        doors.Clear();
-        stairs.Clear();
-        buildings.Clear();
+        rooms.Clear(); walls.Clear(); doors.Clear(); stairs.Clear(); buildings.Clear();
+        sharedWallLookup = null;
+
+        // Destroy previously generated geometry
+        for (int i = transform.childCount - 1; i >= 0; i--)
+            DestroyImmediate(transform.GetChild(i).gameObject);
     }
 
     [ContextMenu("Generate Building")]
-    public void RegenerateBuilding()
+    public void RegenerateBuilding() => GenerateBuilding();
+    // ?????????????????????????????????????????????????????????????????????????
+    //  MINIMAP
+    // ?????????????????????????????????????????????????????????????????????????
+
+    private void BuildMinimap()
     {
-        GenerateBuilding();
+        if (floorplanRenderer == null) return;
+        floorplanRenderer.Build(walls, doors, rooms, floorHeight);
+        Debug.Log("[Minimap] Floorplan sprites built.");
     }
+
+
 }
