@@ -133,8 +133,7 @@ GameObject:
   - component: {fileID: 302446465}
   - component: {fileID: 302446469}
   - component: {fileID: 302446468}
-  - component: {fileID: 302446467}
-  - component: {fileID: 302446466}
+  - component: {fileID: 302446470}
   m_Layer: 0
   m_Name: NetBootStrap
   m_TagString: Untagged
@@ -157,39 +156,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &302446466
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 302446464}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f02a588728393784cb1585cd20522f25, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  transport: {fileID: 0}
-  playerProxyPrefab: {fileID: 0}
-  lerpPos: 12
-  lerpYaw: 12
---- !u!114 &302446467
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 302446464}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 8c7a836227808cf4fa44b2d6ceea8576, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  scheme: http
-  host: 127.0.0.1
-  port: 7350
-  serverKey: defaultkey
-  createMatchIfNone: 1
 --- !u!114 &302446468
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -221,6 +187,23 @@ MonoBehaviour:
   inputSendHz: 20
   snapshotSendHz: 10
   moveSpeed: 3
+--- !u!114 &302446470
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 302446464}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8c7a836227808cf4fa44b2d6ceea8576, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  scheme: https
+  host: nakama.juanlibonatti.com
+  port: 443
+  serverKey: 6a990ac72bd7bf85414160d6cd207e1b45f56535ddf71566af85e6b217aa850b
+  createMatchIfNone: 1
 --- !u!1 &586340556
 GameObject:
   m_ObjectHideFlags: 0
