@@ -930,75 +930,6 @@ public class ProceduralBuildingGenerator : MonoBehaviour
         );
         return true;
     }
-
-    public void GenerateBuildingFromSeed(int newSeed)
-    {
-        seed = newSeed;
-        GenerateBuilding();
-    }
-    public bool TryGetSafeSpawnPoint(Vector3 requestedPos, out Vector3 safePos, int preferredFloor = 0, float margin = 0.35f)
-    {
-        safePos = requestedPos;
-        if (rooms == null || rooms.Count == 0) return false;
-
-        var bestIndex = -1;
-        var bestScore = float.MaxValue;
-        var foundPreferredFloor = false;
-
-        for (var i = 0; i < rooms.Count; i++)
-        {
-            var room = rooms[i];
-            if (room == null) continue;
-            if (room.floorIndex == preferredFloor) foundPreferredFloor = true;
-        }
-
-        for (var i = 0; i < rooms.Count; i++)
-        {
-            var room = rooms[i];
-            if (room == null) continue;
-            if (foundPreferredFloor && room.floorIndex != preferredFloor) continue;
-
-            var minX = room.position.x + margin;
-            var maxX = room.position.x + room.size.x - margin;
-            var minZ = room.position.z + margin;
-            var maxZ = room.position.z + room.size.z - margin;
-
-            if (minX > maxX) { minX = room.position.x; maxX = room.position.x + room.size.x; }
-            if (minZ > maxZ) { minZ = room.position.z; maxZ = room.position.z + room.size.z; }
-
-            var clampedX = Mathf.Clamp(requestedPos.x, minX, maxX);
-            var clampedZ = Mathf.Clamp(requestedPos.z, minZ, maxZ);
-            var dx = requestedPos.x - clampedX;
-            var dz = requestedPos.z - clampedZ;
-            var score = dx * dx + dz * dz;
-
-            if (score < bestScore) { bestScore = score; bestIndex = i; }
-        }
-
-        if (bestIndex < 0) return false;
-
-        var bestRoom = rooms[bestIndex];
-        var rMinX = bestRoom.position.x + margin;
-        var rMaxX = bestRoom.position.x + bestRoom.size.x - margin;
-        var rMinZ = bestRoom.position.z + margin;
-        var rMaxZ = bestRoom.position.z + bestRoom.size.z - margin;
-
-        if (rMinX > rMaxX) { rMinX = bestRoom.position.x; rMaxX = bestRoom.position.x + bestRoom.size.x; }
-        if (rMinZ > rMaxZ) { rMinZ = bestRoom.position.z; rMaxZ = bestRoom.position.z + bestRoom.size.z; }
-
-        safePos = new Vector3(
-            Mathf.Clamp(requestedPos.x, rMinX, rMaxX),
-            bestRoom.position.y + 0.5f,
-            Mathf.Clamp(requestedPos.z, rMinZ, rMaxZ)
-        );
-        return true;
-    }
-
-    public void GenerateBuildingFromSeed(int newSeed)
-    {
-        seed = newSeed;
-        GenerateBuilding();
-    }
     public bool TryGetSafeSpawnPoint(Vector3 requestedPos, out Vector3 safePos, int preferredFloor = 0, float margin = 0.35f, bool allowDoors = false)
     {
         safePos = requestedPos;
@@ -1898,40 +1829,10 @@ public class ProceduralBuildingGenerator : MonoBehaviour
 
         Debug.Log("[Minimap] Floorplan sprites built.");
     }
-
-
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     private void BuildProps()
     {
         if (propSpawner == null) return;
         propSpawner.Furnish(rooms, walls, buildingParentMap, roomGeometry, seed);
         Debug.Log("[Props] Furnishing complete.");
     }
-
-
 }
