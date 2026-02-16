@@ -3,59 +3,62 @@ using UnityEngine.UI;
 using System.Collections.Generic;
 
 /// <summary>
-/// Fixed-camera minimap that pans via RawImage.uvRect.
+/// Fixed-camera minimap with uvRect panning and room-by-room reveal.
 ///
-/// Both this camera and your reveal camera stay at the same fixed world position
-/// (centre of the map, high up) so their UVs always align — your reveal shader
-/// keeps working untouched.
+/// Both minimapCamera and revealCamera stay at the same fixed world position
+/// (map centre, high above sprites) so their UVs always align — your reveal
+/// shader works untouched.
 ///
-/// Player tracking works by projecting the player's world XZ position into 0–1
-/// UV space and offsetting uvRect so the player stays centred in the RawImage.
-///
-/// ?? Setup checklist ????????????????????????????????????????????????????????
-///  1. Create a layer called "Minimap" (Edit ? Project Settings ? Tags & Layers).
-///  2. Add this component + FloorplanRenderer to any persistent GameObject.
-///  3. Assign: player, floorplanRenderer, minimapRawImage.
-///  4. Call SetMapBounds() from ProceduralBuildingGenerator after generation,
-///     OR it will be called automatically if you use the BuildMinimap() hook.
-///  5. viewportWorldSize controls how many world units the RawImage "window" shows.
-///     Think of it as the zoom level — smaller = more zoomed in.
+/// Room reveal: each frame we check which BuildingRoom contains the player's
+/// XZ position. On first entry, FloorplanRenderer.RevealRoom() is called,
+/// permanently enabling that room's wall/door sprites on the minimap.
 /// </summary>
 [RequireComponent(typeof(FloorplanRenderer))]
 public class MinimapController : MonoBehaviour
 {
     [Header("References")]
-    public Transform        player;
+    public Transform         player;
     public FloorplanRenderer floorplanRenderer;
-    public RawImage         minimapRawImage;
+    public RawImage          minimapRawImage;
 
-    [Header("Camera")]
-    [Tooltip("Leave null to auto-create.")]
+    [Header("Cameras")]
+    [Tooltip("The minimap camera (renders Minimap layer into RT).")]
     public Camera minimapCamera;
+    [Tooltip("Your existing reveal camera — synced to same position/orthoSize as minimapCamera.")]
     public Camera revealCamera;
-    [Tooltip("Resolution of the RenderTexture in pixels (square).")]
+
+    [Header("Render Texture")]
     public int renderTextureSize = 1024;
 
     [Header("Viewport / Zoom")]
-    [Tooltip("How many world units are visible across the RawImage window. Lower = more zoomed in.")]
+    [Tooltip("World units visible across the minimap window. Lower = more zoomed in.")]
     public float viewportWorldSize = 30f;
-
-    [Tooltip("Extra padding added around the map bounds when fitting the camera.")]
+    [Tooltip("Extra padding around map bounds when fitting the camera.")]
     public float mapPadding = 5f;
 
     [Header("Building Info")]
     [Tooltip("Must match floorHeight in ProceduralBuildingGenerator.")]
-    public float floorHeight = 3.5f;
-    [Tooltip("World Y of the ground floor (usually 0).")]
+    public float floorHeight  = 3.5f;
     public float groundFloorY = 0f;
 
-    // ?? Map bounds (set by generator) ?????????????????????????????????????
-    private Rect   mapBoundsXZ;      // world-space XZ rect of the entire map
-    private bool   boundsReady = false;
+    // ?? Map bounds ?????????????????????????????????????????????????????????
+    private Rect mapBoundsXZ;
+    private bool boundsReady = false;
 
-    // ?? Runtime ???????????????????????????????????????????????????????????
+    /// <summary>World-space XZ bounds of the entire map. Valid after SetMapBounds() is called.</summary>
+    public Rect  MapBoundsXZ  => mapBoundsXZ;
+    public bool  BoundsReady  => boundsReady;
+
+    /// <summary>The RenderTexture shared by the minimap camera. Assign to any RawImage to reuse it.</summary>
+    public RenderTexture MinimapRT => renderTexture;
+
+    // ?? Room data ??????????????????????????????????????????????????????????
+    private List<BuildingRoom> _rooms;
+    private int _lastRoomIndex  = -1;
+    private int _lastFloorIndex = -1;
+
+    // ?? RT ?????????????????????????????????????????????????????????????????
     private RenderTexture renderTexture;
-    private int           lastFloorIndex = -1;
 
     // ?? Unity lifecycle ????????????????????????????????????????????????????
 
@@ -63,61 +66,83 @@ public class MinimapController : MonoBehaviour
     {
         if (floorplanRenderer == null)
             floorplanRenderer = GetComponent<FloorplanRenderer>();
-
         SetupCamera();
     }
 
     private void LateUpdate()
     {
-        if (player == null || !boundsReady || minimapRawImage == null) return;
+        if (player == null || minimapRawImage == null) return;
 
-        // ?? Pan uvRect to centre on the player ????????????????????????????
-        // uvRect.size = what fraction of the RT the RawImage window shows.
-        // uvRect.position = bottom-left corner of that window in UV space.
-        //
-        // UV space: (0,0) = bottom-left of RT = (mapMinX, mapMinZ) in world
-        //           (1,1) = top-right  of RT = (mapMaxX, mapMaxZ) in world
-        //
-        // Fraction of map covered by the viewport:
-        float fracX = viewportWorldSize / mapBoundsXZ.width;
-        float fracZ = viewportWorldSize / mapBoundsXZ.height;
+        if (!boundsReady)
+        {
+            Debug.LogWarning("[MinimapController] SetMapBounds() not called yet. " +
+                             "Make sure MinimapController is assigned in the Generator inspector.");
+            return;
+        }
 
-        // Player position in UV space:
+        // ?? Pan uvRect to centre on player ?????????????????????????????????
+        float fracX = Mathf.Clamp01(viewportWorldSize / mapBoundsXZ.width);
+        float fracZ = Mathf.Clamp01(viewportWorldSize / mapBoundsXZ.height);
+
         float playerU = (player.position.x - mapBoundsXZ.xMin) / mapBoundsXZ.width;
         float playerV = (player.position.z - mapBoundsXZ.yMin) / mapBoundsXZ.height;
 
-        // Bottom-left corner of the window (centred on player, clamped to [0,1]):
         float u = Mathf.Clamp01(playerU - fracX * 0.5f);
         float v = Mathf.Clamp01(playerV - fracZ * 0.5f);
-
-        // Clamp the far edge too so we don't scroll past the map
         u = Mathf.Min(u, 1f - fracX);
         v = Mathf.Min(v, 1f - fracZ);
 
-        var newRect = new Rect(u, v, fracX, fracZ);
-        minimapRawImage.uvRect = newRect;
+        minimapRawImage.uvRect = new Rect(u, v, fracX, fracZ);
 
-        // Uncomment to debug — remove once working:
-        // Debug.Log($"[Minimap] uvRect={newRect}, playerUV=({playerU:F2},{playerV:F2}), boundsReady={boundsReady}");
-
-        // ?? Player marker ?????????????????????????????????????????????????
+        // ?? Player marker ??????????????????????????????????????????????????
         floorplanRenderer.UpdatePlayerMarker(player.position);
 
-        // ?? Floor detection ???????????????????????????????????????????????
+        // ?? Floor detection ????????????????????????????????????????????????
         int currentFloor = WorldYToFloorIndex(player.position.y);
-        if (currentFloor != lastFloorIndex)
+        if (currentFloor != _lastFloorIndex)
         {
-            lastFloorIndex = currentFloor;
+            _lastFloorIndex = currentFloor;
+            _lastRoomIndex  = -1; // force room re-check after floor change
             floorplanRenderer.SetActiveFloor(currentFloor);
+        }
+
+        // ?? Room reveal ????????????????????????????????????????????????????
+        CheckCurrentRoom(currentFloor);
+    }
+
+    // ?? Room detection ?????????????????????????????????????????????????????
+
+    private void CheckCurrentRoom(int floorIndex)
+    {
+        if (_rooms == null) return;
+
+        float px = player.position.x;
+        float pz = player.position.z;
+
+        for (int i = 0; i < _rooms.Count; i++)
+        {
+            var room = _rooms[i];
+            if (room.floorIndex != floorIndex) continue;
+
+            // Point-in-rect on XZ
+            if (px >= room.position.x && px <= room.position.x + room.size.x &&
+                pz >= room.position.z && pz <= room.position.z + room.size.z)
+            {
+                if (i != _lastRoomIndex)
+                {
+                    _lastRoomIndex = i;
+                    floorplanRenderer.RevealRoom(i);
+                }
+                return;
+            }
         }
     }
 
     // ?? Public API ?????????????????????????????????????????????????????????
 
     /// <summary>
-    /// Called by ProceduralBuildingGenerator (via BuildMinimap) after rooms are generated.
-    /// Computes the world XZ bounds, positions the camera to cover the whole map,
-    /// and creates the RenderTexture.
+    /// Called by ProceduralBuildingGenerator after generation.
+    /// Computes map bounds, positions both cameras, creates the RT.
     /// </summary>
     public void SetMapBounds(List<BuildingRoom> rooms)
     {
@@ -127,7 +152,9 @@ public class MinimapController : MonoBehaviour
             return;
         }
 
-        // ?? Compute XZ bounds from all room corners ????????????????????????
+        _rooms = rooms;
+
+        // ?? Compute XZ bounds ??????????????????????????????????????????????
         float minX = float.MaxValue, maxX = float.MinValue;
         float minZ = float.MaxValue, maxZ = float.MinValue;
 
@@ -145,29 +172,25 @@ public class MinimapController : MonoBehaviour
         mapBoundsXZ = new Rect(minX, minZ, maxX - minX, maxZ - minZ);
         boundsReady  = true;
 
-        Debug.Log($"[MinimapController] Map bounds: X[{minX:F1}?{maxX:F1}] Z[{minZ:F1}?{maxZ:F1}]");
-
-        // ?? Position camera at map centre, high above sprites ?????????????
-        float camY = floorplanRenderer.minimapSpriteY + 10f;
+        // ?? Position both cameras at map centre ????????????????????????????
+        float camY    = floorplanRenderer.minimapSpriteY + 10f;
         float centreX = (minX + maxX) * 0.5f;
         float centreZ = (minZ + maxZ) * 0.5f;
 
-        minimapCamera.transform.SetPositionAndRotation(
-            new Vector3(centreX, camY, centreZ),
-            Quaternion.Euler(90f, 0f, 0f));
-        revealCamera.transform.SetPositionAndRotation(
-            new Vector3(centreX, camY, centreZ),
-            Quaternion.Euler(90f, 0f, 0f));
-        // ?? Fit ortho size to cover the entire map ????????????????????????
-        // The camera is square; we need to cover a potentially rectangular map,
-        // so take the larger of the two half-extents.
-        float halfW = mapBoundsXZ.width  * 0.5f;
-        float halfH = mapBoundsXZ.height * 0.5f;
-        minimapCamera.orthographicSize = Mathf.Max(halfW, halfH);
-        revealCamera.orthographicSize = Mathf.Max(halfW, halfH);
-        // ?? Build RenderTexture at aspect ratio matching map bounds ????????
-        // Use a non-square RT so 1 pixel = 1 pixel in both axes (no squish).
-        // We scale the shorter side down from renderTextureSize.
+        var camPos = new Vector3(centreX, camY, centreZ);
+        var camRot = Quaternion.Euler(90f, 0f, 0f);
+
+        minimapCamera.transform.SetPositionAndRotation(camPos, camRot);
+        if (revealCamera != null)
+            revealCamera.transform.SetPositionAndRotation(camPos, camRot);
+
+        // ?? Fit ortho size to cover entire map ????????????????????????????
+        float orthoSize = Mathf.Max(mapBoundsXZ.width, mapBoundsXZ.height) * 0.5f;
+        minimapCamera.orthographicSize = orthoSize;
+        if (revealCamera != null)
+            revealCamera.orthographicSize = orthoSize;
+
+        // ?? Build RT at correct aspect ratio (no squish) ???????????????????
         int rtW, rtH;
         if (mapBoundsXZ.width >= mapBoundsXZ.height)
         {
@@ -180,7 +203,6 @@ public class MinimapController : MonoBehaviour
             rtW = Mathf.Max(1, Mathf.RoundToInt(renderTextureSize * mapBoundsXZ.width / mapBoundsXZ.height));
         }
 
-        // Release previous RT if regenerating
         if (renderTexture != null)
         {
             minimapCamera.targetTexture = null;
@@ -190,46 +212,54 @@ public class MinimapController : MonoBehaviour
 
         renderTexture = new RenderTexture(rtW, rtH, 16)
         {
-            name        = "MinimapRT",
-            filterMode  = FilterMode.Bilinear,
+            name         = "MinimapRT",
+            // Point filtering keeps lines sharp — Bilinear blurs thin wall quads
+            filterMode   = FilterMode.Point,
             antiAliasing = 1
         };
         renderTexture.Create();
         minimapCamera.targetTexture = renderTexture;
 
         if (minimapRawImage != null)
+        {
             minimapRawImage.texture = renderTexture;
+            // Match filtering on the RawImage itself so the GPU doesn't re-blur on display
+            minimapRawImage.material = null; // use default UI material
+            minimapRawImage.texture.filterMode = FilterMode.Point;
+        }
+        else
+            Debug.LogError("[MinimapController] minimapRawImage not assigned.");
 
-        Debug.Log($"[MinimapController] Camera fixed at ({centreX:F1}, {camY:F1}, {centreZ:F1}), " +
-                  $"orthoSize={minimapCamera.orthographicSize:F1}, RT={rtW}×{rtH}");
+        Debug.Log($"[MinimapController] Bounds X[{minX:F1}?{maxX:F1}] Z[{minZ:F1}?{maxZ:F1}] | " +
+                  $"Camera at ({centreX:F1},{camY:F1},{centreZ:F1}) ortho={orthoSize:F1} | RT={rtW}×{rtH}");
     }
 
-    // ?? Setup ??????????????????????????????????????????????????????????????
+    // ?? Camera setup ???????????????????????????????????????????????????????
 
     private void SetupCamera()
     {
         if (minimapCamera == null)
         {
             var go = new GameObject("MinimapCamera");
-            // No parent — must never inherit rotation from anything
             minimapCamera = go.AddComponent<Camera>();
+            // Not parented — must never inherit rotation
         }
 
-        minimapCamera.orthographic   = true;
-        minimapCamera.orthographicSize = 100f; // temporary until SetMapBounds is called
-        revealCamera.orthographicSize = 100f;
+        minimapCamera.orthographic    = true;
+        minimapCamera.orthographicSize = 100f; // overwritten by SetMapBounds
         minimapCamera.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
 
         int minimapMask = LayerMask.GetMask("Minimap");
         if (minimapMask == 0)
-            Debug.LogWarning("[MinimapController] 'Minimap' layer not found — " +
-                             "create it in Edit ? Project Settings ? Tags & Layers.");
-        minimapCamera.cullingMask    = minimapMask;
-        minimapCamera.clearFlags     = CameraClearFlags.SolidColor;
-        minimapCamera.backgroundColor = Color.clear; // transparent so RT background is clear
-        minimapCamera.depth          = 1;
+            Debug.LogWarning("[MinimapController] 'Minimap' layer not found.");
 
-        // targetTexture is assigned in SetMapBounds once bounds are known
+        minimapCamera.cullingMask     = minimapMask;
+        minimapCamera.clearFlags      = CameraClearFlags.SolidColor;
+        minimapCamera.backgroundColor = Color.clear;
+        minimapCamera.depth           = 1;
+
+        if (revealCamera != null)
+            revealCamera.orthographicSize = 100f;
     }
 
     // ?? Helpers ????????????????????????????????????????????????????????????
@@ -256,7 +286,7 @@ public class MinimapController : MonoBehaviour
             new Vector3(mapBoundsXZ.center.x,
                         floorplanRenderer != null ? floorplanRenderer.minimapSpriteY : 200f,
                         mapBoundsXZ.center.y),
-            new Vector3(mapBoundsXZ.width, 0f, mapBoundsXZ.height));
+            new Vector3(mapBoundsXZ.width, 1f, mapBoundsXZ.height));
     }
 #endif
 }

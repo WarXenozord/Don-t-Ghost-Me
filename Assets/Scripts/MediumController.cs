@@ -96,6 +96,8 @@ public class MediumController : MonoBehaviour
     }
     private void MoveCamera()
     {
+        if (FullMapViewer.IsOpen) return; // ? add this line, done
+
         xRotation -= PlayerMouseInput.y * Sensetivity;
         xRotation = Mathf.Clamp(xRotation, -90f, 90f);
 
