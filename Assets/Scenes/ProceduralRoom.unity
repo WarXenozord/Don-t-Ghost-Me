@@ -751,6 +751,7 @@ MonoBehaviour:
   localLerp: 6
   localYawSnapThreshold: 45
   boundsPadding: 0.35
+  clampSnapshotPoses: 0
 --- !u!4 &1594733322
 Transform:
   m_ObjectHideFlags: 0
@@ -906,6 +907,8 @@ MonoBehaviour:
   ceilingPrefab: {fileID: 1182786263916851811, guid: d98640697ca1ae24aaeeba6d2a30451b, type: 3}
   floorplanRenderer: {fileID: 1793691408}
   minimapController: {fileID: 1793691409}
+  player: {fileID: 0}
+  playerHeightOffset: 1.1
 --- !u!4 &1793691407
 Transform:
   m_ObjectHideFlags: 0
