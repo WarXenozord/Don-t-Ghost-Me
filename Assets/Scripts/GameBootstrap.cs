@@ -17,7 +17,12 @@ public class GameBootstrap : MonoBehaviour
         if (!conn) conn = NakamaConnection.Instance != null ? NakamaConnection.Instance : FindObjectOfType<NakamaConnection>();
         if (!hostAuthority) hostAuthority = FindObjectOfType<HostAuthority>();
         if (!buildingGenerator) buildingGenerator = FindObjectOfType<ProceduralBuildingGenerator>();
-        if (!spawner) spawner = FindObjectOfType<PlayerSpawnManager>();
+        if (!spawner) spawner = PlayerSpawnManager.Instance != null ? PlayerSpawnManager.Instance : FindObjectOfType<PlayerSpawnManager>();
+        if (!spawner)
+        {
+            var go = new GameObject("PlayerSpawnManager");
+            spawner = go.AddComponent<PlayerSpawnManager>();
+        }
     }
 
     void Start()
@@ -37,7 +42,7 @@ public class GameBootstrap : MonoBehaviour
         var init = context.lastInit;
 
         if (buildingGenerator) buildingGenerator.GenerateBuildingFromSeed(init.seed);
-        if (!spawner) spawner = FindObjectOfType<PlayerSpawnManager>();
+        if (!spawner) spawner = PlayerSpawnManager.Instance != null ? PlayerSpawnManager.Instance : FindObjectOfType<PlayerSpawnManager>();
 
         if (spawner != null)
         {
@@ -84,21 +89,8 @@ public class GameBootstrap : MonoBehaviour
 
     private void SpawnLocalPlayer(string userId, Vector3 pos)
     {
-        if (spawner)
-        {
-            spawner.SpawnLocal(userId, pos, 0f);
-            return;
-        }
-
-        if (localPlayerPrefab)
-        {
-            var go = Instantiate(localPlayerPrefab, pos, Quaternion.identity);
-            go.name = "LocalPlayer_" + ShortId(userId);
-            return;
-        }
-
-        var fallback = new GameObject("LocalPlayer_" + ShortId(userId));
-        fallback.transform.position = pos;
+        if (!spawner) return;
+        spawner.SpawnLocal(userId, pos, 0f);
     }
 
     private void SpawnRemoteProxies(MatchTransport.SpawnPoint[] spawns, string selfId)
@@ -110,22 +102,8 @@ public class GameBootstrap : MonoBehaviour
             if (spawn == null || string.IsNullOrEmpty(spawn.userId)) continue;
             if (spawn.userId == selfId) continue;
 
-            if (spawner)
-            {
-                spawner.SpawnRemote(spawn.userId, spawn.position, 0f);
-                continue;
-            }
-
-            if (proxyPlayerPrefab)
-            {
-                var go = Instantiate(proxyPlayerPrefab, spawn.position, Quaternion.identity);
-                go.name = "Proxy_" + ShortId(spawn.userId);
-            }
-            else
-            {
-                var fallback = new GameObject("Proxy_" + ShortId(spawn.userId));
-                fallback.transform.position = spawn.position;
-            }
+            if (!spawner) continue;
+            spawner.SpawnRemote(spawn.userId, spawn.position, 0f);
         }
     }
 

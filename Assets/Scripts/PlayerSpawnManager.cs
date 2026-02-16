@@ -3,6 +3,8 @@ using UnityEngine;
 
 public class PlayerSpawnManager : MonoBehaviour
 {
+    public static PlayerSpawnManager Instance { get; private set; }
+
     [Header("Prefabs")]
     public GameObject localPlayerPrefab;
     public GameObject remoteProxyPrefab;
@@ -12,11 +14,24 @@ public class PlayerSpawnManager : MonoBehaviour
     public float localLerp = 6f;
     public float localYawSnapThreshold = 45f;
     public float boundsPadding = 0.35f;
+    public bool clampSnapshotPoses = false;
 
     public bool spawnedLocal { get; private set; }
 
     private string _localUserId;
     private readonly Dictionary<string, GameObject> _playersById = new Dictionary<string, GameObject>();
+
+    void Awake()
+    {
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+
+        Instance = this;
+        DontDestroyOnLoad(gameObject);
+    }
 
     public bool SpawnLocal(string userId, Vector3 pos, float yaw)
     {
@@ -58,6 +73,17 @@ public class PlayerSpawnManager : MonoBehaviour
         }
 
         return true;
+    }
+
+    public void ClearAll()
+    {
+        foreach (var kv in _playersById)
+        {
+            if (kv.Value) Destroy(kv.Value);
+        }
+        _playersById.Clear();
+        _localUserId = null;
+        spawnedLocal = false;
     }
 
     public bool SpawnRemote(string userId, Vector3 pos, float yaw)
@@ -118,35 +144,23 @@ public class PlayerSpawnManager : MonoBehaviour
     public void ApplyAuthoritativePose(string userId, Vector3 pos, float yaw)
     {
         if (!TryGet(userId, out var go)) return;
-        var safePos = ClampInsideMapBounds(pos);
+        var targetPos = clampSnapshotPoses ? ClampInsideMapBounds(pos) : pos;
 
         if (userId == _localUserId)
         {
-            var dist = Vector3.Distance(go.transform.position, safePos);
+            var dist = Vector3.Distance(go.transform.position, targetPos);
             if (dist > localTeleportThreshold)
             {
-                go.transform.position = safePos;
+                go.transform.position = targetPos;
             }
             else
             {
-                go.transform.position = Vector3.Lerp(go.transform.position, safePos, Time.deltaTime * localLerp);
-            }
-
-            var currentYaw = go.transform.eulerAngles.y;
-            var deltaYaw = Mathf.Abs(Mathf.DeltaAngle(currentYaw, yaw));
-            if (deltaYaw > localYawSnapThreshold)
-            {
-                go.transform.rotation = Quaternion.Euler(0f, yaw, 0f);
-            }
-            else
-            {
-                var target = Quaternion.Euler(0f, yaw, 0f);
-                go.transform.rotation = Quaternion.Slerp(go.transform.rotation, target, Time.deltaTime * localLerp);
+                go.transform.position = Vector3.Lerp(go.transform.position, targetPos, Time.deltaTime * localLerp);
             }
             return;
         }
 
-        go.transform.position = safePos;
+        go.transform.position = targetPos;
         go.transform.rotation = Quaternion.Euler(0f, yaw, 0f);
     }
 
