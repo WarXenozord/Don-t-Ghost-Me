@@ -10,9 +10,9 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 9c66c972ebc589d459db81c9fb61f371, type: 3}
-  m_Name: RoomMaterialProfile
+  m_Name: kitchen
   m_EditorClassIdentifier: 
-  roomType: 4
-  floorMaterial: {fileID: 2100000, guid: 8c4d0100bbb05b94997e2e8c6db49602, type: 2}
-  ceilingMaterial: {fileID: 2100000, guid: de19594457e44fd43b58bf3c22f85728, type: 2}
-  wallMaterial: {fileID: 2100000, guid: 57262dbb983cf8f4684872e71d26ef3b, type: 2}
+  roomType: 2
+  floorMaterial: {fileID: 2100000, guid: fd07e088046bc8c46a2e48aa96f65efb, type: 2}
+  ceilingMaterial: {fileID: 2100000, guid: 8c4d0100bbb05b94997e2e8c6db49602, type: 2}
+  wallMaterial: {fileID: 2100000, guid: 3e6d64ec8c56ba946809bb091b6cc2f7, type: 2}

@@ -820,64 +820,64 @@ wall.isActive = false;
     {
         Transform parent = transform;
 
-        buildingParentMap.Clear();
-        var buildingParents = buildingParentMap; // alias so rest of method unchanged
-        foreach (var b in buildings)
-        {
-            var go = new GameObject($"Building_{b.buildingIndex} ({b.roomsInSection} rooms)");
-            go.transform.parent   = parent;
-            go.transform.position = b.position;
-            buildingParents[b.buildingIndex] = go.transform;
-        }
+    buildingParentMap.Clear();
+    var buildingParents = buildingParentMap;
+    foreach (var b in buildings)
+    {
+        var go = new GameObject($"Building_{b.buildingIndex} ({b.roomsInSection} rooms)");
+        go.transform.parent   = parent;
+        go.transform.position = b.position;
+        buildingParents[b.buildingIndex] = go.transform;
+    }
 
-        roomGeometry.Clear();
-        foreach (var room in rooms)
-        {
-            var bp = buildingParents[room.buildingIndex];
+    roomGeometry.Clear();
+    foreach (var room in rooms)
+    {
+        var bp = buildingParents[room.buildingIndex];
 
-            var floorPos = room.position + new Vector3(room.size.x * 0.5f, floorCeilThickness * 0.5f, room.size.z * 0.5f);
-            var floor = Instantiate(floorPrefab, floorPos, Quaternion.identity, bp);
-            floor.name = $"Floor_{room.roomType}";
-            floor.transform.localScale = new Vector3(room.size.x, floorCeilThickness, room.size.z);
+        var floorPos = room.position + new Vector3(room.size.x * 0.5f, floorCeilThickness * 0.5f, room.size.z * 0.5f);
+        var floor = Instantiate(floorPrefab, floorPos, Quaternion.identity, bp);
+        floor.name = $"Floor_{room.roomType}";
+        floor.transform.localScale = new Vector3(room.size.x, floorCeilThickness, room.size.z);
 
-            var ceilPos = new Vector3(
-                room.position.x + room.size.x * 0.5f,
-                room.position.y + room.size.y - floorCeilThickness * 0.5f,
-                room.position.z + room.size.z * 0.5f);
-            var ceil = Instantiate(ceilingPrefab, ceilPos, Quaternion.identity, bp);
-            ceil.name = $"Ceiling_{room.roomType}";
-            ceil.transform.localScale = new Vector3(room.size.x, floorCeilThickness, room.size.z);
+        var ceilPos = new Vector3(
+            room.position.x + room.size.x * 0.5f,
+            room.position.y + room.size.y - floorCeilThickness * 0.5f,
+            room.position.z + room.size.z * 0.5f);
+        var ceil = Instantiate(ceilingPrefab, ceilPos, Quaternion.identity, bp);
+        ceil.name = $"Ceiling_{room.roomType}";
+        ceil.transform.localScale = new Vector3(room.size.x, floorCeilThickness, room.size.z);
 
-            // Store for PropSpawner
-            roomGeometry.Add((floor, ceil));
-        }
-            wallGameObjects.Clear();
+        roomGeometry.Add((floor, ceil));
+    }
 
-        foreach (var wall in walls)
-        {
-            if (!wall.isActive) continue;
-            activeWalls.Add(wall);
-    var go = CreateWallCube(wall, parent);
+    // Build parallel activeWalls and wallGameObjects lists
+    activeWalls.Clear();
+    wallGameObjects.Clear();
+    foreach (var wall in walls)
+    {
+        if (!wall.isActive) continue;
+        
+        activeWalls.Add(wall);
+        var go = CreateWallCube(wall, parent);  // ← use CreateWallCube (below)
+        wallGameObjects.Add(go);
+    }
 
-            wallGameObjects.Add(go);
+    foreach (var door in doors)
+    {
+        var d = Instantiate(doorPrefab, door.position, Quaternion.identity, parent);
+        d.transform.localScale = door.size;
+    }
 
-        }
-
-        foreach (var door in doors)
-        {
-            var d = Instantiate(doorPrefab, door.position, Quaternion.identity, parent);
-            d.transform.localScale = door.size;
-        }
-
-        int stairCount = 0;
-        foreach (var s in stairs)
-        {
-            var go = stairPrefab != null
-                ? Instantiate(stairPrefab, s.position, Quaternion.identity, parent)
-                : CreateDefaultStairs(s, parent);
-            go.name = $"Stairs_{stairCount++}";
-            go.transform.localScale = s.size;
-        }
+    int stairCount = 0;
+    foreach (var s in stairs)
+    {
+        var go = stairPrefab != null
+            ? Instantiate(stairPrefab, s.position, Quaternion.identity, parent)
+            : CreateDefaultStairs(s, parent);
+        go.name = $"Stairs_{stairCount++}";
+        go.transform.localScale = s.size;
+    }
     }
     /// <summary>
 

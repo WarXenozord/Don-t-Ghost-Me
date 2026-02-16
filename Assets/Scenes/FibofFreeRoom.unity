@@ -1159,6 +1159,8 @@ MonoBehaviour:
   furnishingProfiles: []
   materialProfiles:
   - {fileID: 11400000, guid: ccf01086d1a1af549b44458fc6400eee, type: 2}
+  - {fileID: 11400000, guid: 5d0ae454f74207b408315e369a9adaad, type: 2}
+  - {fileID: 11400000, guid: 4e5e7f7f699758e44be0e1ccaf81b229, type: 2}
   wallMargin: 0.5
   propPadding: 0.1
   maxPlacementAttempts: 30

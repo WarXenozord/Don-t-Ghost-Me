@@ -382,9 +382,8 @@ public class PropSpawner : MonoBehaviour
                 { roomPriority[i] = p; break; }
 
         // Each wall cube has 6 submeshes (one per face). We assign materials to the
-        // inward-facing submeshes based on roomA/roomB:
-        //   facingX (runs along Z): submesh 4 (left/-X) faces roomA, submesh 5 (right/+X) faces roomB
-        //   !facingX (runs along X): submesh 0 (front/-Z) faces roomA, submesh 1 (back/+Z) faces roomB
+        // inward-facing submeshes based on roomA/roomB.
+        // For exterior walls (roomB = -1), determine interior face by wall position vs room bounds.
         int applied = 0;
         for (int wi = 0; wi < walls.Count; wi++)
         {
@@ -395,31 +394,68 @@ public class PropSpawner : MonoBehaviour
             var mr = go.GetComponent<MeshRenderer>();
             if (mr == null) continue;
 
-            // Clone the material array so we don't modify the shared one
             var mats = mr.sharedMaterials;
-            if (mats.Length < 6) continue; // not a proper wall cube
+            if (mats.Length < 6) continue;
 
             bool changed = false;
 
-            // roomA side
-            if (wall.roomA >= 0 && roomPriority.TryGetValue(wall.roomA, out int profA))
+            // Determine which submesh is interior-facing for each room
+            int submeshA = -1, submeshB = -1;
+            
+            if (wall.facingX)
+            {
+                // Wall runs along Z, faces along X. Submesh 4 = -X, submesh 5 = +X
+                if (wall.roomA >= 0 && wall.roomB < 0 && wall.roomA < rooms.Count)
+                {
+                    // Exterior wall: check if it's on room's left (xMin) or right (xMax) edge
+                    var room = rooms[wall.roomA];
+                    if (Mathf.Abs(wall.position.x - room.position.x) < 0.1f)
+                        submeshA = 5; // wall at xMin → room interior faces +X
+                    else
+                        submeshA = 4; // wall at xMax → room interior faces -X
+                }
+                else
+                {
+                    submeshA = 4; // shared wall: roomA on -X side
+                    submeshB = 5; // roomB on +X side
+                }
+            }
+            else
+            {
+                // Wall runs along X, faces along Z. Submesh 0 = -Z, submesh 1 = +Z
+                if (wall.roomA >= 0 && wall.roomB < 0 && wall.roomA < rooms.Count)
+                {
+                    // Exterior wall: check if it's on room's front (zMin) or back (zMax) edge
+                    var room = rooms[wall.roomA];
+                    if (Mathf.Abs(wall.position.z - room.position.z) < 0.1f)
+                        submeshA = 1; // wall at zMin → room interior faces +Z
+                    else
+                        submeshA = 0; // wall at zMax → room interior faces -Z
+                }
+                else
+                {
+                    submeshA = 0; // shared wall: roomA on -Z side
+                    submeshB = 1; // roomB on +Z side
+                }
+            }
+
+            // Apply roomA material
+            if (wall.roomA >= 0 && submeshA >= 0 && roomPriority.TryGetValue(wall.roomA, out int profA))
             {
                 var matA = materialProfiles[profA].wallMaterial;
                 if (matA != null)
                 {
-                    int submeshA = wall.facingX ? 4 : 0; // left for facingX, front for !facingX
                     mats[submeshA] = matA;
                     changed = true;
                 }
             }
 
-            // roomB side
-            if (wall.roomB >= 0 && roomPriority.TryGetValue(wall.roomB, out int profB))
+            // Apply roomB material (shared walls only)
+            if (wall.roomB >= 0 && submeshB >= 0 && roomPriority.TryGetValue(wall.roomB, out int profB))
             {
                 var matB = materialProfiles[profB].wallMaterial;
                 if (matB != null)
                 {
-                    int submeshB = wall.facingX ? 5 : 1; // right for facingX, back for !facingX
                     mats[submeshB] = matB;
                     changed = true;
                 }
@@ -427,7 +463,7 @@ public class PropSpawner : MonoBehaviour
 
             if (changed)
             {
-                mr.sharedMaterials = mats; // assign the modified array back
+                mr.sharedMaterials = mats;
                 applied++;
             }
         }
