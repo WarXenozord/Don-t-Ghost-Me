@@ -10,7 +10,7 @@ GameObject:
   m_Component:
   - component: {fileID: 8522189579036710613}
   - component: {fileID: 3734100177722968086}
-  m_Layer: 0
+  m_Layer: 8
   m_Name: face
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -301,6 +301,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   playerCamera: {fileID: 412409998115839473}
+  energy: 100
   moveSpeed: 8
   verticalSpeed: 6
   sensitivity: 2
