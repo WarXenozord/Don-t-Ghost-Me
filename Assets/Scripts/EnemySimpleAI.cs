@@ -103,6 +103,12 @@ public class EnemySimpleAI : SoundAgroListener
 
     void Update()
     {
+        if (!_isAuthoritativeInstance)
+        {
+            // Non-authoritative clients should only be pose/state-driven by host snapshots.
+            return;
+        }
+
         if (_generator == null) _generator = FindObjectOfType<ProceduralBuildingGenerator>();
         RefreshKnownMediumsIfNeeded();
 
@@ -598,21 +604,40 @@ public class EnemySimpleAI : SoundAgroListener
 
         if (count == 1)
         {
-            PlayContactClip(firstTouchClip);
+            TriggerSyncedTouchFx(1);
             TeleportAfterFirstTouch(medium.transform.position);
             return;
         }
 
         if (count == 2)
         {
-            PlayContactClip(secondTouchClip);
+            TriggerSyncedTouchFx(2);
         }
     }
 
-    private void PlayContactClip(AudioClip clip)
+    public void PlaySyncedTouchFx(int fxId)
     {
+        AudioClip clip = null;
+        if (fxId == 1) clip = firstTouchClip;
+        else if (fxId == 2) clip = secondTouchClip;
         if (clip == null || contactAudioSource == null) return;
-         AudioSource.PlayClipAtPoint(clip, transform.position, 0.7f);;
+        contactAudioSource.PlayOneShot(clip);
+    }
+
+    private void TriggerSyncedTouchFx(int fxId)
+    {
+        if (_netIdentity == null) _netIdentity = GetComponent<EnemyNetIdentity>();
+        if (_netIdentity == null || string.IsNullOrEmpty(_netIdentity.spawnId))
+        {
+            PlaySyncedTouchFx(fxId);
+            return;
+        }
+
+        var mgr = EnemySpawnManager.Instance != null ? EnemySpawnManager.Instance : FindObjectOfType<EnemySpawnManager>();
+        if (mgr == null || !mgr.HostBroadcastEnemyFx(_netIdentity.spawnId, fxId))
+        {
+            PlaySyncedTouchFx(fxId);
+        }
     }
 
     private void TeleportAfterFirstTouch(Vector3 mediumPos)
