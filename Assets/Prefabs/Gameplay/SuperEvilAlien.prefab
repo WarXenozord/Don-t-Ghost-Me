@@ -230,7 +230,7 @@ MonoBehaviour:
   revisitPenalty: 1
   repathInterval: 0.35
   repathTargetDelta: 1
-  stuckTimeout: 1.25
+  stuckTimeout: 4
   progressDistance: 0.2
   doorAxisSteer: 0.45
   attackNoGainTimeout: 1

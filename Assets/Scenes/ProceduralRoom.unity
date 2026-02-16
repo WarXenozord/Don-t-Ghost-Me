@@ -633,79 +633,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1420254550}
   m_CullTransparentMesh: 1
---- !u!1001 &1431772137
-PrefabInstance:
-  m_ObjectHideFlags: 0
-  serializedVersion: 2
-  m_Modification:
-    serializedVersion: 3
-    m_TransformParent: {fileID: 0}
-    m_Modifications:
-    - target: {fileID: 700502250674933459, guid: 3e707070d4901ed4da8f1da255e6baa8, type: 3}
-      propertyPath: attackSpeed
-      value: 3
-      objectReference: {fileID: 0}
-    - target: {fileID: 700502250674933459, guid: 3e707070d4901ed4da8f1da255e6baa8, type: 3}
-      propertyPath: patrolSpeed
-      value: 0.7
-      objectReference: {fileID: 0}
-    - target: {fileID: 700502250674933459, guid: 3e707070d4901ed4da8f1da255e6baa8, type: 3}
-      propertyPath: investigateSpeed
-      value: 1.2
-      objectReference: {fileID: 0}
-    - target: {fileID: 700502250674933459, guid: 3e707070d4901ed4da8f1da255e6baa8, type: 3}
-      propertyPath: patrolSampleRadius
-      value: 20
-      objectReference: {fileID: 0}
-    - target: {fileID: 2431784559735447993, guid: 3e707070d4901ed4da8f1da255e6baa8, type: 3}
-      propertyPath: m_LocalPosition.x
-      value: 18.101652
-      objectReference: {fileID: 0}
-    - target: {fileID: 2431784559735447993, guid: 3e707070d4901ed4da8f1da255e6baa8, type: 3}
-      propertyPath: m_LocalPosition.y
-      value: 1.2
-      objectReference: {fileID: 0}
-    - target: {fileID: 2431784559735447993, guid: 3e707070d4901ed4da8f1da255e6baa8, type: 3}
-      propertyPath: m_LocalPosition.z
-      value: 25.004837
-      objectReference: {fileID: 0}
-    - target: {fileID: 2431784559735447993, guid: 3e707070d4901ed4da8f1da255e6baa8, type: 3}
-      propertyPath: m_LocalRotation.w
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 2431784559735447993, guid: 3e707070d4901ed4da8f1da255e6baa8, type: 3}
-      propertyPath: m_LocalRotation.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 2431784559735447993, guid: 3e707070d4901ed4da8f1da255e6baa8, type: 3}
-      propertyPath: m_LocalRotation.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 2431784559735447993, guid: 3e707070d4901ed4da8f1da255e6baa8, type: 3}
-      propertyPath: m_LocalRotation.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 2431784559735447993, guid: 3e707070d4901ed4da8f1da255e6baa8, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 2431784559735447993, guid: 3e707070d4901ed4da8f1da255e6baa8, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 2431784559735447993, guid: 3e707070d4901ed4da8f1da255e6baa8, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 3748400079962273149, guid: 3e707070d4901ed4da8f1da255e6baa8, type: 3}
-      propertyPath: m_Name
-      value: SuperEvilAlien
-      objectReference: {fileID: 0}
-    m_RemovedComponents: []
-    m_RemovedGameObjects: []
-    m_AddedGameObjects: []
-    m_AddedComponents: []
-  m_SourcePrefab: {fileID: 100100000, guid: 3e707070d4901ed4da8f1da255e6baa8, type: 3}
 --- !u!1 &1468033101
 GameObject:
   m_ObjectHideFlags: 0
@@ -799,6 +726,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1594733322}
   - component: {fileID: 1594733321}
+  - component: {fileID: 1594733323}
   m_Layer: 0
   m_Name: Spawner
   m_TagString: Untagged
@@ -840,6 +768,22 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1594733323
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1594733320}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a41a7d59c6440b14fa7924eada8445b7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  conn: {fileID: 0}
+  transport: {fileID: 0}
+  enemyPrefab: {fileID: 3748400079962273149, guid: 3e707070d4901ed4da8f1da255e6baa8, type: 3}
+  enableDebugLogs: 1
 --- !u!1 &1673759879
 GameObject:
   m_ObjectHideFlags: 0
@@ -980,6 +924,7 @@ MonoBehaviour:
   ceilingPrefab: {fileID: 1182786263916851811, guid: d98640697ca1ae24aaeeba6d2a30451b, type: 3}
   floorplanRenderer: {fileID: 1793691408}
   minimapController: {fileID: 1793691409}
+  propSpawner: {fileID: 0}
   player: {fileID: 0}
   playerHeightOffset: 1.1
 --- !u!4 &1793691407
@@ -1258,4 +1203,3 @@ SceneRoots:
   - {fileID: 1673759880}
   - {fileID: 2078425727}
   - {fileID: 1594733322}
-  - {fileID: 1431772137}

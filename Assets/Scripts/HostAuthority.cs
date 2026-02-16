@@ -7,6 +7,7 @@ public class HostAuthority : MonoBehaviour
     public NakamaConnection conn;
     public MatchTransport transport;
     public PlayerSpawnManager spawner;
+    public EnemySpawnManager enemySpawner;
 
     [Header("Host")]
     public bool isHost = false;
@@ -18,6 +19,10 @@ public class HostAuthority : MonoBehaviour
     [Header("Host Remote Visual Smoothing")]
     public float hostRemoteVisualLerp = 16f;
     public float hostRemoteMaxExtrapolation = 0.12f;
+
+    [Header("Enemy Spawn (Host)")]
+    [Min(0)] public int startEnemyCount = 0;
+    [Min(0f)] public float enemyMinDistanceFromPlayers = 8f;
 
     [Header("Debug")]
     public bool enableDebugLogs = true;
@@ -55,11 +60,13 @@ public class HostAuthority : MonoBehaviour
     private readonly Dictionary<string, float> _nextInputLogAt = new Dictionary<string, float>();
     private float _nextSnapshotLogAt;
     private float _nextSnapshotPayloadLogAt;
+    private bool _initialEnemiesSpawned;
 
     void Awake()
     {
         ResolveRefs();
         if (!spawner) spawner = PlayerSpawnManager.Instance != null ? PlayerSpawnManager.Instance : FindObjectOfType<PlayerSpawnManager>();
+        if (!enemySpawner) enemySpawner = EnemySpawnManager.Instance != null ? EnemySpawnManager.Instance : FindObjectOfType<EnemySpawnManager>();
         EnsureBindings();
     }
 
@@ -134,6 +141,11 @@ public class HostAuthority : MonoBehaviour
         }
         else
         {
+            if (!_initialEnemiesSpawned)
+            {
+                TrySpawnInitialEnemies();
+            }
+
             SimulateHost(Time.deltaTime);
 
             _snapTimer += Time.deltaTime;
@@ -176,6 +188,14 @@ public class HostAuthority : MonoBehaviour
         if (conn == null || conn.Match == null) return;
         if (!MatchContext.Instance.started) return;
         _gameplayStarted = true;
+    }
+
+    public bool HostSpawnEnemyCommand(Vector3 position, float yaw = 0f, string prefabId = "default")
+    {
+        if (conn == null || !conn.IsCurrentPlayerMatchCreator) return false;
+        if (!enemySpawner) enemySpawner = EnemySpawnManager.Instance != null ? EnemySpawnManager.Instance : FindObjectOfType<EnemySpawnManager>();
+        if (!enemySpawner) return false;
+        return enemySpawner.HostCommandSpawnEnemy(position, yaw, prefabId);
     }
 
     private MatchTransport.InitMsg BuildInitMessage(int initId)
@@ -243,6 +263,7 @@ public class HostAuthority : MonoBehaviour
         _spawnByUserId.Clear();
         _cachedInitSpawns = msg.spawns;
         _spawnPassComplete = false;
+        _initialEnemiesSpawned = false;
 
         if (msg.spawns != null)
         {
@@ -302,6 +323,7 @@ public class HostAuthority : MonoBehaviour
         _hostVisualPos.Clear();
         _hostVisualYaw.Clear();
         _tick = 0;
+        _initialEnemiesSpawned = false;
 
         if (!spawner) spawner = PlayerSpawnManager.Instance != null ? PlayerSpawnManager.Instance : FindObjectOfType<PlayerSpawnManager>();
         if (spawner) spawner.ClearAll();
@@ -675,6 +697,7 @@ public class HostAuthority : MonoBehaviour
         if (!conn) conn = FindObjectOfType<NakamaConnection>();
         if (!transport) transport = MatchTransport.Instance != null ? MatchTransport.Instance : GetComponent<MatchTransport>();
         if (!transport) transport = FindObjectOfType<MatchTransport>();
+        if (!enemySpawner) enemySpawner = EnemySpawnManager.Instance != null ? EnemySpawnManager.Instance : FindObjectOfType<EnemySpawnManager>();
     }
 
     private void EnsureBindings()
@@ -778,5 +801,98 @@ public class HostAuthority : MonoBehaviour
             }
             spawner.ApplyAuthoritativePose(ps.id, pos, ps.yaw);
         }
+    }
+
+    private void TrySpawnInitialEnemies()
+    {
+        if (startEnemyCount <= 0)
+        {
+            _initialEnemiesSpawned = true;
+            return;
+        }
+
+        if (!enemySpawner) enemySpawner = EnemySpawnManager.Instance != null ? EnemySpawnManager.Instance : FindObjectOfType<EnemySpawnManager>();
+        if (!enemySpawner) return;
+
+        var generator = FindObjectOfType<ProceduralBuildingGenerator>();
+        if (!generator) return;
+
+        var roomCenters = new List<Vector3>();
+        generator.CollectRoomCenterNodes(roomCenters, preferredFloor: 0);
+        if (roomCenters.Count == 0) return;
+
+        var players = new List<Vector3>();
+        foreach (var kv in _spawnByUserId)
+        {
+            players.Add(kv.Value);
+        }
+
+        if (players.Count == 0 && !string.IsNullOrEmpty(conn?.SelfUserId))
+        {
+            if (!spawner) spawner = PlayerSpawnManager.Instance != null ? PlayerSpawnManager.Instance : FindObjectOfType<PlayerSpawnManager>();
+            if (spawner != null && spawner.TryGet(conn.SelfUserId, out var selfGo) && selfGo != null)
+            {
+                players.Add(selfGo.transform.position);
+            }
+        }
+
+        if (players.Count == 0)
+        {
+            _initialEnemiesSpawned = true;
+            return;
+        }
+
+        var used = new HashSet<int>();
+        var spawned = 0;
+        for (var n = 0; n < startEnemyCount; n++)
+        {
+            var chosen = ChooseSpawnNodeIndex(roomCenters, players, used, enemyMinDistanceFromPlayers);
+            if (chosen < 0) break;
+
+            used.Add(chosen);
+            var ok = enemySpawner.HostCommandSpawnEnemy(roomCenters[chosen], 0f, "default");
+            if (ok) spawned++;
+        }
+
+        _initialEnemiesSpawned = true;
+        LogDebug($"ENEMY_START_SPAWN | requested={startEnemyCount} spawned={spawned} minDist={enemyMinDistanceFromPlayers:F1}");
+    }
+
+    private static int ChooseSpawnNodeIndex(List<Vector3> nodes, List<Vector3> players, HashSet<int> used, float minDistance)
+    {
+        var eligible = new List<int>();
+        var bestFallback = -1;
+        var bestFallbackDist = float.MinValue;
+
+        for (var i = 0; i < nodes.Count; i++)
+        {
+            if (used.Contains(i)) continue;
+            var node = nodes[i];
+
+            var minDist = float.MaxValue;
+            for (var p = 0; p < players.Count; p++)
+            {
+                var d = Vector3.Distance(node, players[p]);
+                if (d < minDist) minDist = d;
+            }
+
+            if (minDist >= minDistance)
+            {
+                eligible.Add(i);
+            }
+
+            if (minDist > bestFallbackDist)
+            {
+                bestFallbackDist = minDist;
+                bestFallback = i;
+            }
+        }
+
+        if (eligible.Count > 0)
+        {
+            return eligible[Random.Range(0, eligible.Count)];
+        }
+
+        return bestFallback;
     }
 }
