@@ -6,6 +6,7 @@ public class HostAuthority : MonoBehaviour
 {
     public NakamaConnection conn;
     public MatchTransport transport;
+    public PlayerSpawnManager spawner;
 
     [Header("Host")]
     public bool isHost = false;
@@ -28,8 +29,12 @@ public class HostAuthority : MonoBehaviour
     private int _processedInitId = -1;
     private string _processedInitMatchId = string.Empty;
     private string _runtimeMatchId = string.Empty;
+    private Vector3 _goalPos;
+    private MatchTransport.SpawnPoint[] _cachedInitSpawns;
+    private bool _spawnPassComplete;
 
     private readonly HashSet<string> _readyUserIds = new HashSet<string>();
+    private readonly Dictionary<string, Vector3> _spawnByUserId = new Dictionary<string, Vector3>();
 
     // Authoritative state (host only)
     private readonly Dictionary<string, Vector3> _pos = new Dictionary<string, Vector3>();
@@ -40,6 +45,7 @@ public class HostAuthority : MonoBehaviour
     {
         if (!conn) conn = GetComponent<NakamaConnection>();
         if (!transport) transport = GetComponent<MatchTransport>();
+        if (!spawner) spawner = FindObjectOfType<PlayerSpawnManager>();
 
         transport.OnInput += HandleInputFromClient;
         transport.OnInit += OnInitReceived;
@@ -65,10 +71,15 @@ public class HostAuthority : MonoBehaviour
     void Start()
     {
         isHost = false;
+        TryApplyInitFromContext();
+        TrySpawnPass();
     }
 
     void Update()
     {
+        TryApplyInitFromContext();
+        TrySpawnPass();
+
         if (conn?.Match == null || conn.Socket == null)
         {
             if (!string.IsNullOrEmpty(_runtimeMatchId))
@@ -199,6 +210,22 @@ public class HostAuthority : MonoBehaviour
         _yaw.Clear();
         _lastInput.Clear();
         _tick = 0;
+        _spawnByUserId.Clear();
+        _cachedInitSpawns = msg.spawns;
+        _spawnPassComplete = false;
+
+        if (msg.spawns != null)
+        {
+            for (var i = 0; i < msg.spawns.Length; i++)
+            {
+                var spawn = msg.spawns[i];
+                if (spawn == null || string.IsNullOrEmpty(spawn.userId)) continue;
+                _spawnByUserId[spawn.userId] = spawn.position;
+            }
+        }
+
+        TrySpawnPass();
+        StoreGoalPosition(msg.goalPos);
 
         var context = MatchContext.Instance;
         context.lastInit = msg;
@@ -220,7 +247,7 @@ public class HostAuthority : MonoBehaviour
     {
         if (msg == null || msg.initId != _activeInitId) return;
         MatchContext.Instance.started = true;
-        _gameplayStarted = false;
+        _gameplayStarted = true;
     }
 
     private void ResetMatchRuntimeState()
@@ -233,6 +260,9 @@ public class HostAuthority : MonoBehaviour
         _processedInitMatchId = string.Empty;
 
         _readyUserIds.Clear();
+        _spawnByUserId.Clear();
+        _cachedInitSpawns = null;
+        _spawnPassComplete = false;
         _pos.Clear();
         _yaw.Clear();
         _lastInput.Clear();
@@ -261,7 +291,7 @@ public class HostAuthority : MonoBehaviour
 
         _startSent = true;
         MatchContext.Instance.started = true;
-        _gameplayStarted = false;
+        _gameplayStarted = true;
         transport.BroadcastStart(new MatchTransport.StartMsg { initId = _activeInitId });
     }
 
@@ -316,8 +346,13 @@ public class HostAuthority : MonoBehaviour
 
         if (!_pos.ContainsKey(msg.senderUserId))
         {
-            _pos[msg.senderUserId] = Random.insideUnitSphere * 2f + Vector3.up * 0.5f;
-            _pos[msg.senderUserId] = new Vector3(_pos[msg.senderUserId].x, 0.5f, _pos[msg.senderUserId].z);
+            if (!_spawnByUserId.TryGetValue(msg.senderUserId, out var spawn))
+            {
+                spawn = Vector3.zero;
+            }
+            if (!spawner) spawner = FindObjectOfType<PlayerSpawnManager>();
+            if (spawner) spawn = spawner.ClampInsideMapBounds(spawn);
+            _pos[msg.senderUserId] = spawn;
             _yaw[msg.senderUserId] = 0f;
         }
 
@@ -330,7 +365,13 @@ public class HostAuthority : MonoBehaviour
         var selfId = conn.SelfUserId;
         if (!string.IsNullOrEmpty(selfId) && !_pos.ContainsKey(selfId))
         {
-            _pos[selfId] = new Vector3(0f, 0.5f, 0f);
+            if (!_spawnByUserId.TryGetValue(selfId, out var selfSpawn))
+            {
+                selfSpawn = new Vector3(0f, 0.5f, 0f);
+            }
+            if (!spawner) spawner = FindObjectOfType<PlayerSpawnManager>();
+            if (spawner) selfSpawn = spawner.ClampInsideMapBounds(selfSpawn);
+            _pos[selfId] = selfSpawn;
             _yaw[selfId] = 0f;
         }
 
@@ -374,5 +415,105 @@ public class HostAuthority : MonoBehaviour
         }
 
         return new MatchTransport.SnapshotMsg { tick = _tick, players = players };
+    }
+
+    private bool TryGetLocalSpawn(out Vector3 spawn)
+    {
+        spawn = Vector3.zero;
+        if (conn == null || string.IsNullOrEmpty(conn.SelfUserId)) return false;
+        return _spawnByUserId.TryGetValue(conn.SelfUserId, out spawn);
+    }
+
+    private void SpawnLocalPlayerAtAssignedSpawn(Vector3 spawnPos)
+    {
+        if (!spawner) spawner = FindObjectOfType<PlayerSpawnManager>();
+        if (spawner == null || string.IsNullOrEmpty(conn?.SelfUserId)) return;
+
+        var safeSpawn = spawner.ClampInsideMapBounds(spawnPos);
+        spawner.SpawnLocal(conn.SelfUserId, safeSpawn, 0f);
+
+        _spawnByUserId[conn.SelfUserId] = safeSpawn;
+        _pos[conn.SelfUserId] = safeSpawn;
+        _yaw[conn.SelfUserId] = 0f;
+    }
+
+    private void SpawnProxiesForOthersAtAssignedSpawns(MatchTransport.SpawnPoint[] spawns)
+    {
+        if (spawns == null) return;
+        if (!spawner) spawner = FindObjectOfType<PlayerSpawnManager>();
+
+        var selfId = conn != null ? conn.SelfUserId : string.Empty;
+        for (var i = 0; i < spawns.Length; i++)
+        {
+            var spawn = spawns[i];
+            if (spawn == null || string.IsNullOrEmpty(spawn.userId)) continue;
+            if (spawn.userId == selfId) continue;
+
+            var safeSpawn = spawner ? spawner.ClampInsideMapBounds(spawn.position) : spawn.position;
+            if (spawner) spawner.SpawnRemote(spawn.userId, safeSpawn, 0f);
+            _spawnByUserId[spawn.userId] = safeSpawn;
+
+            if (isHost)
+            {
+                _pos[spawn.userId] = safeSpawn;
+                _yaw[spawn.userId] = 0f;
+            }
+        }
+    }
+
+    private void StoreGoalPosition(Vector3 goalPos)
+    {
+        _goalPos = goalPos;
+    }
+
+    private void TryApplyInitFromContext()
+    {
+        var context = MatchContext.Instance;
+        if (!context.hasInit || context.lastInit == null) return;
+
+        var lastInit = context.lastInit;
+        var alreadyProcessedThisMatch =
+            _processedInitId == lastInit.initId &&
+            _processedInitMatchId == (conn?.Match?.Id ?? string.Empty);
+
+        if (alreadyProcessedThisMatch) return;
+
+        var startedBefore = context.started;
+        ApplyInitOnce(lastInit);
+        context.started = startedBefore;
+        if (startedBefore) _gameplayStarted = true;
+    }
+
+    private void TrySpawnPass()
+    {
+        if (_spawnPassComplete) return;
+        if (!conn || string.IsNullOrEmpty(conn.SelfUserId)) return;
+
+        if (!spawner) spawner = FindObjectOfType<PlayerSpawnManager>();
+        if (!spawner) return;
+        if (!FindObjectOfType<ProceduralBuildingGenerator>()) return;
+
+        if (TryGetLocalSpawn(out var localSpawn))
+        {
+            SpawnLocalPlayerAtAssignedSpawn(localSpawn);
+        }
+        else
+        {
+            SpawnLocalPlayerAtAssignedSpawn(Vector3.zero);
+        }
+
+        SpawnProxiesForOthersAtAssignedSpawns(_cachedInitSpawns);
+
+        // Normalize cached spawn map through the same clamp used for instantiated players.
+        if (spawner)
+        {
+            var keys = new List<string>(_spawnByUserId.Keys);
+            for (var i = 0; i < keys.Count; i++)
+            {
+                var id = keys[i];
+                _spawnByUserId[id] = spawner.ClampInsideMapBounds(_spawnByUserId[id]);
+            }
+        }
+        _spawnPassComplete = true;
     }
 }
