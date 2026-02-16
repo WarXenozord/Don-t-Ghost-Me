@@ -15,6 +15,10 @@ public class HostAuthority : MonoBehaviour
     public float inputSendHz = 20f;
     public float snapshotSendHz = 10f;
 
+    [Header("Host Remote Visual Smoothing")]
+    public float hostRemoteVisualLerp = 16f;
+    public float hostRemoteMaxExtrapolation = 0.12f;
+
     [Header("Debug")]
     public bool enableDebugLogs = true;
     public float debugLogInterval = 1f;
@@ -43,6 +47,9 @@ public class HostAuthority : MonoBehaviour
     private readonly Dictionary<string, Vector3> _pos = new Dictionary<string, Vector3>();
     private readonly Dictionary<string, float> _yaw = new Dictionary<string, float>();
     private readonly Dictionary<string, MatchTransport.InputMsg> _lastInput = new Dictionary<string, MatchTransport.InputMsg>();
+    private readonly Dictionary<string, float> _lastInputRecvAt = new Dictionary<string, float>();
+    private readonly Dictionary<string, Vector3> _hostVisualPos = new Dictionary<string, Vector3>();
+    private readonly Dictionary<string, float> _hostVisualYaw = new Dictionary<string, float>();
     private bool _transportBound;
     private bool _presenceBound;
     private readonly Dictionary<string, float> _nextInputLogAt = new Dictionary<string, float>();
@@ -229,6 +236,9 @@ public class HostAuthority : MonoBehaviour
         _pos.Clear();
         _yaw.Clear();
         _lastInput.Clear();
+        _lastInputRecvAt.Clear();
+        _hostVisualPos.Clear();
+        _hostVisualYaw.Clear();
         _tick = 0;
         _spawnByUserId.Clear();
         _cachedInitSpawns = msg.spawns;
@@ -288,6 +298,9 @@ public class HostAuthority : MonoBehaviour
         _pos.Clear();
         _yaw.Clear();
         _lastInput.Clear();
+        _lastInputRecvAt.Clear();
+        _hostVisualPos.Clear();
+        _hostVisualYaw.Clear();
         _tick = 0;
 
         if (!spawner) spawner = PlayerSpawnManager.Instance != null ? PlayerSpawnManager.Instance : FindObjectOfType<PlayerSpawnManager>();
@@ -402,6 +415,8 @@ public class HostAuthority : MonoBehaviour
             _spawnByUserId[msg.senderUserId] = spawn;
             _pos[msg.senderUserId] = spawn;
             _yaw[msg.senderUserId] = 0f;
+            _hostVisualPos[msg.senderUserId] = spawn;
+            _hostVisualYaw[msg.senderUserId] = 0f;
 
             if (spawner != null && msg.senderUserId != conn?.SelfUserId && !spawner.TryGet(msg.senderUserId, out _))
             {
@@ -412,8 +427,14 @@ public class HostAuthority : MonoBehaviour
         }
 
         _lastInput[msg.senderUserId] = msg;
+        _lastInputRecvAt[msg.senderUserId] = Time.unscaledTime;
         _pos[msg.senderUserId] = new Vector3(msg.posX, msg.posY, msg.posZ);
         _yaw[msg.senderUserId] = msg.yaw;
+        if (!_hostVisualPos.ContainsKey(msg.senderUserId))
+        {
+            _hostVisualPos[msg.senderUserId] = _pos[msg.senderUserId];
+            _hostVisualYaw[msg.senderUserId] = msg.yaw;
+        }
         if (_pos.TryGetValue(msg.senderUserId, out var p))
         {
             LogInputDebug(
@@ -448,9 +469,26 @@ public class HostAuthority : MonoBehaviour
             {
                 var id = kv.Key;
                 if (id == selfId) continue;
-                var p = kv.Value;
-                var y = _yaw.TryGetValue(id, out var yy) ? yy : 0f;
-                spawner.ApplyAuthoritativePose(id, p, y);
+
+                var targetPos = kv.Value;
+                if (_lastInput.TryGetValue(id, out var lastRemoteInput) && _lastInputRecvAt.TryGetValue(id, out var recvAt))
+                {
+                    var age = Mathf.Clamp(Time.unscaledTime - recvAt, 0f, hostRemoteMaxExtrapolation);
+                    var vel = new Vector3(lastRemoteInput.velX, lastRemoteInput.velY, lastRemoteInput.velZ);
+                    targetPos += vel * age;
+                }
+
+                var targetYaw = _yaw.TryGetValue(id, out var yy) ? yy : 0f;
+                var currentVisualPos = _hostVisualPos.TryGetValue(id, out var vp) ? vp : targetPos;
+                var currentVisualYaw = _hostVisualYaw.TryGetValue(id, out var vy) ? vy : targetYaw;
+
+                var t = 1f - Mathf.Exp(-Mathf.Max(0.1f, hostRemoteVisualLerp) * Time.deltaTime);
+                var nextVisualPos = Vector3.Lerp(currentVisualPos, targetPos, t);
+                var nextVisualYaw = Mathf.LerpAngle(currentVisualYaw, targetYaw, t);
+
+                _hostVisualPos[id] = nextVisualPos;
+                _hostVisualYaw[id] = nextVisualYaw;
+                spawner.ApplyAuthoritativePose(id, nextVisualPos, nextVisualYaw);
             }
         }
 
@@ -547,6 +585,8 @@ public class HostAuthority : MonoBehaviour
             {
                 _pos[spawn.userId] = safeSpawn;
                 _yaw[spawn.userId] = 0f;
+                _hostVisualPos[spawn.userId] = safeSpawn;
+                _hostVisualYaw[spawn.userId] = 0f;
             }
         }
     }
