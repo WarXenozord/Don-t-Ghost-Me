@@ -13,6 +13,6 @@ MonoBehaviour:
   m_Name: RoomMaterialProfile
   m_EditorClassIdentifier: 
   roomType: 4
-  floorMaterial: {fileID: 2100000, guid: ee407babc2dc5704eb9855fd7893f4a1, type: 2}
-  ceilingMaterial: {fileID: 2100000, guid: 7e33cd56ec4523740bf1766e1b4a877f, type: 2}
-  wallMaterial: {fileID: 2100000, guid: 43a0d5b7add0ed64186a272d21782ff3, type: 2}
+  floorMaterial: {fileID: 2100000, guid: 8c4d0100bbb05b94997e2e8c6db49602, type: 2}
+  ceilingMaterial: {fileID: 2100000, guid: de19594457e44fd43b58bf3c22f85728, type: 2}
+  wallMaterial: {fileID: 2100000, guid: 57262dbb983cf8f4684872e71d26ef3b, type: 2}

@@ -381,6 +381,10 @@ public class PropSpawner : MonoBehaviour
                 if (materialProfiles[p] != null && materialProfiles[p].roomType == rooms[i].roomType)
                 { roomPriority[i] = p; break; }
 
+        // Each wall cube has 6 submeshes (one per face). We assign materials to the
+        // inward-facing submeshes based on roomA/roomB:
+        //   facingX (runs along Z): submesh 4 (left/-X) faces roomA, submesh 5 (right/+X) faces roomB
+        //   !facingX (runs along X): submesh 0 (front/-Z) faces roomA, submesh 1 (back/+Z) faces roomB
         int applied = 0;
         for (int wi = 0; wi < walls.Count; wi++)
         {
@@ -388,21 +392,44 @@ public class PropSpawner : MonoBehaviour
             var go   = wallGOs[wi];
             if (go == null) continue;
 
-            // Pick whichever bordering room has the highest-priority profile
-            int bestRoom = -1, bestPriority = int.MaxValue;
+            var mr = go.GetComponent<MeshRenderer>();
+            if (mr == null) continue;
 
-            if (wall.roomA >= 0 && roomPriority.TryGetValue(wall.roomA, out int pA) && pA < bestPriority)
-            { bestRoom = wall.roomA; bestPriority = pA; }
-            if (wall.roomB >= 0 && roomPriority.TryGetValue(wall.roomB, out int pB) && pB < bestPriority)
-            { bestRoom = wall.roomB; }
+            // Clone the material array so we don't modify the shared one
+            var mats = mr.sharedMaterials;
+            if (mats.Length < 6) continue; // not a proper wall cube
 
-            if (bestRoom < 0) continue;
+            bool changed = false;
 
-            var mat = materialProfiles[roomPriority[bestRoom]].wallMaterial;
-            if (mat == null) continue;
+            // roomA side
+            if (wall.roomA >= 0 && roomPriority.TryGetValue(wall.roomA, out int profA))
+            {
+                var matA = materialProfiles[profA].wallMaterial;
+                if (matA != null)
+                {
+                    int submeshA = wall.facingX ? 4 : 0; // left for facingX, front for !facingX
+                    mats[submeshA] = matA;
+                    changed = true;
+                }
+            }
 
-            var mr = go.GetComponentInChildren<MeshRenderer>();
-            if (mr != null) { mr.sharedMaterial = mat; applied++; }
+            // roomB side
+            if (wall.roomB >= 0 && roomPriority.TryGetValue(wall.roomB, out int profB))
+            {
+                var matB = materialProfiles[profB].wallMaterial;
+                if (matB != null)
+                {
+                    int submeshB = wall.facingX ? 5 : 1; // right for facingX, back for !facingX
+                    mats[submeshB] = matB;
+                    changed = true;
+                }
+            }
+
+            if (changed)
+            {
+                mr.sharedMaterials = mats; // assign the modified array back
+                applied++;
+            }
         }
 
         Debug.Log($"[PropSpawner] Wall materials applied to {applied}/{walls.Count} walls.");

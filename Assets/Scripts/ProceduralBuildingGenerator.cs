@@ -40,6 +40,7 @@ public class BuildingWall
     // facingX = false ? wall normal points along Z; wall runs along X (front/back walls)
     //                    size = (length, height, wallThickness)
     public bool facingX;
+    public bool isActive = true;
     public int roomA = -1; // -1 = exterior
     public int roomB = -1; // -1 = exterior
 }
@@ -121,6 +122,7 @@ public class ProceduralBuildingGenerator : MonoBehaviour
 
     private List<BuildingRoom>    rooms     = new List<BuildingRoom>();
     private List<BuildingWall>    walls     = new List<BuildingWall>();
+    private List<BuildingWall> activeWalls = new List<BuildingWall>();
     private List<BuildingDoor>    doors     = new List<BuildingDoor>();
     private List<BuildingStairs>  stairs    = new List<BuildingStairs>();
     private List<BuildingSection> buildings = new List<BuildingSection>();
@@ -452,44 +454,57 @@ public class ProceduralBuildingGenerator : MonoBehaviour
     }
 
     // leftIdx's right edge touches rightIdx's left edge
+    
     private void TryMakeSharedWallX(int leftIdx, int rightIdx,
                                     BuildingRoom left, BuildingRoom right,
                                     Dictionary<(int, int), List<(float, float)>> coverage)
     {
-        float z1 = Mathf.Max(left.position.z, right.position.z);
-        float z2 = Mathf.Min(left.position.z + left.size.z, right.position.z + right.size.z);
+        float z1     = Mathf.Max(left.position.z, right.position.z);
+        float z2     = Mathf.Min(left.position.z + left.size.z, right.position.z + right.size.z);
         if (z2 - z1 < 0.05f) return;
-
         int wIdx = walls.Count;
+        
         walls.Add(MakeWall(
-            new Vector3(left.position.x + left.size.x, left.position.y + left.size.y * 0.5f, (z1 + z2) * 0.5f),
+                        new Vector3(left.position.x + left.size.x, left.position.y + left.size.y * 0.5f, (z1 + z2) * 0.5f),
             new Vector3(wallThickness, left.size.y, z2 - z1),
             facingX: true, leftIdx, rightIdx));
 
-        RegisterSharedWall(leftIdx, rightIdx, wIdx);
+
+                RegisterSharedWall(leftIdx, rightIdx, wIdx);
+
         coverage[(leftIdx, 1)].Add((z1, z2));
         coverage[(rightIdx, 0)].Add((z1, z2));
     }
 
-    // frontIdx's back edge touches backIdx's front edge
+    // frontIdx's back edge touches backIdx's front edge.
+    
     private void TryMakeSharedWallZ(int frontIdx, int backIdx,
-                                    BuildingRoom front, BuildingRoom back,
-                                    Dictionary<(int, int), List<(float, float)>> coverage)
-    {
-        float x1 = Mathf.Max(front.position.x, back.position.x);
-        float x2 = Mathf.Min(front.position.x + front.size.x, back.position.x + back.size.x);
-        if (x2 - x1 < 0.05f) return;
+                                BuildingRoom front, BuildingRoom back,
+                                Dictionary<(int, int), List<(float, float)>> coverage)
+{
+    float x1 = Mathf.Max(front.position.x, back.position.x);
+    float x2 = Mathf.Min(front.position.x + front.size.x,
+                         back.position.x + back.size.x);
 
-        int wIdx = walls.Count;
-        walls.Add(MakeWall(
-            new Vector3((x1 + x2) * 0.5f, front.position.y + front.size.y * 0.5f, front.position.z + front.size.z),
-            new Vector3(x2 - x1, front.size.y, wallThickness),
-            facingX: false, frontIdx, backIdx));
+    if (x2 - x1 < 0.05f) return;
 
-        RegisterSharedWall(frontIdx, backIdx, wIdx);
-        coverage[(frontIdx, 3)].Add((x1, x2));
-        coverage[(backIdx, 2)].Add((x1, x2));
-    }
+    int wIdx = walls.Count;
+
+    walls.Add(MakeWall(
+        new Vector3((x1 + x2) * 0.5f,
+                    front.position.y + front.size.y * 0.5f,
+                    front.position.z + front.size.z),
+        new Vector3(x2 - x1, front.size.y, wallThickness),
+        facingX: false,
+        frontIdx,
+        backIdx
+    ));
+
+    RegisterSharedWall(frontIdx, backIdx, wIdx);
+
+    coverage[(frontIdx, 3)].Add((x1, x2));
+    coverage[(backIdx, 2)].Add((x1, x2));
+}
 
     private BuildingWall MakeWall(Vector3 pos, Vector3 sz, bool facingX, int roomA, int roomB) =>
         new BuildingWall { position = pos, size = sz, facingX = facingX, roomA = roomA, roomB = roomB };
@@ -695,7 +710,7 @@ public class ProceduralBuildingGenerator : MonoBehaviour
             float openingCenterY      = wallBottomY + openingHeight * 0.5f;
             Vector3 openingSize       = new Vector3(wall.size.x, openingHeight, wall.size.z);
 
-            walls.RemoveAt(door.wallIndex);
+            wall.isActive = false;
 
             // Left segment (full height)
             if (gapMin > wallZMin + 0.05f)
@@ -723,7 +738,7 @@ public class ProceduralBuildingGenerator : MonoBehaviour
             float gapMin   = door.position.x  - doorWidth * 0.5f;
             float gapMax   = door.position.x  + doorWidth * 0.5f;
 
-            walls.RemoveAt(door.wallIndex);
+wall.isActive = false;
 
             // Left segment (full height)
             if (gapMin > wallXMin + 0.05f)
@@ -840,9 +855,11 @@ public class ProceduralBuildingGenerator : MonoBehaviour
 
         foreach (var wall in walls)
         {
-            var w = Instantiate(wallPrefab, wall.position, Quaternion.identity, parent);
-            w.transform.localScale = wall.size;
-                        wallGameObjects.Add(w);
+            if (!wall.isActive) continue;
+            activeWalls.Add(wall);
+    var go = CreateWallCube(wall, parent);
+
+            wallGameObjects.Add(go);
 
         }
 
@@ -862,7 +879,159 @@ public class ProceduralBuildingGenerator : MonoBehaviour
             go.transform.localScale = s.size;
         }
     }
+    /// <summary>
 
+    /// Creates a cube mesh with 6 submeshes (one per face) so each face can have
+
+    /// an independent material. Used for walls so shared walls can show different
+
+    /// materials to each bordering room without needing two separate wall objects.
+
+    /// </summary>
+
+    private GameObject CreateWallCube(BuildingWall wall, Transform parent)
+
+    {
+
+        var go = new GameObject($"Wall_{(wall.facingX ? "X" : "Z")}");
+
+        go.transform.SetParent(parent, worldPositionStays: false);
+
+        go.transform.position   = wall.position;
+
+        go.transform.localScale = wall.size;
+
+
+
+        var mf = go.AddComponent<MeshFilter>();
+
+        var mr = go.AddComponent<MeshRenderer>();
+
+        go.AddComponent<BoxCollider>();
+
+
+
+        // Create cube with 6 submeshes
+
+        mf.mesh = CreateCubeMeshWithSubmeshes();
+
+
+
+        // Default material on all faces — PropSpawner will replace the relevant ones
+
+        var defaultMat = wallPrefab != null
+
+            ? wallPrefab.GetComponentInChildren<MeshRenderer>()?.sharedMaterial
+
+            : new Material(Shader.Find("Standard"));
+
+        mr.sharedMaterials = new Material[6]
+
+        {
+
+            defaultMat, defaultMat, defaultMat, defaultMat, defaultMat, defaultMat
+
+        };
+
+
+
+        return go;
+
+    }
+
+
+
+    /// <summary>
+
+    /// Cube with 6 submeshes, one per face. Submesh order matches Unity's standard:
+
+    /// 0=front(-Z), 1=back(+Z), 2=bottom(-Y), 3=top(+Y), 4=left(-X), 5=right(+X).
+
+    /// </summary>
+
+    private Mesh CreateCubeMeshWithSubmeshes()
+
+    {
+
+        var mesh = new Mesh();
+
+
+
+        // 8 vertices of a unit cube centered at origin
+
+        mesh.vertices = new Vector3[]
+
+        {
+
+            new Vector3(-0.5f, -0.5f, -0.5f), // 0
+
+            new Vector3( 0.5f, -0.5f, -0.5f), // 1
+
+            new Vector3( 0.5f,  0.5f, -0.5f), // 2
+
+            new Vector3(-0.5f,  0.5f, -0.5f), // 3
+
+            new Vector3(-0.5f, -0.5f,  0.5f), // 4
+
+            new Vector3( 0.5f, -0.5f,  0.5f), // 5
+
+            new Vector3( 0.5f,  0.5f,  0.5f), // 6
+
+            new Vector3(-0.5f,  0.5f,  0.5f), // 7
+
+        };
+
+
+
+        mesh.uv = new Vector2[]
+
+        {
+
+            new Vector2(0,0), new Vector2(1,0), new Vector2(1,1), new Vector2(0,1),
+
+            new Vector2(0,0), new Vector2(1,0), new Vector2(1,1), new Vector2(0,1)
+
+        };
+
+
+
+        mesh.subMeshCount = 6;
+
+
+
+        // 0: front (-Z)
+
+        mesh.SetTriangles(new int[] { 0,2,1, 0,3,2 }, 0);
+
+        // 1: back (+Z)
+
+        mesh.SetTriangles(new int[] { 4,5,6, 4,6,7 }, 1);
+
+        // 2: bottom (-Y)
+
+        mesh.SetTriangles(new int[] { 0,1,5, 0,5,4 }, 2);
+
+        // 3: top (+Y)
+
+        mesh.SetTriangles(new int[] { 2,3,7, 2,7,6 }, 3);
+
+        // 4: left (-X)
+
+        mesh.SetTriangles(new int[] { 0,4,7, 0,7,3 }, 4);
+
+        // 5: right (+X)
+
+        mesh.SetTriangles(new int[] { 1,2,6, 1,6,5 }, 5);
+
+
+
+        mesh.RecalculateNormals();
+
+        mesh.RecalculateBounds();
+
+        return mesh;
+
+    }
     private GameObject CreateDefaultStairs(BuildingStairs s, Transform parent)
     {
         var go = new GameObject("Stairs");
@@ -903,7 +1072,7 @@ public class ProceduralBuildingGenerator : MonoBehaviour
     {
         rooms.Clear(); walls.Clear(); doors.Clear(); stairs.Clear(); buildings.Clear();
         roomGeometry.Clear(); buildingParentMap.Clear();
-                roomGeometry.Clear(); buildingParentMap.Clear(); wallGameObjects.Clear();
+                 wallGameObjects.Clear(); activeWalls.Clear();
 
         sharedWallLookup = null;
 
@@ -1876,7 +2045,8 @@ public class ProceduralBuildingGenerator : MonoBehaviour
     private void BuildProps()
     {
         if (propSpawner == null) return;
-                propSpawner.Furnish(rooms, walls, buildingParentMap, roomGeometry, seed, wallGameObjects);
+        Debug.Log("Wall GameObjects count: " + wallGameObjects.Count);
+                propSpawner.Furnish(rooms, activeWalls, buildingParentMap, roomGeometry, seed, wallGameObjects);
 
         Debug.Log("[Props] Furnishing complete.");
     }
