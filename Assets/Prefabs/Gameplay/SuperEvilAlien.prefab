@@ -15,6 +15,7 @@ GameObject:
   - component: {fileID: 1879015478588035561}
   - component: {fileID: 700502250674933459}
   - component: {fileID: 4074586490499717683}
+  - component: {fileID: 5670175324699855587}
   m_Layer: 0
   m_Name: SuperEvilAlien
   m_TagString: Untagged
@@ -280,6 +281,19 @@ CharacterController:
   m_SkinWidth: 0.08
   m_MinMoveDistance: 0.001
   m_Center: {x: 0, y: 0, z: 0}
+--- !u!114 &5670175324699855587
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3748400079962273149}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9c25bb1a0b42a5a469631aa1a048a6cf, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  spawnId: 
 --- !u!1 &7763219896745936953
 GameObject:
   m_ObjectHideFlags: 0
