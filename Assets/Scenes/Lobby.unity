@@ -388,11 +388,14 @@ MonoBehaviour:
   conn: {fileID: 0}
   transport: {fileID: 0}
   spawner: {fileID: 0}
+  enemySpawner: {fileID: 0}
   isHost: 0
   inputSendHz: 30
   snapshotSendHz: 15
   hostRemoteVisualLerp: 16
   hostRemoteMaxExtrapolation: 0.12
+  startEnemyCount: 1
+  enemyMinDistanceFromPlayers: 30
   enableDebugLogs: 1
   debugLogInterval: 1
 --- !u!114 &302446470
