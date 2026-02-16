@@ -425,12 +425,12 @@ MonoBehaviour:
   transport: {fileID: 302446468}
   conn: {fileID: 0}
   spawner: {fileID: 0}
-  lerpPos: 40
-  lerpYaw: 40
-  smoothTimePos: 0.3
-  snapDistance: 6
-  maxExtrapolationTime: 0.12
-  maxEstimatedSpeed: 12
+  interpolationBackTime: 0.1
+  maxExtrapolationTime: 0.6
+  snapDistance: 5
+  positionLerpGain: 40
+  yawLerpGain: 25
+  maxSamplesPerPlayer: 15
   correctLocalWithSnapshots: 0
   enableDebugLogs: 0
   debugLogInterval: 1

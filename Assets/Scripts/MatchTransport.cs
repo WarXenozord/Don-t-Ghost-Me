@@ -163,8 +163,6 @@ public class MatchTransport : MonoBehaviour
     public class InputMsg
     {
         public int seq;
-        public float moveX;
-        public float moveZ;
         public float yaw;
         public float posX;
         public float posY;

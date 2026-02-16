@@ -366,9 +366,6 @@ public class HostAuthority : MonoBehaviour
 
     private MatchTransport.InputMsg BuildLocalInput()
     {
-        var h = Input.GetAxisRaw("Horizontal");
-        var v = Input.GetAxisRaw("Vertical");
-
         var yaw = GetLocalYaw();
         var vel = GetLocalNetworkVelocity();
         var pos = GetLocalNetworkPosition();
@@ -376,8 +373,6 @@ public class HostAuthority : MonoBehaviour
         return new MatchTransport.InputMsg
         {
             seq = ++_seq,
-            moveX = h,
-            moveZ = v,
             yaw = yaw,
             posX = pos.x,
             posY = pos.y,
@@ -423,7 +418,7 @@ public class HostAuthority : MonoBehaviour
         {
             LogInputDebug(
                 msg.senderUserId,
-                $"RECV_INPUT | move=({msg.moveX:F2},{msg.moveZ:F2}) pos=({msg.posX:F2},{msg.posY:F2},{msg.posZ:F2}) vel=({msg.velX:F2},{msg.velY:F2},{msg.velZ:F2}) yaw={msg.yaw:F1} authPos=({p.x:F2},{p.y:F2},{p.z:F2})"
+                $"RECV_INPUT | pos=({msg.posX:F2},{msg.posY:F2},{msg.posZ:F2}) vel=({msg.velX:F2},{msg.velY:F2},{msg.velZ:F2}) yaw={msg.yaw:F1} authPos=({p.x:F2},{p.y:F2},{p.z:F2})"
             );
         }
     }
@@ -724,6 +719,7 @@ public class HostAuthority : MonoBehaviour
 
     private void OnSnapshotReceived(MatchTransport.SnapshotMsg snap)
     {
+        if (conn != null && !conn.IsCurrentPlayerMatchCreator) return;
         if (snap == null || snap.players == null) return;
         if (!spawner) spawner = PlayerSpawnManager.Instance != null ? PlayerSpawnManager.Instance : FindObjectOfType<PlayerSpawnManager>();
         if (spawner == null) return;

@@ -7,24 +7,28 @@ public class SnapshotInterpolation : MonoBehaviour
     public NakamaConnection conn;
     public PlayerSpawnManager spawner;
 
-    [Header("Smoothing")]
-    public float lerpPos = 12f;
-    public float lerpYaw = 12f;
-    public float smoothTimePos = 0.06f;
-    public float snapDistance = 6f;
-    public float maxExtrapolationTime = 0.12f;
-    public float maxEstimatedSpeed = 12f;
+    [Header("Interpolation")]
+    public float interpolationBackTime = 0.10f;
+    public float maxExtrapolationTime = 0.15f;
+    public float snapDistance = 5f;
+    public float positionLerpGain = 25f;
+    public float yawLerpGain = 25f;
+    public int maxSamplesPerPlayer = 12;
     public bool correctLocalWithSnapshots = false;
+
+    [Header("Debug")]
     public bool enableDebugLogs = true;
     public float debugLogInterval = 1f;
-    public bool verboseMotionDebug = true;
+    public bool verboseMotionDebug = false;
 
-    private readonly Dictionary<string, Vector3> _targetPos = new Dictionary<string, Vector3>();
-    private readonly Dictionary<string, float> _targetYaw = new Dictionary<string, float>();
-    private readonly Dictionary<string, Vector3> _lastSnapPos = new Dictionary<string, Vector3>();
-    private readonly Dictionary<string, float> _lastSnapAt = new Dictionary<string, float>();
-    private readonly Dictionary<string, Vector3> _estimatedVel = new Dictionary<string, Vector3>();
-    private readonly Dictionary<string, Vector3> _smoothVel = new Dictionary<string, Vector3>();
+    private struct NetSample
+    {
+        public float recvTime;
+        public Vector3 pos;
+        public float yaw;
+    }
+
+    private readonly Dictionary<string, List<NetSample>> _buffersByUser = new Dictionary<string, List<NetSample>>();
     private bool _bound;
     private float _nextSnapshotLogAt;
     private float _nextMotionLogAt;
@@ -48,37 +52,46 @@ public class SnapshotInterpolation : MonoBehaviour
     {
         ResolveRefs();
         EnsureBound();
+        if (!spawner || conn == null) return;
 
-        foreach (var kv in _targetPos)
+        var renderTime = Time.unscaledTime - Mathf.Max(0f, interpolationBackTime);
+        var selfId = conn.SelfUserId;
+
+        foreach (var kv in _buffersByUser)
         {
             var userId = kv.Key;
-            if (!spawner || !spawner.TryGet(userId, out var go)) continue;
+            if (string.IsNullOrEmpty(userId)) continue;
+            if (!string.IsNullOrEmpty(selfId) && userId == selfId) continue;
 
-            var targetPos = kv.Value;
-            if (_lastSnapAt.TryGetValue(userId, out var lastAt) && _estimatedVel.TryGetValue(userId, out var estVel))
-            {
-                var sinceSnap = Mathf.Clamp(Time.unscaledTime - lastAt, 0f, maxExtrapolationTime);
-                targetPos += estVel * sinceSnap;
-            }
+            var samples = kv.Value;
+            if (samples == null || samples.Count == 0) continue;
+            if (!spawner.TryGet(userId, out var go) || go == null) continue;
 
-            var current = go.transform.position;
-            var dist = Vector3.Distance(current, targetPos);
-            if (dist > snapDistance)
+            var targetPos = samples[samples.Count - 1].pos;
+            var targetYaw = samples[samples.Count - 1].yaw;
+            ComputeTargetPose(samples, renderTime, out targetPos, out targetYaw);
+
+            var currentPos = go.transform.position;
+            var dist = Vector3.Distance(currentPos, targetPos);
+            if (dist >= snapDistance)
             {
                 go.transform.position = targetPos;
-                _smoothVel[userId] = Vector3.zero;
             }
             else
             {
-                var velRef = _smoothVel.TryGetValue(userId, out var v) ? v : Vector3.zero;
-                go.transform.position = Vector3.SmoothDamp(current, targetPos, ref velRef, smoothTimePos, Mathf.Infinity, Time.deltaTime);
-                _smoothVel[userId] = velRef;
+                var tPos = 1f - Mathf.Exp(-positionLerpGain * Time.deltaTime);
+                go.transform.position = Vector3.Lerp(currentPos, targetPos, tPos);
             }
 
-            if (_targetYaw.TryGetValue(userId, out var targetYaw))
+            var currentYaw = go.transform.eulerAngles.y;
+            var tYaw = 1f - Mathf.Exp(-yawLerpGain * Time.deltaTime);
+            var smoothedYaw = Mathf.LerpAngle(currentYaw, targetYaw, tYaw);
+            go.transform.rotation = Quaternion.Euler(0f, smoothedYaw, 0f);
+
+            if (enableDebugLogs && verboseMotionDebug && Time.unscaledTime >= _nextMotionLogAt)
             {
-                var rot = Quaternion.Euler(0f, targetYaw, 0f);
-                go.transform.rotation = Quaternion.Slerp(go.transform.rotation, rot, Time.deltaTime * lerpYaw);
+                _nextMotionLogAt = Time.unscaledTime + Mathf.Max(0.1f, debugLogInterval);
+                Debug.Log($"[SnapshotInterp] APPLY user={userId} curr=({currentPos.x:F2},{currentPos.y:F2},{currentPos.z:F2}) target=({targetPos.x:F2},{targetPos.y:F2},{targetPos.z:F2}) dist={dist:F2}");
             }
         }
     }
@@ -90,13 +103,10 @@ public class SnapshotInterpolation : MonoBehaviour
         if (!spawner || conn == null) return;
 
         var selfId = conn.SelfUserId;
-        var appliedRemotes = 0;
-        var missingRefs = 0;
-        string sampleId = null;
-        Vector3 sampleSnapPos = Vector3.zero;
-        Vector3 sampleBefore = Vector3.zero;
-        Vector3 sampleAfter = Vector3.zero;
-        var capturedSample = false;
+        var now = Time.unscaledTime;
+        var remotesBuffered = 0;
+        var localApplied = false;
+
         for (var i = 0; i < snap.players.Length; i++)
         {
             var ps = snap.players[i];
@@ -107,10 +117,10 @@ public class SnapshotInterpolation : MonoBehaviour
 
             if (!string.IsNullOrEmpty(selfId) && ps.id == selfId)
             {
-                // Optional: local correction can fight collision and feel like teleports through walls.
                 if (correctLocalWithSnapshots)
                 {
                     spawner.ApplyAuthoritativePose(ps.id, pos, yaw);
+                    localApplied = true;
                 }
                 continue;
             }
@@ -119,62 +129,82 @@ public class SnapshotInterpolation : MonoBehaviour
             {
                 spawner.SpawnRemote(ps.id, pos, yaw);
             }
-            if (!spawner.TryGet(ps.id, out var remoteGo))
+
+            if (!_buffersByUser.TryGetValue(ps.id, out var samples))
             {
-                missingRefs++;
-                continue;
+                samples = new List<NetSample>(maxSamplesPerPlayer);
+                _buffersByUser[ps.id] = samples;
             }
 
-            if (!capturedSample)
+            samples.Add(new NetSample
             {
-                capturedSample = true;
-                sampleId = ps.id;
-                sampleSnapPos = pos;
-                sampleBefore = remoteGo.transform.position;
+                recvTime = now,
+                pos = pos,
+                yaw = yaw
+            });
+
+            while (samples.Count > Mathf.Max(2, maxSamplesPerPlayer))
+            {
+                samples.RemoveAt(0);
             }
 
-            if (_lastSnapPos.TryGetValue(ps.id, out var prevPos) && _lastSnapAt.TryGetValue(ps.id, out var prevAt))
-            {
-                var dt = Time.unscaledTime - prevAt;
-                if (dt > 0.0001f)
-                {
-                    var vel = (pos - prevPos) / dt;
-                    if (vel.sqrMagnitude > maxEstimatedSpeed * maxEstimatedSpeed)
-                    {
-                        vel = vel.normalized * maxEstimatedSpeed;
-                    }
-                    _estimatedVel[ps.id] = vel;
-                }
-            }
-            _lastSnapPos[ps.id] = pos;
-            _lastSnapAt[ps.id] = Time.unscaledTime;
-
-            if (capturedSample && sampleId == ps.id)
-            {
-                sampleAfter = remoteGo.transform.position;
-            }
-            _targetPos[ps.id] = pos;
-            _targetYaw[ps.id] = yaw;
-            appliedRemotes++;
+            remotesBuffered++;
         }
 
         if (enableDebugLogs && Time.unscaledTime >= _nextSnapshotLogAt)
         {
             _nextSnapshotLogAt = Time.unscaledTime + Mathf.Max(0.1f, debugLogInterval);
-            Debug.Log($"[SnapshotInterp] RECV_SNAPSHOT players={snap.players.Length} remotesApplied={appliedRemotes} missingRefs={missingRefs} targets={_targetPos.Count} self={selfId}");
+            Debug.Log($"[SnapshotInterp] RECV_SNAPSHOT players={snap.players.Length} remotesBuffered={remotesBuffered} buffers={_buffersByUser.Count} localApplied={localApplied}");
+        }
+    }
+
+    private void ComputeTargetPose(List<NetSample> samples, float renderTime, out Vector3 pos, out float yaw)
+    {
+        var newestIdx = samples.Count - 1;
+        var newest = samples[newestIdx];
+
+        if (samples.Count == 1)
+        {
+            pos = newest.pos;
+            yaw = newest.yaw;
+            return;
         }
 
-        if (enableDebugLogs && verboseMotionDebug && capturedSample && Time.unscaledTime >= _nextMotionLogAt)
+        // Drop stale samples while we have two and render time has moved past the second one.
+        while (samples.Count >= 2 && samples[1].recvTime <= renderTime)
         {
-            _nextMotionLogAt = Time.unscaledTime + Mathf.Max(0.1f, debugLogInterval);
-            var beforeDist = Vector3.Distance(sampleBefore, sampleSnapPos);
-            var afterDist = Vector3.Distance(sampleAfter, sampleSnapPos);
-            Debug.Log(
-                $"[SnapshotInterp] APPLY_SAMPLE user={sampleId} snap=({sampleSnapPos.x:F2},{sampleSnapPos.y:F2},{sampleSnapPos.z:F2}) " +
-                $"before=({sampleBefore.x:F2},{sampleBefore.y:F2},{sampleBefore.z:F2}) after=({sampleAfter.x:F2},{sampleAfter.y:F2},{sampleAfter.z:F2}) " +
-                $"errBefore={beforeDist:F2} errAfter={afterDist:F2}"
-            );
+            samples.RemoveAt(0);
         }
+
+        if (samples.Count >= 2 && samples[0].recvTime <= renderTime && renderTime <= samples[1].recvTime)
+        {
+            var a = samples[0];
+            var b = samples[1];
+            var dt = b.recvTime - a.recvTime;
+            var t = dt > 0.0001f ? Mathf.Clamp01((renderTime - a.recvTime) / dt) : 1f;
+            pos = Vector3.LerpUnclamped(a.pos, b.pos, t);
+            yaw = Mathf.LerpAngle(a.yaw, b.yaw, t);
+            return;
+        }
+
+        // Render time is newer than newest sample: short capped extrapolation.
+        if (samples.Count >= 2)
+        {
+            var a = samples[samples.Count - 2];
+            var b = samples[samples.Count - 1];
+            var dt = b.recvTime - a.recvTime;
+            if (dt > 0.0001f)
+            {
+                var vel = (b.pos - a.pos) / dt;
+                var ext = Mathf.Clamp(renderTime - b.recvTime, 0f, maxExtrapolationTime);
+                pos = b.pos + vel * ext;
+                yaw = b.yaw;
+                return;
+            }
+        }
+
+        pos = newest.pos;
+        yaw = newest.yaw;
     }
 
     private void ResolveRefs()
