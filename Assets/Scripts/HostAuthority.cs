@@ -35,16 +35,13 @@ public class HostAuthority : MonoBehaviour
 
     void Start()
     {
-        // Simple host rule for MVP:
-        // If this instance was configured to create the match, it is the host.
-        // (Set this in inspector: one client createMatchIfNone=true, other=false)
-        isHost = conn.createMatchIfNone;
-        Debug.Log(isHost ? "[HostAuthority] I am HOST" : "[HostAuthority] I am CLIENT");
+        isHost = false;
     }
 
     void Update()
     {
         if (conn?.Match == null || conn.Socket == null) return;
+        isHost = conn.IsCurrentPlayerMatchCreator;
 
         if (!isHost)
         {

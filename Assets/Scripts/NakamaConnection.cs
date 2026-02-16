@@ -19,8 +19,13 @@ public class NakamaConnection : MonoBehaviour
     public ISession Session { get; private set; }
     public ISocket Socket { get; private set; }
     public IMatch Match { get; set; }
+    public string MatchCreatorUserId { get; set; }
 
     public string SelfUserId => Session?.UserId;
+    public bool IsCurrentPlayerMatchCreator =>
+        !string.IsNullOrEmpty(SelfUserId) &&
+        !string.IsNullOrEmpty(MatchCreatorUserId) &&
+        SelfUserId == MatchCreatorUserId;
 
     async void Awake()
     {
@@ -33,7 +38,8 @@ public class NakamaConnection : MonoBehaviour
         Client = new Client(scheme, host, port, serverKey, UnityWebRequestAdapter.Instance);
 
         var deviceId = GetOrCreateDeviceId();
-        Session = await Client.AuthenticateDeviceAsync(deviceId, create: true);
+        var username = GetOrCreateGuestUsername();
+        Session = await Client.AuthenticateDeviceAsync(deviceId, username: username, create: true);
 
         Socket = Client.NewSocket(useMainThread: true);
         Socket.ReceivedMatchState += OnReceivedMatchState;
@@ -59,5 +65,17 @@ public class NakamaConnection : MonoBehaviour
         PlayerPrefs.SetString(key, id);
         PlayerPrefs.Save();
         return id;
+    }
+
+    private string GetOrCreateGuestUsername()
+    {
+        const string key = "guest_username";
+        if (PlayerPrefs.HasKey(key)) return PlayerPrefs.GetString(key);
+
+        var suffix = UnityEngine.Random.Range(100, 1000);
+        var username = "Guest" + suffix;
+        PlayerPrefs.SetString(key, username);
+        PlayerPrefs.Save();
+        return username;
     }
 }

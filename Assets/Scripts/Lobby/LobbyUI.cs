@@ -10,18 +10,29 @@ public class LobbyUI : MonoBehaviour
     [Header("Refs")]
     public NakamaConnection conn;
 
-    [Header("UI")]
+    [Header("Screens")]
+    public GameObject lobbywindow;
+    public GameObject roomwindow;
+
+    [Header("Main Menu")]
     public Button hostBtn;
     public Button refreshBtn;
-    public Button startBtn;
     public Transform matchListContainer;
     public Button matchRowPrefab;
+
+    [Header("Lobby")]
+    public TMP_Text lobbyMatchIdText;
+    public TMP_Text playerListText;
+    public Button leaveBtn;
+    public Button startBtn;
+
+    [Header("Optional")]
     public TMP_Text infoText;
 
     private const long OPCODE_START = 99;
+    private const string LastMatchIdKey = "last_match_id";
 
     private readonly Dictionary<string, IUserPresence> players = new Dictionary<string, IUserPresence>();
-    private bool isHost;
 
     private void Awake()
     {
@@ -29,6 +40,7 @@ public class LobbyUI : MonoBehaviour
 
         if (hostBtn) hostBtn.onClick.AddListener(HostLobby);
         if (refreshBtn) refreshBtn.onClick.AddListener(RefreshLobbies);
+        if (leaveBtn) leaveBtn.onClick.AddListener(LeaveLobby);
         if (startBtn) startBtn.onClick.AddListener(StartGame);
 
         if (conn)
@@ -37,8 +49,8 @@ public class LobbyUI : MonoBehaviour
             conn.MatchStateReceived += OnMatchState;
         }
 
-        SetStartButton();
-        RenderInfo("Lobby ready.");
+        SetScreen(isInRoom: false);
+        RefreshLobbyUi();
     }
 
     private void OnDestroy()
@@ -52,22 +64,23 @@ public class LobbyUI : MonoBehaviour
     {
         if (!HasConnectedSocket()) return;
 
-        conn.Match = await conn.Socket.CreateMatchAsync();
-        isHost = true;
+        var match = await conn.Socket.CreateMatchAsync();
+        conn.Match = match;
+        conn.MatchCreatorUserId = conn.SelfUserId;
 
-        players.Clear();
-        ClearMatchList();
-        SetStartButton();
+        PlayerPrefs.SetString(LastMatchIdKey, match.Id);
+        PlayerPrefs.Save();
 
-        Debug.Log("[Lobby] Hosting match " + conn.Match.Id);
-        RenderInfo("Hosting: " + ShortId(conn.Match.Id));
+        RebuildPlayersFromCurrentMatch();
+        SetScreen(isInRoom: true);
+        RefreshLobbyUi("Hosting match " + ShortId(match.Id));
     }
 
     public async void RefreshLobbies()
     {
         if (conn == null || conn.Client == null || conn.Session == null)
         {
-            Debug.LogWarning("[Lobby] Cannot refresh: not connected.");
+            RefreshLobbyUi("Not connected.");
             return;
         }
 
@@ -75,42 +88,31 @@ public class LobbyUI : MonoBehaviour
 
         const int minSize = 0;
         const int maxSize = 16;
-        const int limit = 20;
+        const int limit = 50;
 
         var res = await conn.Client.ListMatchesAsync(
             conn.Session,
             minSize,
             maxSize,
             limit,
-            false,
-            null,
-            null
+            authoritative: false,
+            label: null,
+            query: null
         );
 
-        var hasAny = false;
-        if (res != null && res.Matches != null)
+        var found = false;
+        if (res?.Matches != null)
         {
             foreach (var m in res.Matches)
             {
-                if (m == null) continue;
-                hasAny = true;
-
-                var rowLabel = ShortId(m.MatchId) + " (" + m.Size + "/?)";
-                AddJoinRow(rowLabel, m.MatchId);
+                if (m == null || string.IsNullOrEmpty(m.MatchId)) continue;
+                found = true;
+                AddJoinRow(ShortId(m.MatchId) + "  |  " + m.Size + " players", m.MatchId);
             }
         }
 
-        if (!hasAny)
-        {
-            AddInfoRow("No open lobbies.");
-            Debug.Log("[Lobby] Refresh complete: no lobbies found.");
-        }
-        else
-        {
-            Debug.Log("[Lobby] Refresh complete.");
-        }
-
-        RenderInfo("Lobby list refreshed.");
+        if (!found) AddInfoRow("No matches available.");
+        RefreshLobbyUi("Matches refreshed.");
     }
 
     public async void JoinLobby(string matchId)
@@ -118,34 +120,44 @@ public class LobbyUI : MonoBehaviour
         if (!HasConnectedSocket()) return;
         if (string.IsNullOrEmpty(matchId)) return;
 
-        conn.Match = await conn.Socket.JoinMatchAsync(matchId);
-        isHost = false;
+        var match = await conn.Socket.JoinMatchAsync(matchId);
+        conn.Match = match;
+        var lastHostedMatchId = PlayerPrefs.GetString(LastMatchIdKey, string.Empty);
+        conn.MatchCreatorUserId = match.Id == lastHostedMatchId ? conn.SelfUserId : string.Empty;
 
+        RebuildPlayersFromCurrentMatch();
+        SetScreen(isInRoom: true);
+        RefreshLobbyUi("Joined match " + ShortId(match.Id));
+    }
+
+    public async void LeaveLobby()
+    {
+        if (conn == null) return;
+
+        if (conn.Socket != null && conn.Match != null)
+        {
+            await conn.Socket.LeaveMatchAsync(conn.Match.Id);
+        }
+
+        conn.Match = null;
+        conn.MatchCreatorUserId = string.Empty;
         players.Clear();
-        ClearMatchList();
-        SetStartButton();
-
-        Debug.Log("[Lobby] Joined match " + conn.Match.Id);
-        RenderInfo("Joined: " + ShortId(conn.Match.Id));
+        SetScreen(isInRoom: false);
+        RefreshLobbyUi("Left match.");
     }
 
     public async void StartGame()
     {
-        if (!isHost || conn == null || conn.Socket == null || conn.Match == null)
-        {
-            Debug.LogWarning("[Lobby] Start blocked: host only and requires active match.");
-            return;
-        }
+        if (conn == null || conn.Socket == null || conn.Match == null || !conn.IsCurrentPlayerMatchCreator) return;
 
         var payload = Encoding.UTF8.GetBytes("{\"start\":true}");
         await conn.Socket.SendMatchStateAsync(conn.Match.Id, OPCODE_START, payload);
-        Debug.Log("[Lobby] Start sent.");
-        RenderInfo("Start sent.");
+        RefreshLobbyUi("Start sent.");
     }
 
     private void OnPresence(IMatchPresenceEvent e)
     {
-        if (e == null) return;
+        if (conn == null || conn.Match == null || e == null) return;
 
         if (e.Joins != null)
         {
@@ -165,72 +177,75 @@ public class LobbyUI : MonoBehaviour
             }
         }
 
-        RenderInfo();
+        RefreshLobbyUi();
     }
 
     private void OnMatchState(IMatchState state)
     {
-        if (state == null) return;
+        if (state == null || state.OpCode != OPCODE_START) return;
+        RefreshLobbyUi("Game starting...");
+    }
 
-        if (state.OpCode == OPCODE_START)
+    private void RebuildPlayersFromCurrentMatch()
+    {
+        players.Clear();
+        if (conn?.Match == null) return;
+
+        if (conn.Match.Presences != null)
         {
-            Debug.Log("[Lobby] START received.");
-            RenderInfo("START received.");
+            foreach (var p in conn.Match.Presences)
+            {
+                if (p == null || string.IsNullOrEmpty(p.UserId)) continue;
+                players[p.UserId] = p;
+            }
+        }
+
+        if (conn.Match.Self != null && !string.IsNullOrEmpty(conn.Match.Self.UserId))
+        {
+            players[conn.Match.Self.UserId] = conn.Match.Self;
         }
     }
 
     private bool HasConnectedSocket()
     {
-        if (conn == null || conn.Socket == null || !conn.Socket.IsConnected)
-        {
-            Debug.LogWarning("[Lobby] Socket not connected.");
-            return false;
-        }
-
-        return true;
+        return conn != null && conn.Socket != null && conn.Socket.IsConnected;
     }
 
-    private void SetStartButton()
+    private void SetScreen(bool isInRoom)
     {
-        if (startBtn) startBtn.interactable = isHost;
+        if (lobbywindow) lobbywindow.SetActive(!isInRoom);
+        if (roomwindow) roomwindow.SetActive(isInRoom);
     }
 
-    private void RenderInfo(string extra = null)
+    private void RefreshLobbyUi(string status = null)
     {
+        var hasMatch = conn != null && conn.Match != null;
+        if (lobbyMatchIdText) lobbyMatchIdText.text = hasMatch ? "Match ID: " + ShortId(conn.Match.Id) : "Match ID: -";
+
+        if (startBtn) startBtn.gameObject.SetActive(hasMatch && conn.IsCurrentPlayerMatchCreator);
+        if (playerListText) playerListText.text = BuildPlayerList();
+
+        if (infoText && !string.IsNullOrEmpty(status)) infoText.text = status;
+    }
+
+    private string BuildPlayerList()
+    {
+        if (players.Count == 0) return "No players";
+
         var sb = new StringBuilder();
-        sb.AppendLine("Status: " + ConnectionState());
-
-        if (conn != null && conn.Match != null)
+        foreach (var kv in players)
         {
-            sb.AppendLine("Lobby: " + ShortId(conn.Match.Id));
-            sb.AppendLine("Role: " + (isHost ? "HOST" : "CLIENT"));
+            var p = kv.Value;
+            var username = string.IsNullOrEmpty(p.Username) ? "Guest" : p.Username;
+            sb.AppendLine(username + " (" + ShortId(p.UserId) + ")");
         }
-        else
-        {
-            sb.AppendLine("Lobby: (none)");
-        }
-
-        sb.AppendLine("Players tracked: " + players.Count);
-
-        if (!string.IsNullOrEmpty(extra))
-        {
-            sb.AppendLine(extra);
-        }
-
-        if (infoText) infoText.text = sb.ToString();
-    }
-
-    private string ConnectionState()
-    {
-        if (conn == null) return "No NakamaConnection";
-        if (conn.Socket == null) return "Socket not created";
-        return conn.Socket.IsConnected ? "Connected" : "Disconnected";
+        return sb.ToString();
     }
 
     private static string ShortId(string id)
     {
-        if (string.IsNullOrEmpty(id)) return "(null)";
-        return id.Length > 6 ? id.Substring(0, 6) : id;
+        if (string.IsNullOrEmpty(id)) return "------";
+        return id.Length <= 6 ? id : id.Substring(0, 6);
     }
 
     private void ClearMatchList()
@@ -249,35 +264,31 @@ public class LobbyUI : MonoBehaviour
 
     private void AddJoinRow(string label, string matchId)
     {
-        if (!matchRowPrefab || !matchListContainer)
-        {
-            Debug.Log("[Lobby] " + label + " => " + matchId);
-            return;
-        }
+        if (!matchRowPrefab || !matchListContainer) return;
 
         var row = Instantiate(matchRowPrefab, matchListContainer);
         row.gameObject.SetActive(true);
 
-        var rowText = row.GetComponentInChildren<Text>();
-        if (rowText) rowText.text = label;
+        var tmp = row.GetComponentInChildren<TMP_Text>();
+        if (tmp) tmp.text = label;
+        var txt = row.GetComponentInChildren<Text>();
+        if (txt) txt.text = label;
 
         row.onClick.RemoveAllListeners();
         row.onClick.AddListener(() => JoinLobby(matchId));
     }
 
-    private void AddInfoRow(string text)
+    private void AddInfoRow(string label)
     {
-        if (!matchRowPrefab || !matchListContainer)
-        {
-            Debug.Log("[Lobby] " + text);
-            return;
-        }
+        if (!matchRowPrefab || !matchListContainer) return;
 
         var row = Instantiate(matchRowPrefab, matchListContainer);
         row.gameObject.SetActive(true);
 
-        var rowText = row.GetComponentInChildren<Text>();
-        if (rowText) rowText.text = text;
+        var tmp = row.GetComponentInChildren<TMP_Text>();
+        if (tmp) tmp.text = label;
+        var txt = row.GetComponentInChildren<Text>();
+        if (txt) txt.text = label;
 
         row.onClick.RemoveAllListeners();
         row.interactable = false;
