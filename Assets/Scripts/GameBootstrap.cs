@@ -7,10 +7,12 @@ public class GameBootstrap : MonoBehaviour
     public HostAuthority hostAuthority;
     public ProceduralBuildingGenerator buildingGenerator;
     public PlayerSpawnManager spawner;
+    public EnemySpawnManager enemySpawner;
 
     [Header("Prefabs")]
     public GameObject localPlayerPrefab;
     public GameObject proxyPlayerPrefab;
+    public GameObject enemyPrefab;
 
     void Awake()
     {
@@ -18,10 +20,16 @@ public class GameBootstrap : MonoBehaviour
         if (!hostAuthority) hostAuthority = FindObjectOfType<HostAuthority>();
         if (!buildingGenerator) buildingGenerator = FindObjectOfType<ProceduralBuildingGenerator>();
         if (!spawner) spawner = PlayerSpawnManager.Instance != null ? PlayerSpawnManager.Instance : FindObjectOfType<PlayerSpawnManager>();
+        if (!enemySpawner) enemySpawner = EnemySpawnManager.Instance != null ? EnemySpawnManager.Instance : FindObjectOfType<EnemySpawnManager>();
         if (!spawner)
         {
             var go = new GameObject("PlayerSpawnManager");
             spawner = go.AddComponent<PlayerSpawnManager>();
+        }
+        if (!enemySpawner)
+        {
+            var go = new GameObject("EnemySpawnManager");
+            enemySpawner = go.AddComponent<EnemySpawnManager>();
         }
     }
 
@@ -49,6 +57,8 @@ public class GameBootstrap : MonoBehaviour
             if (!spawner.localPlayerPrefab && localPlayerPrefab) spawner.localPlayerPrefab = localPlayerPrefab;
             if (!spawner.remoteProxyPrefab && proxyPlayerPrefab) spawner.remoteProxyPrefab = proxyPlayerPrefab;
         }
+        if (enemySpawner != null && !enemySpawner.enemyPrefab && enemyPrefab) enemySpawner.enemyPrefab = enemyPrefab;
+        if (enemySpawner != null) enemySpawner.ClearAll();
 
         var selfId = conn != null ? conn.SelfUserId : string.Empty;
         if (string.IsNullOrEmpty(selfId))

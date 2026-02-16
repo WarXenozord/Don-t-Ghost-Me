@@ -12,6 +12,7 @@ public class MatchTransport : MonoBehaviour
     public const long OPCODE_INIT = 10;
     public const long OPCODE_READY = 11;
     public const long OPCODE_START = 12;
+    public const long OPCODE_ENEMY_SPAWN = 20;
 
     public NakamaConnection conn;
 
@@ -20,6 +21,7 @@ public class MatchTransport : MonoBehaviour
     public event Action<InitMsg> OnInit;
     public event Action<ReadyMsg> OnReady;
     public event Action<StartMsg> OnStart;
+    public event Action<EnemySpawnMsg> OnEnemySpawn;
     private bool _isBound;
     private NakamaConnection _boundConn;
 
@@ -117,6 +119,12 @@ public class MatchTransport : MonoBehaviour
             var msg = JsonUtility.FromJson<StartMsg>(json);
             OnStart?.Invoke(msg);
         }
+        else if (state.OpCode == OPCODE_ENEMY_SPAWN)
+        {
+            var msg = JsonUtility.FromJson<EnemySpawnMsg>(json);
+            msg.senderUserId = state.UserPresence.UserId;
+            OnEnemySpawn?.Invoke(msg);
+        }
     }
 
     public async void SendInput(InputMsg msg)
@@ -157,6 +165,13 @@ public class MatchTransport : MonoBehaviour
         if (conn?.Socket == null || conn.Match == null) return;
         var bytes = Encoding.UTF8.GetBytes(JsonUtility.ToJson(msg));
         await conn.Socket.SendMatchStateAsync(conn.Match.Id, OPCODE_START, bytes);
+    }
+
+    public async void BroadcastEnemySpawn(EnemySpawnMsg msg)
+    {
+        if (conn?.Socket == null || conn.Match == null) return;
+        var bytes = Encoding.UTF8.GetBytes(JsonUtility.ToJson(msg));
+        await conn.Socket.SendMatchStateAsync(conn.Match.Id, OPCODE_ENEMY_SPAWN, bytes);
     }
 
     [Serializable]
@@ -208,6 +223,16 @@ public class MatchTransport : MonoBehaviour
     public class StartMsg
     {
         public int initId;
+    }
+
+    [Serializable]
+    public class EnemySpawnMsg
+    {
+        public string spawnId;
+        public string prefabId;
+        public float x, y, z;
+        public float yaw;
+        [NonSerialized] public string senderUserId;
     }
 
     [Serializable]

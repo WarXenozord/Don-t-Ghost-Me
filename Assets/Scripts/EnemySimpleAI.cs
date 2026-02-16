@@ -64,6 +64,7 @@ public class EnemySimpleAI : SoundAgroListener
     private float _nextRepathAt;
     private Vector3 _lastProgressPos;
     private float _lastProgressAt;
+    private bool _patrolInitialized;
     private float _attackNoGainStartedAt;
     private float _attackNoGainStartDist;
     private bool _attackRerouteToDoorActive;
@@ -78,13 +79,13 @@ public class EnemySimpleAI : SoundAgroListener
 
     void Start()
     {
-        PickNextPatrolTarget(force: true);
-        _lastProgressPos = transform.position;
-        _lastProgressAt = Time.time;
+        _patrolInitialized = false;
+        ResetMovementProgress();
     }
 
     void Update()
     {
+        if (_generator == null) _generator = FindObjectOfType<ProceduralBuildingGenerator>();
         RefreshKnownMediumsIfNeeded();
 
         var visibleTarget = FindVisibleMedium();
@@ -118,6 +119,22 @@ public class EnemySimpleAI : SoundAgroListener
 
     private void TickPatrol()
     {
+        if (!_patrolInitialized)
+        {
+            PickNextPatrolTarget(force: true);
+            _nextRepathAt = 0f;
+            _patrolInitialized = true;
+        }
+
+        if (IsStuck())
+        {
+            TeleportToRandomPatrolNode();
+            PickNextPatrolTarget(force: true);
+            _nextRepathAt = 0f;
+            ResetMovementProgress();
+            return;
+        }
+
         if (Time.time >= _nextPatrolResampleAt || Reached2D(_patrolTarget, waypointReachDistance))
         {
             PickNextPatrolTarget(force: true);
@@ -141,6 +158,7 @@ public class EnemySimpleAI : SoundAgroListener
         {
             _attackRerouteToDoorActive = false;
             state = EnemyState.Patrol;
+            _patrolInitialized = false;
             PickNextPatrolTarget(force: true);
             return;
         }
@@ -197,6 +215,17 @@ public class EnemySimpleAI : SoundAgroListener
             }
         }
 
+        if (IsStuck())
+        {
+            _attackTarget = null;
+            _attackRerouteToDoorActive = false;
+            state = EnemyState.Patrol;
+            _patrolInitialized = false;
+            PickNextPatrolTarget(force: true);
+            ResetMovementProgress();
+            return;
+        }
+
         var stillVisible = CanSeeMedium(_attackTarget);
         var far2D = Distance2D(transform.position, targetPos) >= loseTargetDistance2D;
         if (!stillVisible && far2D)
@@ -204,6 +233,7 @@ public class EnemySimpleAI : SoundAgroListener
             _attackTarget = null;
             _attackRerouteToDoorActive = false;
             state = EnemyState.Patrol;
+            _patrolInitialized = false;
             PickNextPatrolTarget(force: true);
         }
     }
@@ -431,6 +461,51 @@ public class EnemySimpleAI : SoundAgroListener
         _attackRerouteToDoorActive = false;
         _attackRerouteNodes.Clear();
         _attackRerouteIndex = 0;
+        ResetMovementProgress();
+    }
+
+    private void ResetMovementProgress()
+    {
+        _lastProgressPos = transform.position;
+        _lastProgressAt = Time.time;
+    }
+
+    private void TeleportToRandomPatrolNode()
+    {
+        if (_generator != null)
+        {
+            _roomCenterNodes.Clear();
+            _generator.CollectRoomCenterNodes(_roomCenterNodes, preferredFloor: 0);
+            if (_roomCenterNodes.Count > 0)
+            {
+                var idx = Random.Range(0, _roomCenterNodes.Count);
+                var target = _roomCenterNodes[idx];
+                if (_controller != null && _controller.enabled)
+                {
+                    _controller.enabled = false;
+                    transform.position = target;
+                    _controller.enabled = true;
+                }
+                else
+                {
+                    transform.position = target;
+                }
+                RegisterNodeVisit(target);
+                return;
+            }
+        }
+
+        var fallback = transform.position + new Vector3(Random.Range(-4f, 4f), 0f, Random.Range(-4f, 4f));
+        if (_controller != null && _controller.enabled)
+        {
+            _controller.enabled = false;
+            transform.position = fallback;
+            _controller.enabled = true;
+        }
+        else
+        {
+            transform.position = fallback;
+        }
     }
 
     private static int NodeKey(Vector3 p)

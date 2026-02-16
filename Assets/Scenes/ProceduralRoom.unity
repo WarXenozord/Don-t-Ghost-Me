@@ -659,15 +659,15 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2431784559735447993, guid: 3e707070d4901ed4da8f1da255e6baa8, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 18.101652
+      value: 18
       objectReference: {fileID: 0}
     - target: {fileID: 2431784559735447993, guid: 3e707070d4901ed4da8f1da255e6baa8, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 1.2
+      value: 1.1
       objectReference: {fileID: 0}
     - target: {fileID: 2431784559735447993, guid: 3e707070d4901ed4da8f1da255e6baa8, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 25.004837
+      value: 25
       objectReference: {fileID: 0}
     - target: {fileID: 2431784559735447993, guid: 3e707070d4901ed4da8f1da255e6baa8, type: 3}
       propertyPath: m_LocalRotation.w
@@ -980,6 +980,7 @@ MonoBehaviour:
   ceilingPrefab: {fileID: 1182786263916851811, guid: d98640697ca1ae24aaeeba6d2a30451b, type: 3}
   floorplanRenderer: {fileID: 1793691408}
   minimapController: {fileID: 1793691409}
+  propSpawner: {fileID: 0}
   player: {fileID: 0}
   playerHeightOffset: 1.1
 --- !u!4 &1793691407

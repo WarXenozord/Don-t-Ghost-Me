@@ -7,6 +7,7 @@ public class HostAuthority : MonoBehaviour
     public NakamaConnection conn;
     public MatchTransport transport;
     public PlayerSpawnManager spawner;
+    public EnemySpawnManager enemySpawner;
 
     [Header("Host")]
     public bool isHost = false;
@@ -60,6 +61,7 @@ public class HostAuthority : MonoBehaviour
     {
         ResolveRefs();
         if (!spawner) spawner = PlayerSpawnManager.Instance != null ? PlayerSpawnManager.Instance : FindObjectOfType<PlayerSpawnManager>();
+        if (!enemySpawner) enemySpawner = EnemySpawnManager.Instance != null ? EnemySpawnManager.Instance : FindObjectOfType<EnemySpawnManager>();
         EnsureBindings();
     }
 
@@ -176,6 +178,14 @@ public class HostAuthority : MonoBehaviour
         if (conn == null || conn.Match == null) return;
         if (!MatchContext.Instance.started) return;
         _gameplayStarted = true;
+    }
+
+    public bool HostSpawnEnemyCommand(Vector3 position, float yaw = 0f, string prefabId = "default")
+    {
+        if (conn == null || !conn.IsCurrentPlayerMatchCreator) return false;
+        if (!enemySpawner) enemySpawner = EnemySpawnManager.Instance != null ? EnemySpawnManager.Instance : FindObjectOfType<EnemySpawnManager>();
+        if (!enemySpawner) return false;
+        return enemySpawner.HostCommandSpawnEnemy(position, yaw, prefabId);
     }
 
     private MatchTransport.InitMsg BuildInitMessage(int initId)
@@ -675,6 +685,7 @@ public class HostAuthority : MonoBehaviour
         if (!conn) conn = FindObjectOfType<NakamaConnection>();
         if (!transport) transport = MatchTransport.Instance != null ? MatchTransport.Instance : GetComponent<MatchTransport>();
         if (!transport) transport = FindObjectOfType<MatchTransport>();
+        if (!enemySpawner) enemySpawner = EnemySpawnManager.Instance != null ? EnemySpawnManager.Instance : FindObjectOfType<EnemySpawnManager>();
     }
 
     private void EnsureBindings()
