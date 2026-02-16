@@ -988,6 +988,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   conn: {fileID: 0}
+  transport: {fileID: 0}
+  hostAuthority: {fileID: 0}
   lobbywindow: {fileID: 1920071833}
   roomwindow: {fileID: 949264952}
   hostBtn: {fileID: 1984774205}
@@ -999,6 +1001,7 @@ MonoBehaviour:
   leaveBtn: {fileID: 1155418348}
   startBtn: {fileID: 1694211007}
   infoText: {fileID: 2118586971}
+  gameSceneName: ProceduralRoom
 --- !u!1 &705507993
 GameObject:
   m_ObjectHideFlags: 0

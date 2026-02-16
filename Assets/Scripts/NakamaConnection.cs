@@ -5,6 +5,8 @@ using UnityEngine;
 
 public class NakamaConnection : MonoBehaviour
 {
+    public static NakamaConnection Instance { get; private set; }
+
     [Header("Nakama")]
     public string scheme = "https";
     public string host = "nakama.juanlibonatti.com";
@@ -29,6 +31,13 @@ public class NakamaConnection : MonoBehaviour
 
     async void Awake()
     {
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+
+        Instance = this;
         DontDestroyOnLoad(gameObject);
         await ConnectOnly();
     }

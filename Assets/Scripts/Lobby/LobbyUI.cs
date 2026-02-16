@@ -1,14 +1,16 @@
 using System.Collections.Generic;
-using System.Text;
 using Nakama;
 using TMPro;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 public class LobbyUI : MonoBehaviour
 {
     [Header("Refs")]
     public NakamaConnection conn;
+    public MatchTransport transport;
+    public HostAuthority hostAuthority;
 
     [Header("Screens")]
     public GameObject lobbywindow;
@@ -29,35 +31,58 @@ public class LobbyUI : MonoBehaviour
     [Header("Optional")]
     public TMP_Text infoText;
 
-    private const long OPCODE_START = 99;
+    [Header("Scene Flow")]
+    public string gameSceneName = "GameScene";
+
     private const string LastMatchIdKey = "last_match_id";
 
     private readonly Dictionary<string, IUserPresence> players = new Dictionary<string, IUserPresence>();
+    private int _lastInitUiLogId = -1;
+    private bool _loadingGameScene;
 
     private void Awake()
     {
         if (!conn) conn = FindObjectOfType<NakamaConnection>();
+        if (!transport) transport = FindObjectOfType<MatchTransport>();
+        if (!hostAuthority) hostAuthority = FindObjectOfType<HostAuthority>();
 
         if (hostBtn) hostBtn.onClick.AddListener(HostLobby);
         if (refreshBtn) refreshBtn.onClick.AddListener(RefreshLobbies);
         if (leaveBtn) leaveBtn.onClick.AddListener(LeaveLobby);
         if (startBtn) startBtn.onClick.AddListener(StartGame);
 
-        if (conn)
+        if (conn) conn.MatchPresenceReceived += OnPresence;
+
+        if (transport)
         {
-            conn.MatchPresenceReceived += OnPresence;
-            conn.MatchStateReceived += OnMatchState;
+            transport.OnInit += OnInitReceived;
+            transport.OnStart += OnStartReceived;
         }
 
         SetScreen(isInRoom: false);
         RefreshLobbyUi();
     }
 
+    private void Update()
+    {
+        if (_loadingGameScene) return;
+        if (conn == null || conn.Match == null) return;
+
+        var context = MatchContext.Instance;
+        if (!context.hasInit || !context.started) return;
+
+        LoadGameSceneIfNeeded();
+    }
+
     private void OnDestroy()
     {
-        if (!conn) return;
-        conn.MatchPresenceReceived -= OnPresence;
-        conn.MatchStateReceived -= OnMatchState;
+        if (conn) conn.MatchPresenceReceived -= OnPresence;
+
+        if (transport)
+        {
+            transport.OnInit -= OnInitReceived;
+            transport.OnStart -= OnStartReceived;
+        }
     }
 
     public async void HostLobby()
@@ -146,13 +171,17 @@ public class LobbyUI : MonoBehaviour
         RefreshLobbyUi("Left match.");
     }
 
-    public async void StartGame()
+    public void StartGame()
     {
-        if (conn == null || conn.Socket == null || conn.Match == null || !conn.IsCurrentPlayerMatchCreator) return;
+        if (conn == null || conn.Match == null || !conn.IsCurrentPlayerMatchCreator) return;
+        if (!hostAuthority)
+        {
+            RefreshLobbyUi("Host authority missing.");
+            return;
+        }
 
-        var payload = Encoding.UTF8.GetBytes("{\"start\":true}");
-        await conn.Socket.SendMatchStateAsync(conn.Match.Id, OPCODE_START, payload);
-        RefreshLobbyUi("Start sent.");
+        hostAuthority.BeginMatchInitialization();
+        RefreshLobbyUi("Init sent.");
     }
 
     private void OnPresence(IMatchPresenceEvent e)
@@ -180,10 +209,48 @@ public class LobbyUI : MonoBehaviour
         RefreshLobbyUi();
     }
 
-    private void OnMatchState(IMatchState state)
+    private void OnInitReceived(MatchTransport.InitMsg msg)
     {
-        if (state == null || state.OpCode != OPCODE_START) return;
+        if (msg == null || _lastInitUiLogId == msg.initId) return;
+        _lastInitUiLogId = msg.initId;
+
+        var context = MatchContext.Instance;
+        context.lastInit = msg;
+        context.hasInit = true;
+        context.started = false;
+
+        var hasSpawn = false;
+        if (msg.spawns != null && conn != null && !string.IsNullOrEmpty(conn.SelfUserId))
+        {
+            foreach (var spawn in msg.spawns)
+            {
+                if (spawn == null) continue;
+                if (spawn.userId == conn.SelfUserId)
+                {
+                    hasSpawn = true;
+                    break;
+                }
+            }
+        }
+
+        RefreshLobbyUi(hasSpawn
+            ? "Init received."
+            : "Init received. Missing spawn for local user.");
+    }
+
+    private void OnStartReceived(MatchTransport.StartMsg msg)
+    {
+        if (msg == null) return;
+        MatchContext.Instance.started = true;
         RefreshLobbyUi("Game starting...");
+        LoadGameSceneIfNeeded();
+    }
+
+    private void LoadGameSceneIfNeeded()
+    {
+        if (_loadingGameScene) return;
+        _loadingGameScene = true;
+        SceneManager.LoadScene(gameSceneName);
     }
 
     private void RebuildPlayersFromCurrentMatch()
@@ -232,7 +299,7 @@ public class LobbyUI : MonoBehaviour
     {
         if (players.Count == 0) return "No players";
 
-        var sb = new StringBuilder();
+        var sb = new System.Text.StringBuilder();
         foreach (var kv in players)
         {
             var p = kv.Value;
