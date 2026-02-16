@@ -27,6 +27,7 @@ public class FloorplanRenderer : MonoBehaviour
     public float wallSpriteThickness = 0.3f;
     public float doorSpriteSize      = 1.2f;
     public float playerMarkerSize    = 1.5f;
+    public bool isHidden = true;
 
     // ?? Runtime ????????????????????????????????????????????????????????????
     private Dictionary<int, GameObject>      floorParents  = new Dictionary<int, GameObject>();
@@ -65,7 +66,7 @@ public class FloorplanRenderer : MonoBehaviour
             parent.transform.SetParent(transform, worldPositionStays: false);
             SetLayerRecursively(parent, minimapLayer);
             floorParents[f] = parent;
-            parent.SetActive(false);
+            if(isHidden) parent.SetActive(false);
         }
 
         SpawnWallSprites(walls, floorHeight, minimapLayer);
@@ -144,7 +145,7 @@ public class FloorplanRenderer : MonoBehaviour
             created++;
 
             // Start hidden — RevealRoom will enable it
-            go.SetActive(false);
+            if(isHidden) go.SetActive(false);
 
             // Try roomA/roomB first (set by the refactored generator).
             // If both are -1 (older generator or exterior walls), fall back to a
@@ -250,7 +251,7 @@ public class FloorplanRenderer : MonoBehaviour
             SetLayerRecursively(go, layer);
 
             // Start hidden
-            go.SetActive(false);
+            if(isHidden) go.SetActive(false);
 
             // Door is revealed when either neighbouring room is entered
             RegisterSpriteToRoom(door.roomA, go);
