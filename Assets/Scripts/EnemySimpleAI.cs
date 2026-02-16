@@ -680,19 +680,6 @@ public class EnemySimpleAI : SoundAgroListener
             transform.position = best;
         }
 
-        if (CanApplyGameplayEffects())
-        {
-            if (_netIdentity == null) _netIdentity = GetComponent<EnemyNetIdentity>();
-            if (_netIdentity != null && !string.IsNullOrEmpty(_netIdentity.spawnId))
-            {
-                var mgr = EnemySpawnManager.Instance != null ? EnemySpawnManager.Instance : FindObjectOfType<EnemySpawnManager>();
-                if (mgr != null)
-                {
-                    mgr.HostBroadcastTeleport(_netIdentity.spawnId, transform.position, transform.eulerAngles.y, reason: 1);
-                }
-            }
-        }
-
         // After first-touch teleport, always reset to patrol.
         _attackTarget = null;
         _attackRerouteToDoorActive = false;
@@ -705,5 +692,18 @@ public class EnemySimpleAI : SoundAgroListener
         _routeIndex = 0;
         _nextRepathAt = 0f;
         ResetMovementProgress();
+
+        if (CanApplyGameplayEffects())
+        {
+            if (_netIdentity == null) _netIdentity = GetComponent<EnemyNetIdentity>();
+            if (_netIdentity != null && !string.IsNullOrEmpty(_netIdentity.spawnId))
+            {
+                var mgr = EnemySpawnManager.Instance != null ? EnemySpawnManager.Instance : FindObjectOfType<EnemySpawnManager>();
+                if (mgr != null)
+                {
+                    mgr.HostBroadcastTeleport(_netIdentity.spawnId, transform.position, transform.eulerAngles.y, reason: 1);
+                }
+            }
+        }
     }
 }

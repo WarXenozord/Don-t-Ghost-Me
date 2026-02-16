@@ -248,6 +248,12 @@ public class EnemySpawnManager : MonoBehaviour
 
         OnEnemyTeleportReceived(msg);
         transport.BroadcastEnemyTeleport(msg);
+        // Enforce host truth immediately after teleport (including AI state).
+        var snap = BuildEnemySnapshot();
+        if (snap.enemies != null && snap.enemies.Length > 0)
+        {
+            transport.BroadcastEnemySnapshot(snap);
+        }
         return true;
     }
 
