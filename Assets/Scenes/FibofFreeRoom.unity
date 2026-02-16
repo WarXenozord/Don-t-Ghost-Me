@@ -1164,6 +1164,8 @@ MonoBehaviour:
   healthBarFill: {fileID: 950575940}
   drainRadius: 10
   maxDrainPerMedium: 15
+  regenPerSecond: 10
+  regenDelay: 2
 --- !u!1001 &1883023662
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -1218,7 +1220,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8307503184249558993, guid: c9bbaba696bdecb4f81e61a5f1d77782, type: 3}
       propertyPath: m_LocalPosition.x
-      value: -18.92
+      value: 5.2
       objectReference: {fileID: 0}
     - target: {fileID: 8307503184249558993, guid: c9bbaba696bdecb4f81e61a5f1d77782, type: 3}
       propertyPath: m_LocalPosition.y
@@ -1226,7 +1228,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8307503184249558993, guid: c9bbaba696bdecb4f81e61a5f1d77782, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 20.79
+      value: 20.09
       objectReference: {fileID: 0}
     - target: {fileID: 8307503184249558993, guid: c9bbaba696bdecb4f81e61a5f1d77782, type: 3}
       propertyPath: m_LocalRotation.w

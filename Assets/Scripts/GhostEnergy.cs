@@ -12,6 +12,12 @@ public class GhostEnergy : MonoBehaviour
     public float drainRadius = 10f;
     public float maxDrainPerMedium = 15f; // per medium per second
 
+    [Header("Regen Settings")]
+    public float regenPerSecond = 10f;
+    public float regenDelay = 2f;
+
+    private float timeSinceLastDrain = 0f;
+
     private GameObject[] mediums;
 
     private void Start()
@@ -25,16 +31,40 @@ public class GhostEnergy : MonoBehaviour
     private void Update()
     {
         UpdateHealthBar();
-        DrainFromMediums();
+        float drainAmount = DrainFromMediums();
+
+        if (drainAmount > 0f)
+        {
+            // Ghost is being drained
+            currentHealth -= drainAmount;
+            currentHealth = Mathf.Clamp(currentHealth, 0f, maxHealth);
+
+            timeSinceLastDrain = 0f;
+        }
+        else
+        {
+            // No drain happening
+            timeSinceLastDrain += Time.deltaTime;
+
+            if (timeSinceLastDrain >= regenDelay)
+            {
+                Regenerate();
+            }
+        }
+
+        if (currentHealth <= 0f)
+        {
+            Die();
+        }
     }
-    private void DrainFromMediums()
+    private float DrainFromMediums()
     {
-        float totalDrainThisFrame = 0f;
+        float totalDrain = 0f;
+
+        GameObject[] mediums = GameObject.FindGameObjectsWithTag("Medium");
 
         foreach (GameObject medium in mediums)
         {
-            if (medium == null) continue;
-
             float distance = Vector3.Distance(
                 transform.position,
                 medium.transform.position
@@ -44,22 +74,22 @@ public class GhostEnergy : MonoBehaviour
             {
                 float proximityPercent = 1f - (distance / drainRadius);
 
-                float drainAmount =
+                float drain =
                     maxDrainPerMedium *
                     proximityPercent *
                     Time.deltaTime;
 
-                totalDrainThisFrame += drainAmount;
+                totalDrain += drain;
             }
         }
 
-        currentHealth -= totalDrainThisFrame;
-        currentHealth = Mathf.Clamp(currentHealth, 0f, maxHealth);
+        return totalDrain;
+    }
 
-        if (currentHealth <= 0f)
-        {
-            Die();
-        }
+    private void Regenerate()
+    {
+        currentHealth += regenPerSecond * Time.deltaTime;
+        currentHealth = Mathf.Clamp(currentHealth, 0f, maxHealth);
     }
 
     private void Die()
