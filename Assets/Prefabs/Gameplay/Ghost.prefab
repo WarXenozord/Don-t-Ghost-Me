@@ -156,7 +156,7 @@ Camera:
   m_Depth: 0
   m_CullingMask:
     serializedVersion: 2
-    m_Bits: 55
+    m_Bits: 567
   m_RenderingPath: -1
   m_TargetTexture: {fileID: 0}
   m_TargetDisplay: 0
@@ -190,9 +190,11 @@ GameObject:
   - component: {fileID: 139811745504333480}
   - component: {fileID: 2101878484288253936}
   - component: {fileID: 7502443982139659806}
+  - component: {fileID: 590951162705015939}
+  - component: {fileID: 4159529108978260038}
   m_Layer: 0
   m_Name: Ghost
-  m_TagString: Untagged
+  m_TagString: Ghost
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -205,7 +207,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 5652273883015588081}
   serializedVersion: 2
-  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 18.99, y: 1.4749, z: 20.79}
   m_LocalScale: {x: 0.77373, y: 0.77373, z: 0.77373}
   m_ConstrainProportionsScale: 0
@@ -333,6 +335,49 @@ Rigidbody:
   m_Interpolate: 0
   m_Constraints: 0
   m_CollisionDetection: 0
+--- !u!114 &590951162705015939
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5652273883015588081}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0280823020055554fabdcf5ce4718e6d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  maxHealth: 100
+  currentHealth: 0
+  healthBarFill: {fileID: 0}
+  drainRadius: 10
+  maxDrainPerMedium: 15
+  regenPerSecond: 10
+  regenDelay: 2
+--- !u!114 &4159529108978260038
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5652273883015588081}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8b2d8837c6232f14cb4d1845791d7546, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  interactionRange: 5
+  energyCostPerFlicker: 20
+  interactKey: 101
+  lampLayer:
+    serializedVersion: 2
+    m_Bits: 512
+  detectionRadius: 8
+  useRaycast: 1
+  raycastDistance: 10
+  playerCamera: {fileID: 412409998115839473}
+  ghostEnergy: {fileID: 590951162705015939}
+  interactionPrompt: {fileID: 0}
 --- !u!1 &6290174318891195069
 GameObject:
   m_ObjectHideFlags: 0

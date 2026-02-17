@@ -891,171 +891,87 @@ Camera:
   m_OcclusionCulling: 1
   m_StereoConvergence: 10
   m_StereoSeparation: 0.022
---- !u!1 &1793691405
-GameObject:
+--- !u!1001 &1685896158
+PrefabInstance:
   m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1793691407}
-  - component: {fileID: 1793691406}
-  - component: {fileID: 1793691408}
-  - component: {fileID: 1793691409}
-  - component: {fileID: 1793691410}
-  - component: {fileID: 1793691411}
-  m_Layer: 0
-  m_Name: GameObject
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &1793691406
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1793691405}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e8f2e89fb7a609248a3a27784a6d4ebe, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  seed: 12345
-  targetNumRooms: 10
-  numFloors: 1
-  floorHeight: 3.5
-  buildingsPerRow: 2
-  buildingSpacingX: 0
-  buildingSpacingZ: 0
-  minBuildingSize: {x: 5, y: 12, z: 5}
-  maxBuildingSize: {x: 30, y: 12, z: 30}
-  minRoomSize: 4
-  maxRoomSize: 7
-  doorWidth: 1
-  doorHeight: 2.2
-  wallThickness: 0.2
-  floorCeilThickness: 0.15
-  stairWidth: 1.5
-  stairDepth: 3
-  stairPrefab: {fileID: 0}
-  wallPrefab: {fileID: 4316525582638928304, guid: 70605147838c20e458f51e5b096442d4, type: 3}
-  doorPrefab: {fileID: 7209226886201637402, guid: 50cd8b5378ce2984d8b546de4c164981, type: 3}
-  doorwayPrefab: {fileID: 2889030233283407942, guid: b1d743e9b3d0427438c562aa37b0d7d0, type: 3}
-  floorPrefab: {fileID: 2936626781115102207, guid: f4a79324f08aba047a7ecfce965a6823, type: 3}
-  ceilingPrefab: {fileID: 1182786263916851811, guid: d98640697ca1ae24aaeeba6d2a30451b, type: 3}
-  floorplanRenderer: {fileID: 1793691408}
-  minimapController: {fileID: 1793691409}
-  propSpawner: {fileID: 1793691411}
-  player: {fileID: 0}
-  playerHeightOffset: 1.1
---- !u!4 &1793691407
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1793691405}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1793691408
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1793691405}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ca1b6313ac4ebe74691f3a0c5f746fcb, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  wallColor: {r: 0, g: 0, b: 0, a: 1}
-  wallShader: {fileID: 0}
-  wallMaterialOverride: {fileID: 0}
-  doorSpritePrefab: {fileID: 7617629106695220390, guid: 53252bceed04663459b87d8295cbb028, type: 3}
-  playerMarkerPrefab: {fileID: 0}
-  minimapSpriteY: 200
-  wallSpriteThickness: 0.3
-  doorSpriteSize: 1.2
-  playerMarkerSize: 1.5
-  isHidden: 1
---- !u!114 &1793691409
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1793691405}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 343bad8c56680d143b862213f4fd6340, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  player: {fileID: 0}
-  floorplanRenderer: {fileID: 1793691408}
-  minimapRawImage: {fileID: 1971851830}
-  minimapCamera: {fileID: 1673759882}
-  revealCamera: {fileID: 793674898}
-  renderTextureSize: 512
-  viewportWorldSize: 15
-  mapPadding: 5
-  floorHeight: 3.5
-  groundFloorY: 0
---- !u!114 &1793691410
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1793691405}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ff23ee7395540c94e84670df8ea159e7, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  minimapController: {fileID: 1793691409}
-  mapPanel: {fileID: 1420254550}
-  mapRawImage: {fileID: 569910529}
-  minimapRawImage: {fileID: 2048498105}
-  openButton: {fileID: 0}
-  closeButton: {fileID: 0}
-  toggleKey: 109
-  minViewportSize: 10
-  maxViewportSize: 200
-  defaultViewportSize: 60
-  zoomSpeed: 0.12
-  zoomSmoothing: 0.15
-  panSmoothing: 0.2
---- !u!114 &1793691411
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1793691405}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 59ebec3f47da079439dd8531f72b6b75, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  furnishingProfiles: []
-  materialProfiles:
-  - {fileID: 11400000, guid: ccf01086d1a1af549b44458fc6400eee, type: 2}
-  - {fileID: 11400000, guid: 5d0ae454f74207b408315e369a9adaad, type: 2}
-  - {fileID: 11400000, guid: 4e5e7f7f699758e44be0e1ccaf81b229, type: 2}
-  wallMargin: 0.5
-  propPadding: 0.1
-  maxPlacementAttempts: 30
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 73163572864504066, guid: 3b4ec7472d45f3c4f9bd2ffe57d02ad3, type: 3}
+      propertyPath: m_Name
+      value: GameController
+      objectReference: {fileID: 0}
+    - target: {fileID: 1023229969626592785, guid: 3b4ec7472d45f3c4f9bd2ffe57d02ad3, type: 3}
+      propertyPath: mapPanel
+      value: 
+      objectReference: {fileID: 1420254550}
+    - target: {fileID: 1023229969626592785, guid: 3b4ec7472d45f3c4f9bd2ffe57d02ad3, type: 3}
+      propertyPath: mapRawImage
+      value: 
+      objectReference: {fileID: 569910529}
+    - target: {fileID: 1023229969626592785, guid: 3b4ec7472d45f3c4f9bd2ffe57d02ad3, type: 3}
+      propertyPath: minimapRawImage
+      value: 
+      objectReference: {fileID: 1971851828}
+    - target: {fileID: 5342688327122664781, guid: 3b4ec7472d45f3c4f9bd2ffe57d02ad3, type: 3}
+      propertyPath: revealCamera
+      value: 
+      objectReference: {fileID: 793674898}
+    - target: {fileID: 5342688327122664781, guid: 3b4ec7472d45f3c4f9bd2ffe57d02ad3, type: 3}
+      propertyPath: minimapCamera
+      value: 
+      objectReference: {fileID: 1673759882}
+    - target: {fileID: 5342688327122664781, guid: 3b4ec7472d45f3c4f9bd2ffe57d02ad3, type: 3}
+      propertyPath: minimapRawImage
+      value: 
+      objectReference: {fileID: 1971851830}
+    - target: {fileID: 6900539596992752293, guid: 3b4ec7472d45f3c4f9bd2ffe57d02ad3, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6900539596992752293, guid: 3b4ec7472d45f3c4f9bd2ffe57d02ad3, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6900539596992752293, guid: 3b4ec7472d45f3c4f9bd2ffe57d02ad3, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6900539596992752293, guid: 3b4ec7472d45f3c4f9bd2ffe57d02ad3, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 6900539596992752293, guid: 3b4ec7472d45f3c4f9bd2ffe57d02ad3, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6900539596992752293, guid: 3b4ec7472d45f3c4f9bd2ffe57d02ad3, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6900539596992752293, guid: 3b4ec7472d45f3c4f9bd2ffe57d02ad3, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6900539596992752293, guid: 3b4ec7472d45f3c4f9bd2ffe57d02ad3, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6900539596992752293, guid: 3b4ec7472d45f3c4f9bd2ffe57d02ad3, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6900539596992752293, guid: 3b4ec7472d45f3c4f9bd2ffe57d02ad3, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 3b4ec7472d45f3c4f9bd2ffe57d02ad3, type: 3}
 --- !u!1 &1971851828
 GameObject:
   m_ObjectHideFlags: 0
@@ -1240,8 +1156,8 @@ SceneRoots:
   m_ObjectHideFlags: 0
   m_Roots:
   - {fileID: 1468033104}
+  - {fileID: 1685896158}
   - {fileID: 1122274430}
-  - {fileID: 1793691407}
   - {fileID: 1027122384}
   - {fileID: 1364889596}
   - {fileID: 793674896}

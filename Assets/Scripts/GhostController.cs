@@ -9,6 +9,8 @@ public class GhostController : MonoBehaviour
 
     [Header("Components")]
     [SerializeField] private Transform playerCamera;
+    public Transform PlayerCamera => playerCamera; // ? Added getter for GhostInteraction
+    
     private Rigidbody rb;
     [SerializeField] private float energy = 100f;
 
@@ -31,6 +33,8 @@ public class GhostController : MonoBehaviour
 
     private void Update()
     {
+        if (FullMapViewer.IsOpen) return; // ? Don't move when map is open
+        
         movementInput = new Vector3(
             Input.GetAxis("Horizontal"),
             0f,
@@ -47,6 +51,8 @@ public class GhostController : MonoBehaviour
 
     private void FixedUpdate()
     {
+        if (FullMapViewer.IsOpen) return; // ? Don't move when map is open
+        
         MoveGhost();
     }
 

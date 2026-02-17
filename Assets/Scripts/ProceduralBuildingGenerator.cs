@@ -104,9 +104,9 @@ public class ProceduralBuildingGenerator : MonoBehaviour
     [SerializeField] public GameObject stairPrefab;
 
     [Header("Prefabs")]
-    [SerializeField] private GameObject wallPrefab;
+     private GameObject wallPrefab;
     [SerializeField] private GameObject doorPrefab;
-    [SerializeField] private GameObject doorwayPrefab;
+     private GameObject doorwayPrefab;
     [SerializeField] private GameObject floorPrefab;
     [SerializeField] private GameObject ceilingPrefab;
 

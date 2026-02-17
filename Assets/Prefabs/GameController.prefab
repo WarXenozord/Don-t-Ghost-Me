@@ -1,0 +1,168 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &73163572864504066
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 6900539596992752293}
+  - component: {fileID: 8338342181003095868}
+  - component: {fileID: 4645658144665287632}
+  - component: {fileID: 5342688327122664781}
+  - component: {fileID: 1023229969626592785}
+  - component: {fileID: 987081709109066427}
+  m_Layer: 0
+  m_Name: GameController
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &6900539596992752293
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 73163572864504066}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &8338342181003095868
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 73163572864504066}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e8f2e89fb7a609248a3a27784a6d4ebe, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  seed: 12
+  targetNumRooms: 15
+  numFloors: 1
+  floorHeight: 3.5
+  buildingsPerRow: 2
+  buildingSpacingX: 0
+  buildingSpacingZ: 0
+  minBuildingSize: {x: 5, y: 12, z: 5}
+  maxBuildingSize: {x: 30, y: 12, z: 30}
+  minRoomSize: 4
+  maxRoomSize: 7
+  doorWidth: 1
+  doorHeight: 2.4
+  wallThickness: 0.2
+  floorCeilThickness: 0.15
+  stairWidth: 1.5
+  stairDepth: 3
+  stairPrefab: {fileID: 0}
+  wallPrefab: {fileID: 0}
+  doorPrefab: {fileID: 3945542326107531079, guid: e878d8d094994104aab0a32d30223ea6, type: 3}
+  doorwayPrefab: {fileID: 0}
+  floorPrefab: {fileID: 2936626781115102207, guid: f4a79324f08aba047a7ecfce965a6823, type: 3}
+  ceilingPrefab: {fileID: 1182786263916851811, guid: d98640697ca1ae24aaeeba6d2a30451b, type: 3}
+  floorplanRenderer: {fileID: 4645658144665287632}
+  minimapController: {fileID: 5342688327122664781}
+  propSpawner: {fileID: 987081709109066427}
+  player: {fileID: 0}
+  playerHeightOffset: 1.1
+--- !u!114 &4645658144665287632
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 73163572864504066}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ca1b6313ac4ebe74691f3a0c5f746fcb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  wallColor: {r: 0, g: 0, b: 0, a: 1}
+  wallShader: {fileID: 0}
+  wallMaterialOverride: {fileID: 0}
+  doorSpritePrefab: {fileID: 7617629106695220390, guid: 53252bceed04663459b87d8295cbb028, type: 3}
+  playerMarkerPrefab: {fileID: 0}
+  minimapSpriteY: 200
+  wallSpriteThickness: 0.3
+  doorSpriteSize: 1.2
+  playerMarkerSize: 1.5
+  isHidden: 0
+--- !u!114 &5342688327122664781
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 73163572864504066}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 343bad8c56680d143b862213f4fd6340, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  player: {fileID: 0}
+  floorplanRenderer: {fileID: 4645658144665287632}
+  minimapRawImage: {fileID: 0}
+  minimapCamera: {fileID: 0}
+  revealCamera: {fileID: 0}
+  renderTextureSize: 2048
+  viewportWorldSize: 15
+  mapPadding: 5
+  floorHeight: 3.5
+  groundFloorY: 0
+--- !u!114 &1023229969626592785
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 73163572864504066}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ff23ee7395540c94e84670df8ea159e7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  minimapController: {fileID: 5342688327122664781}
+  mapPanel: {fileID: 0}
+  mapRawImage: {fileID: 0}
+  minimapRawImage: {fileID: 0}
+  openButton: {fileID: 0}
+  closeButton: {fileID: 0}
+  toggleKey: 109
+  minViewportSize: 10
+  maxViewportSize: 200
+  defaultViewportSize: 60
+  zoomSpeed: 0.12
+  zoomSmoothing: 0.15
+  panSmoothing: 0.2
+--- !u!114 &987081709109066427
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 73163572864504066}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 59ebec3f47da079439dd8531f72b6b75, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  furnishingProfiles:
+  - {fileID: 11400000, guid: e2ce87ba480296142baf5a8984b5822d, type: 2}
+  materialProfiles:
+  - {fileID: 11400000, guid: ccf01086d1a1af549b44458fc6400eee, type: 2}
+  - {fileID: 11400000, guid: 5d0ae454f74207b408315e369a9adaad, type: 2}
+  - {fileID: 11400000, guid: 4e5e7f7f699758e44be0e1ccaf81b229, type: 2}
+  wallMargin: 0.5
+  propPadding: 0.1
+  maxPlacementAttempts: 30
