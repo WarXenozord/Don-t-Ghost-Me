@@ -34,6 +34,9 @@ public class PropSpawner : MonoBehaviour
     public RoomMaterialProfile[]   materialProfiles;
 
     [Header("Placement Settings")]
+    [Tooltip("Must match the generator's Wall Thickness value so paintings sit flush on the interior surface.")]
+    public float wallThickness = 0.2f;
+
     [Tooltip("Minimum clearance from room walls for floor prop placement.")]
     public float wallMargin  = 0.5f;
 
@@ -48,6 +51,7 @@ public class PropSpawner : MonoBehaviour
     private Dictionary<RoomType, RoomMaterialProfile>   _matLookup;
     private List<BuildingWall>                          _walls;
     private List<BuildingRoom>                          _rooms;
+    private List<BuildingDoor>                          _doors;
     private System.Random                               _rng;
 
     // Per-room placed item footprints (XZ AABB) for overlap checking
@@ -63,6 +67,7 @@ public class PropSpawner : MonoBehaviour
     public void Furnish(
         List<BuildingRoom>                           rooms,
         List<BuildingWall>                           walls,
+        List<BuildingDoor>                           doors,
         Dictionary<int, Transform>                   buildingParents,
         List<(GameObject floor, GameObject ceiling)> roomGeometry,
         int                                          seed,
@@ -71,6 +76,7 @@ public class PropSpawner : MonoBehaviour
         _rng    = new System.Random(seed ^ 0xBEEF);
         _rooms  = rooms;
         _walls  = walls;
+        _doors  = doors;
 
         BuildLookups();
 
@@ -191,14 +197,31 @@ public class PropSpawner : MonoBehaviour
             float minSpan    = entry.footprintX + wallMargin * 2f;
             if (spanLength < minSpan) continue;
 
-            // Random position along the wall span, keeping margin from corners
-            float t        = (float)_rng.NextDouble();
-            float spanPos  = Mathf.Lerp(spanMin + wallMargin, spanMax - wallMargin, t);
-            float propY    = room.position.y + profile.wallPropHeight;
+            // Collect door blocked intervals on this wall along its span axis
+            var blockedIntervals = GetDoorIntervalsOnWall(wall, isXWall);
+
+            // Build list of clear sub-spans (wall span minus door openings minus margins)
+            float propHalf  = entry.footprintX * 0.5f;
+            var clearSpans  = SubtractIntervals(
+                spanMin + wallMargin + propHalf,
+                spanMax - wallMargin - propHalf,
+                blockedIntervals, propHalf + wallMargin);
+
+            if (clearSpans.Count == 0) continue; // no room for a prop on this wall
+
+            // Pick a random clear sub-span, then a random position inside it
+            var (cMin, cMax) = clearSpans[_rng.Next(clearSpans.Count)];
+            float spanPos = (float)(_rng.NextDouble() * (cMax - cMin) + cMin);
+            float propY   = room.position.y + profile.wallPropHeight;
+
+            // Offset from the interior wall FACE (not centre):
+            // wall centre → interior face = wallThickness * 0.5f
+            // then nudge slightly off the face = wallPropInset
+            float surfaceOffset = wallThickness * 0.5f + profile.wallPropInset;
 
             Vector3 propPos = isXWall
-                ? new Vector3(spanPos, propY, wallCoord + inwardNormal.z * profile.wallPropInset)
-                : new Vector3(wallCoord + inwardNormal.x * profile.wallPropInset, propY, spanPos);
+                ? new Vector3(spanPos, propY, wallCoord + inwardNormal.z * surfaceOffset)
+                : new Vector3(wallCoord + inwardNormal.x * surfaceOffset, propY, spanPos);
 
             float yRot = Mathf.Atan2(-inwardNormal.x, -inwardNormal.z) * Mathf.Rad2Deg;
             PlaceProp(entry.prefab, propPos, yRot, parent);
@@ -553,6 +576,70 @@ public class PropSpawner : MonoBehaviour
                 ? Vector3.forward  // wall at room.zMin → inward is +Z
                 : Vector3.back;    // wall at room.zMax → inward is -Z
         }
+    }
+
+    // ── Door-aware span helpers ────────────────────────────────────────────
+
+    /// <summary>
+    /// Returns the blocked intervals (min, max) along a wall's span axis
+    /// caused by doors on that wall. Adds a margin on each side of the door.
+    /// </summary>
+    private List<(float min, float max)> GetDoorIntervalsOnWall(BuildingWall wall, bool isXWall)
+    {
+        var result = new List<(float, float)>();
+        if (_doors == null) return result;
+
+        const float tol = 0.3f;
+
+        foreach (var door in _doors)
+        {
+            // Check if this door sits on this wall by comparing position
+            if (isXWall) // wall runs along X, doors block X span
+            {
+                if (Mathf.Abs(door.position.z - wall.position.z) > tol) continue;
+                float half = door.size.x * 0.5f;
+                result.Add((door.position.x - half, door.position.x + half));
+            }
+            else // wall runs along Z, doors block Z span
+            {
+                if (Mathf.Abs(door.position.x - wall.position.x) > tol) continue;
+                float half = door.size.z * 0.5f;
+                result.Add((door.position.z - half, door.position.z + half));
+            }
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Subtracts blocked intervals from [rangeMin, rangeMax] and returns
+    /// sub-spans that are wide enough to fit a prop (>= minWidth).
+    /// </summary>
+    private List<(float min, float max)> SubtractIntervals(
+        float rangeMin, float rangeMax,
+        List<(float min, float max)> blocked, float minWidth)
+    {
+        var result  = new List<(float, float)>();
+        if (rangeMax <= rangeMin) return result;
+
+        // Sort blocked intervals by start
+        var sorted = new List<(float min, float max)>(blocked);
+        sorted.Sort((a, b) => a.min.CompareTo(b.min));
+
+        float cur = rangeMin;
+        foreach (var (bMin, bMax) in sorted)
+        {
+            float clearEnd = Mathf.Min(bMin, rangeMax);
+            if (clearEnd - cur >= minWidth)
+                result.Add((cur, clearEnd));
+            cur = Mathf.Max(cur, bMax);
+        }
+
+        // Remainder after last blocked interval
+        if (rangeMax - cur >= minWidth)
+            result.Add((cur, rangeMax));
+
+        return result;
     }
 
     // ── Utility ────────────────────────────────────────────────────────────

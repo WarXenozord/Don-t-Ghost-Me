@@ -157,6 +157,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   furnishingProfiles:
   - {fileID: 11400000, guid: e2ce87ba480296142baf5a8984b5822d, type: 2}
+  - {fileID: 11400000, guid: fc69113cadb6d2d43be9d797481207b7, type: 2}
   materialProfiles:
   - {fileID: 11400000, guid: ccf01086d1a1af549b44458fc6400eee, type: 2}
   - {fileID: 11400000, guid: 5d0ae454f74207b408315e369a9adaad, type: 2}
@@ -166,6 +167,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 5ec98f76da5f5a94eb37e767c00c3aaa, type: 2}
   - {fileID: 11400000, guid: 05ddb1972197d31419ae5f180be9e5b9, type: 2}
   - {fileID: 11400000, guid: 11bce4f4190699b4b8a55be62216561c, type: 2}
+  wallThickness: 0.2
   wallMargin: 0.5
   propPadding: 0.1
   maxPlacementAttempts: 30

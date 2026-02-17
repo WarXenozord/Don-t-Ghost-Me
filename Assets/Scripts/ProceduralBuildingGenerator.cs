@@ -441,7 +441,7 @@ private RoomType ClassifyRoom(Vector3 sz)
     foreach (var type in pool)
         totalWeight += roomWeights[type];
 
-    float r = UnityEngine.Random.value * totalWeight;
+    float r = random.Next() * totalWeight;
 
     foreach (var type in pool)
     {
@@ -2166,11 +2166,9 @@ foreach (var door in doors)
         Debug.Log("[Minimap] Floorplan sprites built.");
     }
     private void BuildProps()
-    {
-        if (propSpawner == null) return;
-        Debug.Log("Wall GameObjects count: " + wallGameObjects.Count);
-                propSpawner.Furnish(rooms, activeWalls, buildingParentMap, roomGeometry, seed, wallGameObjects);
-
-        Debug.Log("[Props] Furnishing complete.");
-    }
+{
+    if (propSpawner == null) return;
+    propSpawner.Furnish(rooms, activeWalls, doors, buildingParentMap, roomGeometry, seed, wallGameObjects);
+    Debug.Log("[Props] Furnishing complete.");
+}
 }
