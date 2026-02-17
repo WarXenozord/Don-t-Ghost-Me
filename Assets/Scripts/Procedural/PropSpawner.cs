@@ -33,6 +33,9 @@ public class PropSpawner : MonoBehaviour
     [Tooltip("One RoomMaterialProfile per RoomType. First in array = highest wall priority.")]
     public RoomMaterialProfile[]   materialProfiles;
 
+    [Tooltip("Assign GhostInteraction so it re-caches interactables after props are spawned.")]
+    public GhostInteraction ghostInteraction;
+
     [Header("Placement Settings")]
     [Tooltip("Must match the generator's Wall Thickness value so paintings sit flush on the interior surface.")]
     public float wallThickness = 0.2f;
@@ -127,10 +130,19 @@ public class PropSpawner : MonoBehaviour
 
             _placed = new List<Rect>();
 
+            // Pre-block door clearance zones so no floor prop can land in a doorway.
+            // We add a rect around each door that borders this room so TryCommitPlacement
+            // automatically rejects any footprint that overlaps it.
+            AddDoorClearanceRects(room, i);
+
             SpawnCeilingProps(room, profile, ceilingGO, parent);
             SpawnWallProps(room, i, profile, parent);
             SpawnFloorProps(room, profile, parent);
         }
+
+        // Notify GhostInteraction so newly spawned interactable props are detected
+        if (ghostInteraction != null)
+            ghostInteraction.RefreshInteractableCache();
     }
 
     // ── Ceiling props ──────────────────────────────────────────────────────
@@ -578,6 +590,51 @@ public class PropSpawner : MonoBehaviour
         }
     }
 
+    // ── Door clearance for floor props ─────────────────────────────────────
+
+    /// <summary>
+    /// Pre-seeds _placed with clearance rects around every door that borders
+    /// this room, so TryCommitPlacement automatically rejects any floor prop
+    /// footprint that overlaps a doorway.
+    /// doorClearance controls how far in front of the door is kept clear on
+    /// each side (default 1.0 so a bed can't block the entry from either side).
+    /// </summary>
+    private void AddDoorClearanceRects(BuildingRoom room, int roomIndex,
+                                        float doorClearance = 1.0f)
+    {
+        if (_doors == null) return;
+
+        foreach (var door in _doors)
+        {
+            // Only care about doors that connect to this room
+            if (door.roomA != roomIndex && door.roomB != roomIndex) continue;
+
+            // Build a clearance rect that covers the doorway opening plus
+            // doorClearance units into the room on the interior side.
+            float halfW, halfD;
+            if (door.wallFacingX)
+            {
+                // Door opening along Z — keep clear along Z and push into room on X
+                halfW = door.size.z * 0.5f + wallMargin;   // along Z
+                halfD = door.size.x * 0.5f + doorClearance; // into room along X
+            }
+            else
+            {
+                // Door opening along X — keep clear along X and push into room on Z
+                halfW = door.size.x * 0.5f + wallMargin;   // along X
+                halfD = door.size.z * 0.5f + doorClearance; // into room along Z
+            }
+
+            var clearRect = new Rect(
+                door.position.x - halfW,
+                door.position.z - halfD,
+                halfW * 2f,
+                halfD * 2f);
+
+            _placed.Add(clearRect);
+        }
+    }
+
     // ── Door-aware span helpers ────────────────────────────────────────────
 
     /// <summary>
@@ -653,11 +710,18 @@ public class PropSpawner : MonoBehaviour
     private PropEntry WeightedPick(PropEntry[] entries)
     {
         if (entries == null || entries.Length == 0) return null;
+        if (entries.Length == 1) return entries[0];
 
+        // If all weights are zero, treat as equal probability
         float total = 0f;
         foreach (var e in entries) total += e.weight;
-        float roll = (float)_rng.NextDouble() * total;
+        if (total <= 0f)
+        {
+            // Equal weight fallback — just pick randomly
+            return entries[_rng.Next(entries.Length)];
+        }
 
+        float roll = (float)_rng.NextDouble() * total;
         foreach (var e in entries)
         {
             roll -= e.weight;

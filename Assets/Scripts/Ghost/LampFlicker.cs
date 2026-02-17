@@ -5,8 +5,20 @@ using UnityEngine;
 /// Requires a Light component on this GameObject or a child.
 /// </summary>
 [RequireComponent(typeof(Light))]
-public class LampFlicker : MonoBehaviour
+public class LampFlicker : MonoBehaviour, IInteractable
 {
+    [Header("Interaction")]
+    [SerializeField] private float energyCost = 20f;
+
+    // ?? IInteractable ??????????????????????????????????????????????????????
+    public float EnergyCost => energyCost;
+    public bool  IsBusy     => isFlickering;
+
+    public void Interact(UnityEngine.Transform ghostTransform)
+    {
+        StartFlicker();
+        SetHighlight(false);
+    }
     [Header("Flicker Settings")]
     [SerializeField] private float flickerDuration = 3f;
     [SerializeField] private float flickerSpeed = 0.1f;       // how fast the flicker changes

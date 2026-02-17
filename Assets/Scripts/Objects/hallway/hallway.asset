@@ -10,9 +10,9 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 9c66c972ebc589d459db81c9fb61f371, type: 3}
-  m_Name: RoomMaterialProfile
+  m_Name: hallway
   m_EditorClassIdentifier: 
-  roomType: 7
+  roomType: 3
   floorMaterial: {fileID: 2100000, guid: a3bf1692b6f3f2745941d72bcaa3a5ef, type: 2}
-  ceilingMaterial: {fileID: 2100000, guid: fd07e088046bc8c46a2e48aa96f65efb, type: 2}
-  wallMaterial: {fileID: 2100000, guid: 1e325de3b0eecb344b332313ced78b95, type: 2}
+  ceilingMaterial: {fileID: 2100000, guid: 51b03055ce930b646974fe93bc2a8a97, type: 2}
+  wallMaterial: {fileID: 2100000, guid: be38c08927485ff4a8f9867bb2f709e0, type: 2}

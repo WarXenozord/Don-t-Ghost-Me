@@ -10,14 +10,14 @@ TagManager:
   - Default
   - TransparentFX
   - Ignore Raycast
-  - 
+  - VeryCollidable
   - Water
   - UI
   - Minimap
   - Revealead Area
   - Face
   - Lamp
-  - 
+  - Spiritual
   - 
   - 
   - 

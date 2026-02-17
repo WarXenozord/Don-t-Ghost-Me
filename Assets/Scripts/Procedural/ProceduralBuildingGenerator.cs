@@ -43,6 +43,7 @@ public class BuildingWall
     public bool isActive = true;
     public int roomA = -1; // -1 = exterior
     public int roomB = -1; // -1 = exterior
+    public string layer = "Default";
 }
 
 [System.Serializable]
@@ -336,7 +337,7 @@ else
     if (area > maxRoomSize * maxRoomSize * 0.5f)
         splitChance = 0.4f;
 
-    if (UnityEngine.Random.value < splitChance)
+    if (random.NextDouble() < splitChance)
     {
         if (canX && canZ)
         {
@@ -422,13 +423,14 @@ else
         float mn    = Mathf.Min(sz.x, sz.z);
         float mx    = Mathf.Max(sz.x, sz.z);
         float ratio = mx / mn;
-
-    if (area < 20f)
+    
+    if ( ratio >=2f || ratio <= 0.5f ) return RoomSize.Narrow;
+    if (area < 15f)
         return RoomSize.Small;
 
-    if (area < 50f)
+    if (area < 40f)
         return RoomSize.Medium;
-    if ( ratio >2f ) return RoomSize.Narrow;
+    
 
     return RoomSize.Large;
 }
@@ -441,7 +443,7 @@ private RoomType ClassifyRoom(Vector3 sz)
     foreach (var type in pool)
         totalWeight += roomWeights[type];
 
-    float r = random.Next() * totalWeight;
+    float r = (float)random.NextDouble() * totalWeight;
 
     foreach (var type in pool)
     {
@@ -540,22 +542,22 @@ void ApplyDiminishing(RoomType selected)
             // x- side  (facingX wall, runs along Z)
             foreach (var (lo, hi) in UncoveredSegments(coverage[(i, 0)], zMin, zMax))
                 walls.Add(MakeWall(new Vector3(xMin, halfY, (lo + hi) * 0.5f),
-                                   new Vector3(wallThickness, h, hi - lo), facingX: true, i, -1));
+                                   new Vector3(wallThickness, h, hi - lo), facingX: true, i, -1,"VeryCollidable"));
 
             // x+ side
             foreach (var (lo, hi) in UncoveredSegments(coverage[(i, 1)], zMin, zMax))
                 walls.Add(MakeWall(new Vector3(xMax, halfY, (lo + hi) * 0.5f),
-                                   new Vector3(wallThickness, h, hi - lo), facingX: true, i, -1));
+                                   new Vector3(wallThickness, h, hi - lo), facingX: true, i, -1,"VeryCollidable"));
 
             // z- side  (facingX=false wall, runs along X)
             foreach (var (lo, hi) in UncoveredSegments(coverage[(i, 2)], xMin, xMax))
                 walls.Add(MakeWall(new Vector3((lo + hi) * 0.5f, halfY, zMin),
-                                   new Vector3(hi - lo, h, wallThickness), facingX: false, i, -1));
+                                   new Vector3(hi - lo, h, wallThickness), facingX: false, i, -1,"VeryCollidable"));
 
             // z+ side
             foreach (var (lo, hi) in UncoveredSegments(coverage[(i, 3)], xMin, xMax))
                 walls.Add(MakeWall(new Vector3((lo + hi) * 0.5f, halfY, zMax),
-                                   new Vector3(hi - lo, h, wallThickness), facingX: false, i, -1));
+                                   new Vector3(hi - lo, h, wallThickness), facingX: false, i, -1,"VeryCollidable"));
         }
     }
 
@@ -612,8 +614,8 @@ void ApplyDiminishing(RoomType selected)
     coverage[(backIdx, 2)].Add((x1, x2));
 }
 
-    private BuildingWall MakeWall(Vector3 pos, Vector3 sz, bool facingX, int roomA, int roomB) =>
-        new BuildingWall { position = pos, size = sz, facingX = facingX, roomA = roomA, roomB = roomB };
+    private BuildingWall MakeWall(Vector3 pos, Vector3 sz, bool facingX, int roomA, int roomB, string l = "Default") =>
+        new BuildingWall { position = pos, size = sz, facingX = facingX, roomA = roomA, roomB = roomB, layer = l };
 
     private void RegisterSharedWall(int a, int b, int wallIdx)
     {
@@ -1029,6 +1031,7 @@ foreach (var door in doors)
         go.transform.SetParent(parent, worldPositionStays: false);
         go.transform.position   = wall.position;
         go.transform.localScale = wall.size;
+        go.layer= LayerMask.NameToLayer(wall.layer);
 
         var mf = go.AddComponent<MeshFilter>();
         var mr = go.AddComponent<MeshRenderer>();

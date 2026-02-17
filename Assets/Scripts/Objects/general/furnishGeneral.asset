@@ -10,9 +10,9 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 8f872ee2c8174f442b258a3a424c9e1f, type: 3}
-  m_Name: RoomFurnishingProfile
+  m_Name: furnishGeneral
   m_EditorClassIdentifier: 
-  roomType: 0
+  roomType: 4
   floorProps:
   - prefab: {fileID: 3870623439920937331, guid: 62256db0118e5da4cac019c6c06894c4, type: 3}
     weight: 3
@@ -21,7 +21,7 @@ MonoBehaviour:
     prefersWall: 0
     yOffset: 0
   - prefab: {fileID: 4417545005964817228, guid: 1de0ccc0a37456347877438a10609bf8, type: 3}
-    weight: 2
+    weight: 0
     footprintX: 0
     footprintZ: 0
     prefersWall: 0
