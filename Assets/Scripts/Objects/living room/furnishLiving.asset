@@ -1,0 +1,67 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8f872ee2c8174f442b258a3a424c9e1f, type: 3}
+  m_Name: furnishLiving
+  m_EditorClassIdentifier: 
+  roomType: 4
+  floorProps:
+  - prefab: {fileID: 3870623439920937331, guid: 62256db0118e5da4cac019c6c06894c4, type: 3}
+    weight: 3
+    footprintX: 0
+    footprintZ: 0
+    prefersWall: 0
+    yOffset: 0
+  - prefab: {fileID: 4417545005964817228, guid: 1de0ccc0a37456347877438a10609bf8, type: 3}
+    weight: 0
+    footprintX: 0
+    footprintZ: 0
+    prefersWall: 0
+    yOffset: 0
+  minFloorProps: 1
+  maxFloorProps: 4
+  wallProps:
+  - prefab: {fileID: 828344217250804676, guid: 871cc1ddeda7a544f88bd2da5416a017, type: 3}
+    weight: 3
+    footprintX: 0
+    footprintZ: 0
+    prefersWall: 0
+    yOffset: 0
+  - prefab: {fileID: 8361179694932463014, guid: 3e834981002110b4bab5a8cdec21e01a, type: 3}
+    weight: 4
+    footprintX: 0
+    footprintZ: 0
+    prefersWall: 0
+    yOffset: 0
+  - prefab: {fileID: 1626908218395244434, guid: c93f980e9f13e4544b017738f17c51d3, type: 3}
+    weight: 4
+    footprintX: 0
+    footprintZ: 0
+    prefersWall: 0
+    yOffset: 0
+  maxWallProps: 4
+  wallPropHeight: 1.5
+  wallPropInset: 0.05
+  ceilingProps:
+  - prefab: {fileID: 7639312203187580989, guid: bc8712f31d5bf8c4b8fdd4ccb4296bf1, type: 3}
+    weight: 4
+    footprintX: 0
+    footprintZ: 0
+    prefersWall: 0
+    yOffset: 0
+  - prefab: {fileID: 6808661584344290269, guid: fc11921f3e04fbd48942add478ca27fe, type: 3}
+    weight: 1
+    footprintX: 0
+    footprintZ: 0
+    prefersWall: 0
+    yOffset: 0
+  singleLampAreaThreshold: 16
+  ceilingPropYOffset: -0.1

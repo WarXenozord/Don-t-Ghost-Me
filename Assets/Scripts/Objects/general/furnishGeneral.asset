@@ -12,16 +12,22 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8f872ee2c8174f442b258a3a424c9e1f, type: 3}
   m_Name: furnishGeneral
   m_EditorClassIdentifier: 
-  roomType: 4
+  roomType: 0
   floorProps:
-  - prefab: {fileID: 3870623439920937331, guid: 62256db0118e5da4cac019c6c06894c4, type: 3}
+  - prefab: {fileID: 7306335275045125360, guid: 5fb44d377fa19c246a2399d90f76a139, type: 3}
     weight: 3
     footprintX: 0
     footprintZ: 0
     prefersWall: 0
     yOffset: 0
-  - prefab: {fileID: 4417545005964817228, guid: 1de0ccc0a37456347877438a10609bf8, type: 3}
-    weight: 0
+  - prefab: {fileID: 3570680850630705159, guid: 4fbeb71f8d99da34db1bc26f61f6f632, type: 3}
+    weight: 2
+    footprintX: 0
+    footprintZ: 0
+    prefersWall: 0
+    yOffset: 0
+  - prefab: {fileID: 3120683321880721924, guid: 8b2618ba71bed214d8dd6d0f7e786f60, type: 3}
+    weight: 4
     footprintX: 0
     footprintZ: 0
     prefersWall: 0
@@ -50,18 +56,6 @@ MonoBehaviour:
   maxWallProps: 4
   wallPropHeight: 1.5
   wallPropInset: 0.05
-  ceilingProps:
-  - prefab: {fileID: 7639312203187580989, guid: bc8712f31d5bf8c4b8fdd4ccb4296bf1, type: 3}
-    weight: 4
-    footprintX: 0
-    footprintZ: 0
-    prefersWall: 0
-    yOffset: 0
-  - prefab: {fileID: 6808661584344290269, guid: fc11921f3e04fbd48942add478ca27fe, type: 3}
-    weight: 1
-    footprintX: 0
-    footprintZ: 0
-    prefersWall: 0
-    yOffset: 0
+  ceilingProps: []
   singleLampAreaThreshold: 16
   ceilingPropYOffset: -0.1

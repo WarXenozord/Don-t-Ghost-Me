@@ -1,0 +1,37 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8f872ee2c8174f442b258a3a424c9e1f, type: 3}
+  m_Name: furnishHallway
+  m_EditorClassIdentifier: 
+  roomType: 3
+  floorProps:
+  - prefab: {fileID: 6865629232166033351, guid: 8057204c89d75794bb5a6d14515667e8, type: 3}
+    weight: 3
+    footprintX: 0
+    footprintZ: 0
+    prefersWall: 1
+    yOffset: 0
+  - prefab: {fileID: 3120683321880721924, guid: 8b2618ba71bed214d8dd6d0f7e786f60, type: 3}
+    weight: 4
+    footprintX: 0
+    footprintZ: 0
+    prefersWall: 1
+    yOffset: 0
+  minFloorProps: 1
+  maxFloorProps: 3
+  wallProps: []
+  maxWallProps: 2
+  wallPropHeight: 1.5
+  wallPropInset: 0.05
+  ceilingProps: []
+  singleLampAreaThreshold: 16
+  ceilingPropYOffset: -0.1
