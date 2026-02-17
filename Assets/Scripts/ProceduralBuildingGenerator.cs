@@ -863,11 +863,37 @@ wall.isActive = false;
         wallGameObjects.Add(go);
     }
 
-    foreach (var door in doors)
+    
+foreach (var door in doors)
+{
+    var d = Instantiate(doorPrefab, door.position, Quaternion.identity, parent);
+    
+    // Rotate door to align with wall orientation
+    // Assumes Blender door faces +Z (forward) by default, with width along X
+    if (door.wallFacingX)
     {
-        var d = Instantiate(doorPrefab, door.position, Quaternion.identity, parent);
-        d.transform.localScale = door.size;
+        // Wall runs along Z (facingX = true) → door opening is along Z
+        // Rotate 90° around Y so door width aligns with Z axis
+        d.transform.rotation = Quaternion.Euler(0f, 90f, 0f);
     }
+    else
+    {
+        // Wall runs along X (!facingX) → door opening is along X
+        // No rotation needed - door already faces +Z with width along X
+        d.transform.rotation = Quaternion.identity;
+    }
+    
+    // Scale uniformly to fit the opening without distortion
+    // Use the opening width as the reference (doorWidth from generator)
+    // Assumes your Blender door is modeled at a standard size (e.g., 1m wide × 2m tall)
+    float targetWidth = doorWidth;  // this is the inspector value (e.g., 1.0f)
+    float doorModelWidth = 1f;      // ← ADJUST THIS to match your Blender model's actual width
+    float scale = targetWidth / doorModelWidth;
+    
+    d.transform.localScale = Vector3.one * scale;
+    
+    d.name = $"Door_{(door.wallFacingX ? "X" : "Z")}";
+}
 
     int stairCount = 0;
     foreach (var s in stairs)
@@ -894,22 +920,13 @@ wall.isActive = false;
     {
 
         var go = new GameObject($"Wall_{(wall.facingX ? "X" : "Z")}");
-
         go.transform.SetParent(parent, worldPositionStays: false);
-
         go.transform.position   = wall.position;
-
         go.transform.localScale = wall.size;
 
-
-
         var mf = go.AddComponent<MeshFilter>();
-
         var mr = go.AddComponent<MeshRenderer>();
-
         go.AddComponent<BoxCollider>();
-
-
 
         // Create cube with 6 submeshes
 
