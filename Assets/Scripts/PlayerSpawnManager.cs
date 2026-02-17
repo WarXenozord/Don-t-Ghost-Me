@@ -40,6 +40,12 @@ public class PlayerSpawnManager : MonoBehaviour
         {
             spawnedLocal = true;
             _localUserId = userId;
+            var minimapExisting = FindObjectOfType<MinimapController>();
+            if (minimapExisting != null && TryGet(userId, out var existingGo) && existingGo != null)
+            {
+                var existingController = existingGo.GetComponentInChildren<MediumController>(true);
+                minimapExisting.player = existingController != null ? existingController.transform : existingGo.transform;
+            }
             return true;
         }
 
@@ -72,6 +78,12 @@ public class PlayerSpawnManager : MonoBehaviour
             listeners[i].enabled = true;
         }
 
+        var minimap = FindObjectOfType<MinimapController>();
+        if (minimap != null)
+        {
+            minimap.player = localController != null ? localController.transform : go.transform;
+        }
+
         return true;
     }
 
@@ -94,6 +106,11 @@ public class PlayerSpawnManager : MonoBehaviour
         if (go) Destroy(go);
         if (_localUserId == userId)
         {
+            var minimap = FindObjectOfType<MinimapController>();
+            if (minimap != null && minimap.player != null && (go == null || minimap.player.IsChildOf(go.transform) || minimap.player == go.transform))
+            {
+                minimap.player = null;
+            }
             _localUserId = null;
             spawnedLocal = false;
         }
