@@ -48,17 +48,17 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e8f2e89fb7a609248a3a27784a6d4ebe, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  seed: 12
-  targetNumRooms: 15
+  seed: 2241
+  targetNumRooms: 6
   numFloors: 1
   floorHeight: 3.5
-  buildingsPerRow: 2
+  buildingsPerRow: 3
   buildingSpacingX: 0
   buildingSpacingZ: 0
-  minBuildingSize: {x: 5, y: 12, z: 5}
-  maxBuildingSize: {x: 30, y: 12, z: 30}
-  minRoomSize: 4
-  maxRoomSize: 7
+  minBuildingSize: {x: 4, y: 12, z: 4}
+  maxBuildingSize: {x: 20, y: 12, z: 20}
+  minRoomSize: 3
+  maxRoomSize: 12
   doorWidth: 1
   doorHeight: 2.4
   wallThickness: 0.2
@@ -66,9 +66,7 @@ MonoBehaviour:
   stairWidth: 1.5
   stairDepth: 3
   stairPrefab: {fileID: 0}
-  wallPrefab: {fileID: 0}
   doorPrefab: {fileID: 3945542326107531079, guid: e878d8d094994104aab0a32d30223ea6, type: 3}
-  doorwayPrefab: {fileID: 0}
   floorPrefab: {fileID: 2936626781115102207, guid: f4a79324f08aba047a7ecfce965a6823, type: 3}
   ceilingPrefab: {fileID: 1182786263916851811, guid: d98640697ca1ae24aaeeba6d2a30451b, type: 3}
   floorplanRenderer: {fileID: 4645658144665287632}
@@ -163,6 +161,11 @@ MonoBehaviour:
   - {fileID: 11400000, guid: ccf01086d1a1af549b44458fc6400eee, type: 2}
   - {fileID: 11400000, guid: 5d0ae454f74207b408315e369a9adaad, type: 2}
   - {fileID: 11400000, guid: 4e5e7f7f699758e44be0e1ccaf81b229, type: 2}
+  - {fileID: 11400000, guid: 518ac274935e70342bffec8cf83e51e1, type: 2}
+  - {fileID: 11400000, guid: 899c073981cd1e94fbba29bdecba8686, type: 2}
+  - {fileID: 11400000, guid: 5ec98f76da5f5a94eb37e767c00c3aaa, type: 2}
+  - {fileID: 11400000, guid: 05ddb1972197d31419ae5f180be9e5b9, type: 2}
+  - {fileID: 11400000, guid: 11bce4f4190699b4b8a55be62216561c, type: 2}
   wallMargin: 0.5
   propPadding: 0.1
   maxPlacementAttempts: 30

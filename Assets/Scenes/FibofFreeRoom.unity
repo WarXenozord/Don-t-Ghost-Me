@@ -454,7 +454,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!23 &955650286
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -609,6 +609,10 @@ PrefabInstance:
     - target: {fileID: 919132149155446097, guid: d3531a3e107cd044ba0a2c5a9e345f67, type: 3}
       propertyPath: m_Name
       value: Pack 3 Wooden Doors
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: d3531a3e107cd044ba0a2c5a9e345f67, type: 3}
+      propertyPath: m_IsActive
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 1925821864070735163, guid: d3531a3e107cd044ba0a2c5a9e345f67, type: 3}
       propertyPath: m_Materials.Array.data[0]
@@ -1810,6 +1814,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Door
       objectReference: {fileID: 0}
+    - target: {fileID: 3945542326107531079, guid: e878d8d094994104aab0a32d30223ea6, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -1882,6 +1890,10 @@ PrefabInstance:
     - target: {fileID: 4249456457173419926, guid: 19084cdbde9677e45bee9f4479092953, type: 3}
       propertyPath: m_Name
       value: Doorway
+      objectReference: {fileID: 0}
+    - target: {fileID: 4249456457173419926, guid: 19084cdbde9677e45bee9f4479092953, type: 3}
+      propertyPath: m_IsActive
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -1969,33 +1981,9 @@ PrefabInstance:
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 8338342181003095868, guid: 3b4ec7472d45f3c4f9bd2ffe57d02ad3, type: 3}
-      propertyPath: seed
-      value: 443422
-      objectReference: {fileID: 0}
-    - target: {fileID: 8338342181003095868, guid: 3b4ec7472d45f3c4f9bd2ffe57d02ad3, type: 3}
       propertyPath: player
       value: 
       objectReference: {fileID: 563108593}
-    - target: {fileID: 8338342181003095868, guid: 3b4ec7472d45f3c4f9bd2ffe57d02ad3, type: 3}
-      propertyPath: minRoomSize
-      value: 4
-      objectReference: {fileID: 0}
-    - target: {fileID: 8338342181003095868, guid: 3b4ec7472d45f3c4f9bd2ffe57d02ad3, type: 3}
-      propertyPath: targetNumRooms
-      value: 15
-      objectReference: {fileID: 0}
-    - target: {fileID: 8338342181003095868, guid: 3b4ec7472d45f3c4f9bd2ffe57d02ad3, type: 3}
-      propertyPath: buildingsPerRow
-      value: 2
-      objectReference: {fileID: 0}
-    - target: {fileID: 8338342181003095868, guid: 3b4ec7472d45f3c4f9bd2ffe57d02ad3, type: 3}
-      propertyPath: minBuildingSize.x
-      value: 4
-      objectReference: {fileID: 0}
-    - target: {fileID: 8338342181003095868, guid: 3b4ec7472d45f3c4f9bd2ffe57d02ad3, type: 3}
-      propertyPath: minBuildingSize.z
-      value: 4
-      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -2060,6 +2048,10 @@ PrefabInstance:
     - target: {fileID: 7639312203187580989, guid: bc8712f31d5bf8c4b8fdd4ccb4296bf1, type: 3}
       propertyPath: m_Layer
       value: 9
+      objectReference: {fileID: 0}
+    - target: {fileID: 7639312203187580989, guid: bc8712f31d5bf8c4b8fdd4ccb4296bf1, type: 3}
+      propertyPath: m_IsActive
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

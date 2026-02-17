@@ -63,15 +63,24 @@ public class BuildingSection
     public int buildingIndex;
     public int roomsInSection;
 }
-
+public enum RoomSize
+{
+    Small,
+    Medium,
+    Large,
+    Narrow
+}
 public enum RoomType
 {
     General, Bathroom, Kitchen, Hallway, LivingRoom, Bedroom, Storage, Stairwell
 }
 
+
+
 // ?????????????????????????????????????????????????????????????????????????????
 //  GENERATOR
 // ?????????????????????????????????????????????????????????????????????????????
+
 
 public class ProceduralBuildingGenerator : MonoBehaviour
 {
@@ -135,6 +144,9 @@ public class ProceduralBuildingGenerator : MonoBehaviour
         // Parallel to walls[] — instantiated wall GOs for PropSpawner material application
     private List<GameObject> wallGameObjects = new List<GameObject>();
 
+    private Dictionary<RoomSize, List<RoomType>> sizePools;
+private Dictionary<RoomType, float> roomWeights;
+
     [Header("Player")]
     [Tooltip("For spawning")]
     [SerializeField] private Transform player;
@@ -150,9 +162,48 @@ public class ProceduralBuildingGenerator : MonoBehaviour
     // ?????????????????????????????????????????????????????????????????????????
 
     void Start() => GenerateBuilding();
+    void InitializeRoomPools(){
 
+sizePools = new Dictionary<RoomSize, List<RoomType>>();
+    roomWeights = new Dictionary<RoomType, float>();
+
+    sizePools[RoomSize.Small] = new List<RoomType>
+    {
+        RoomType.Bathroom,
+        RoomType.Storage,
+        RoomType.Stairwell
+    };
+
+    sizePools[RoomSize.Medium] = new List<RoomType>
+    {
+        RoomType.Bedroom,
+        RoomType.Kitchen,
+        RoomType.Hallway
+    };
+
+    sizePools[RoomSize.Large] = new List<RoomType>
+    {
+        RoomType.LivingRoom,
+        RoomType.General
+    };
+    sizePools[RoomSize.Narrow] = new List<RoomType>
+    {
+        RoomType.Hallway
+    };
+
+    // Initialize weights
+    foreach (var pool in sizePools.Values)
+    {
+        foreach (var type in pool)
+        {
+            roomWeights[type] = 1f;
+        }
+    }
+
+}
     public void GenerateBuilding()
     {
+        InitializeRoomPools();
         ClearBuilding();
         Debug.Log($"Starting building generation with seed: {seed}");
         random = new System.Random(seed);
@@ -258,13 +309,51 @@ public class ProceduralBuildingGenerator : MonoBehaviour
             if (!canX && !canZ) { CreateRoom(pos, sz, floorIndex, buildingIndex); continue; }
 
             bool split = false;
-            if (canX && canZ)
-            {
-                split = random.Next(2) == 0 ? TrySplitX(pos, sz, queue) : TrySplitZ(pos, sz, queue);
-                if (!split) split = TrySplitX(pos, sz, queue) || TrySplitZ(pos, sz, queue);
-            }
-            else if (canX) split = TrySplitX(pos, sz, queue);
-            else            split = TrySplitZ(pos, sz, queue);
+            // --- NEW: probabilistic early stop ---
+float area = sz.x * sz.z;
+
+if (sz.x > maxRoomSize || sz.z > maxRoomSize)
+{
+    if (canX && canZ)
+    {
+        split = random.Next(2) == 0
+            ? TrySplitX(pos, sz, queue)
+            : TrySplitZ(pos, sz, queue);
+
+        if (!split)
+            split = TrySplitX(pos, sz, queue) || TrySplitZ(pos, sz, queue);
+    }
+    else if (canX)
+        split = TrySplitX(pos, sz, queue);
+    else if (canZ)
+        split = TrySplitZ(pos, sz, queue);
+}
+else
+{
+    // 🟢 probabilistic splitting for normal rooms
+    float splitChance = 0.75f;
+
+    if (area > maxRoomSize * maxRoomSize * 0.5f)
+        splitChance = 0.4f;
+
+    if (UnityEngine.Random.value < splitChance)
+    {
+        if (canX && canZ)
+        {
+            split = random.Next(2) == 0
+                ? TrySplitX(pos, sz, queue)
+                : TrySplitZ(pos, sz, queue);
+
+            if (!split)
+                split = TrySplitX(pos, sz, queue) || TrySplitZ(pos, sz, queue);
+        }
+        else if (canX)
+            split = TrySplitX(pos, sz, queue);
+        else if (canZ)
+            split = TrySplitZ(pos, sz, queue);
+    }
+}
+
 
             if (!split) CreateRoom(pos, sz, floorIndex, buildingIndex);
         }
@@ -327,40 +416,57 @@ public class ProceduralBuildingGenerator : MonoBehaviour
             floorIndex = floorIndex, buildingIndex = buildingIndex
         });
     }
-
-    private RoomType ClassifyRoom(Vector3 sz)
-    {
-        float area  = sz.x * sz.z;
+    RoomSize GetRoomSize(Vector3 sz)
+{
+    float area  = sz.x * sz.z;
         float mn    = Mathf.Min(sz.x, sz.z);
         float mx    = Mathf.Max(sz.x, sz.z);
         float ratio = mx / mn;
 
-        // Hallway: very narrow and elongated
-        if (mn < 2f && ratio > 2.5f)
-            return RoomType.Hallway;
+    if (area < 20f)
+        return RoomSize.Small;
 
-        // Bathroom: small in both dimensions
-        if (area < 9f)
-            return RoomType.Bathroom;
+    if (area < 50f)
+        return RoomSize.Medium;
+    if ( ratio >2f ) return RoomSize.Narrow;
 
-        // Kitchen: squarish, medium area
-        if (area < 20f && ratio < 1.8f)
-            return RoomType.Kitchen;
+    return RoomSize.Large;
+}
+private RoomType ClassifyRoom(Vector3 sz)
+{
+    RoomSize size = GetRoomSize(sz);
+    var pool = sizePools[size];
 
-        // Storage: elongated medium room
-        if (ratio > 2.5f && area < 30f)
-            return RoomType.Storage;
+    float totalWeight = 0f;
+    foreach (var type in pool)
+        totalWeight += roomWeights[type];
 
-        // Bedroom: medium area, reasonably square
-        if (area < 35f && ratio < 2f)
-            return RoomType.Bedroom;
+    float r = UnityEngine.Random.value * totalWeight;
 
-        // Living room: large open area
-        if (area >= 35f)
-            return RoomType.LivingRoom;
-
-        return RoomType.General;
+    foreach (var type in pool)
+    {
+        r -= roomWeights[type];
+        if (r <= 0f)
+        {
+            ApplyDiminishing(type);
+            return type;
+        }
     }
+
+    return pool[0];
+}
+void ApplyDiminishing(RoomType selected)
+{
+    roomWeights[selected] *= 0.5f;
+
+    foreach (var key in new List<RoomType>(roomWeights.Keys))
+    {
+        if (key == selected) continue;
+
+        roomWeights[key] = Mathf.Min(1f, roomWeights[key] + 0.1f);
+    }
+}
+
 
     private void SpawnPlayerInRandomRoom()
     {

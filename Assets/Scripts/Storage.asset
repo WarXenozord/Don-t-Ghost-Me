@@ -1,0 +1,18 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9c66c972ebc589d459db81c9fb61f371, type: 3}
+  m_Name: Storage
+  m_EditorClassIdentifier: 
+  roomType: 6
+  floorMaterial: {fileID: 2100000, guid: 51b03055ce930b646974fe93bc2a8a97, type: 2}
+  ceilingMaterial: {fileID: 2100000, guid: 57262dbb983cf8f4684872e71d26ef3b, type: 2}
+  wallMaterial: {fileID: 2100000, guid: fd07e088046bc8c46a2e48aa96f65efb, type: 2}
