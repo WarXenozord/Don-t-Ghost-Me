@@ -40,6 +40,12 @@ public class PlayerSpawnManager : MonoBehaviour
         {
             spawnedLocal = true;
             _localUserId = userId;
+            var minimapExisting = FindObjectOfType<MinimapController>();
+            if (minimapExisting != null && TryGet(userId, out var existingGo) && existingGo != null)
+            {
+                var existingController = existingGo.GetComponentInChildren<MediumController>(true);
+                minimapExisting.player = existingController != null ? existingController.transform : existingGo.transform;
+            }
             return true;
         }
 
@@ -72,6 +78,12 @@ public class PlayerSpawnManager : MonoBehaviour
             listeners[i].enabled = true;
         }
 
+        var minimap = FindObjectOfType<MinimapController>();
+        if (minimap != null)
+        {
+            minimap.player = localController != null ? localController.transform : go.transform;
+        }
+
         return true;
     }
 
@@ -84,6 +96,25 @@ public class PlayerSpawnManager : MonoBehaviour
         _playersById.Clear();
         _localUserId = null;
         spawnedLocal = false;
+    }
+
+    public bool Despawn(string userId)
+    {
+        if (string.IsNullOrEmpty(userId)) return false;
+        if (!_playersById.TryGetValue(userId, out var go)) return false;
+        _playersById.Remove(userId);
+        if (go) Destroy(go);
+        if (_localUserId == userId)
+        {
+            var minimap = FindObjectOfType<MinimapController>();
+            if (minimap != null && minimap.player != null && (go == null || minimap.player.IsChildOf(go.transform) || minimap.player == go.transform))
+            {
+                minimap.player = null;
+            }
+            _localUserId = null;
+            spawnedLocal = false;
+        }
+        return true;
     }
 
     public bool SpawnRemote(string userId, Vector3 pos, float yaw)
@@ -139,6 +170,25 @@ public class PlayerSpawnManager : MonoBehaviour
 
         go = found;
         return true;
+    }
+
+    public bool TryGetUserIdByObject(GameObject candidate, out string userId)
+    {
+        userId = null;
+        if (candidate == null) return false;
+
+        foreach (var kv in _playersById)
+        {
+            var root = kv.Value;
+            if (root == null) continue;
+            if (candidate == root || candidate.transform.IsChildOf(root.transform))
+            {
+                userId = kv.Key;
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public void ApplyAuthoritativePose(string userId, Vector3 pos, float yaw)

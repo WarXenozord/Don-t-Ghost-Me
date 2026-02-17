@@ -8,11 +8,14 @@ public class GameBootstrap : MonoBehaviour
     public ProceduralBuildingGenerator buildingGenerator;
     public PlayerSpawnManager spawner;
     public EnemySpawnManager enemySpawner;
+    public GhostSpawner ghostSpawner;
 
     [Header("Prefabs")]
     public GameObject localPlayerPrefab;
     public GameObject proxyPlayerPrefab;
     public GameObject enemyPrefab;
+    public GameObject localGhostPrefab;
+    public GameObject remoteGhostPrefab;
 
     void Awake()
     {
@@ -21,6 +24,7 @@ public class GameBootstrap : MonoBehaviour
         if (!buildingGenerator) buildingGenerator = FindObjectOfType<ProceduralBuildingGenerator>();
         if (!spawner) spawner = PlayerSpawnManager.Instance != null ? PlayerSpawnManager.Instance : FindObjectOfType<PlayerSpawnManager>();
         if (!enemySpawner) enemySpawner = EnemySpawnManager.Instance != null ? EnemySpawnManager.Instance : FindObjectOfType<EnemySpawnManager>();
+        if (!ghostSpawner) ghostSpawner = GhostSpawner.Instance != null ? GhostSpawner.Instance : FindObjectOfType<GhostSpawner>();
         if (!spawner)
         {
             var go = new GameObject("PlayerSpawnManager");
@@ -30,6 +34,11 @@ public class GameBootstrap : MonoBehaviour
         {
             var go = new GameObject("EnemySpawnManager");
             enemySpawner = go.AddComponent<EnemySpawnManager>();
+        }
+        if (!ghostSpawner)
+        {
+            var go = new GameObject("GhostSpawner");
+            ghostSpawner = go.AddComponent<GhostSpawner>();
         }
     }
 
@@ -59,6 +68,12 @@ public class GameBootstrap : MonoBehaviour
         }
         if (enemySpawner != null && !enemySpawner.enemyPrefab && enemyPrefab) enemySpawner.enemyPrefab = enemyPrefab;
         if (enemySpawner != null) enemySpawner.ClearAll();
+        if (ghostSpawner != null)
+        {
+            if (!ghostSpawner.localGhostPrefab && localGhostPrefab) ghostSpawner.localGhostPrefab = localGhostPrefab;
+            if (!ghostSpawner.remoteGhostPrefab && remoteGhostPrefab) ghostSpawner.remoteGhostPrefab = remoteGhostPrefab;
+            ghostSpawner.ClearAll();
+        }
 
         var selfId = conn != null ? conn.SelfUserId : string.Empty;
         if (string.IsNullOrEmpty(selfId))

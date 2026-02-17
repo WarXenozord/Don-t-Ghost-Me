@@ -727,6 +727,7 @@ GameObject:
   - component: {fileID: 1594733322}
   - component: {fileID: 1594733321}
   - component: {fileID: 1594733323}
+  - component: {fileID: 1594733324}
   m_Layer: 0
   m_Name: Spawner
   m_TagString: Untagged
@@ -789,6 +790,24 @@ MonoBehaviour:
   enemyLerpPos: 14
   enemyLerpYaw: 14
   enemyHardSnapDistance: 1
+--- !u!114 &1594733324
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1594733320}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f770589c7c5e84f469c48654d19b5d42, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  conn: {fileID: 0}
+  transport: {fileID: 0}
+  playerSpawner: {fileID: 1594733321}
+  localGhostPrefab: {fileID: 5652273883015588081, guid: 471d28b91db188e4b9691095125224f5, type: 3}
+  remoteGhostPrefab: {fileID: 5792367294580083491, guid: 79feb8ffd26a80741ae19c08908afd8c, type: 3}
+  enableDebugLogs: 1
 --- !u!1 &1673759879
 GameObject:
   m_ObjectHideFlags: 0

@@ -16,6 +16,7 @@ public class MatchTransport : MonoBehaviour
     public const long OPCODE_ENEMY_SNAPSHOT = 21;
     public const long OPCODE_ENEMY_TELEPORT = 22;
     public const long OPCODE_ENEMY_FX = 23;
+    public const long OPCODE_GHOST_SPAWN = 30;
 
     public NakamaConnection conn;
 
@@ -28,6 +29,7 @@ public class MatchTransport : MonoBehaviour
     public event Action<EnemySnapshotMsg> OnEnemySnapshot;
     public event Action<EnemyTeleportMsg> OnEnemyTeleport;
     public event Action<EnemyFxMsg> OnEnemyFx;
+    public event Action<GhostSpawnMsg> OnGhostSpawn;
     private bool _isBound;
     private NakamaConnection _boundConn;
 
@@ -159,6 +161,16 @@ public class MatchTransport : MonoBehaviour
                 Debug.Log("[MatchTransport] RECV_ENEMY_FX id=" + msg.spawnId + " fx=" + msg.fxId);
             }
         }
+        else if (state.OpCode == OPCODE_GHOST_SPAWN)
+        {
+            var msg = JsonUtility.FromJson<GhostSpawnMsg>(json);
+            msg.senderUserId = state.UserPresence.UserId;
+            OnGhostSpawn?.Invoke(msg);
+            if (enableDebugLogs)
+            {
+                Debug.Log("[MatchTransport] RECV_GHOST_SPAWN user=" + msg.userId);
+            }
+        }
     }
 
     public async void SendInput(InputMsg msg)
@@ -235,6 +247,17 @@ public class MatchTransport : MonoBehaviour
         if (enableDebugLogs)
         {
             Debug.Log("[MatchTransport] SEND_ENEMY_FX id=" + msg.spawnId + " fx=" + msg.fxId);
+        }
+    }
+
+    public async void BroadcastGhostSpawn(GhostSpawnMsg msg)
+    {
+        if (conn?.Socket == null || conn.Match == null) return;
+        var bytes = Encoding.UTF8.GetBytes(JsonUtility.ToJson(msg));
+        await conn.Socket.SendMatchStateAsync(conn.Match.Id, OPCODE_GHOST_SPAWN, bytes);
+        if (enableDebugLogs)
+        {
+            Debug.Log("[MatchTransport] SEND_GHOST_SPAWN user=" + msg.userId);
         }
     }
 
@@ -330,6 +353,15 @@ public class MatchTransport : MonoBehaviour
     {
         public string spawnId;
         public int fxId;
+        [NonSerialized] public string senderUserId;
+    }
+
+    [Serializable]
+    public class GhostSpawnMsg
+    {
+        public string userId;
+        public float x, y, z;
+        public float yaw;
         [NonSerialized] public string senderUserId;
     }
 
