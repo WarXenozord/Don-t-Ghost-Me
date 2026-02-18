@@ -60,10 +60,12 @@ public class LevelObjectiveManager : MonoBehaviour
         // Activate ritual mark once all candles are collected
         if (_collectedCandles.Count >= requiredCandles)
         {
-            if (ritualMark != null)
+            if (ritualMark != null){
                 ritualMark.Activate();
+                Debug.Log("[LevelObjective] All candles collected! Find the Ritual Mark!");
+            }
 
-            Debug.Log("[LevelObjective] All candles collected! Find the Ritual Mark!");
+            
         }
     }
 

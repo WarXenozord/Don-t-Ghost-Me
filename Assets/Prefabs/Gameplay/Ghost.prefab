@@ -349,7 +349,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   maxHealth: 100
   currentHealth: 0
-  healthBarFill: {fileID: 0}
+  energyBar: {fileID: 3847393356819025840, guid: 99ddf888cf805834ead53fcdefccce83, type: 3}
   drainRadius: 10
   maxDrainPerMedium: 15
   regenPerSecond: 10

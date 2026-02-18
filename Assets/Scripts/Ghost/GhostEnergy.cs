@@ -6,7 +6,8 @@ public class GhostEnergy : MonoBehaviour
     [Header("Energy")]
     public float maxHealth = 100f;
     public float currentHealth;
-     public Image healthBarFill;
+    private Image energyBarFill;
+    public GameObject energyBar;
 
     [Header("Ghost Drain Settings")]
     public float drainRadius = 10f;
@@ -22,7 +23,13 @@ public class GhostEnergy : MonoBehaviour
 
     private void Start()
     {
+        Transform canvas = GameObject.FindGameObjectWithTag("Canvas").GetComponent<Transform>();
+        Transform child = Instantiate(energyBar).GetComponent<Transform>();
+        child.transform.SetParent(canvas);
+
+
         currentHealth = maxHealth;
+        energyBarFill= child.GetChild(0).GetComponent<Image>();
         UpdateHealthBar();
         // Cache all mediums at start
         mediums = GameObject.FindGameObjectsWithTag("Medium");
@@ -100,7 +107,7 @@ public class GhostEnergy : MonoBehaviour
     void UpdateHealthBar()
     {
         // Update the fill amount based on the health ratio
-        healthBarFill.fillAmount = currentHealth / maxHealth;
+        energyBarFill.fillAmount = currentHealth / maxHealth;
         // If using a Slider: healthSlider.value = currentHealth / maxHealth;
     }
 }

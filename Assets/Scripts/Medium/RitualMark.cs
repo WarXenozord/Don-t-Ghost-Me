@@ -42,6 +42,7 @@ public class RitualMark : MonoBehaviour, IInteractable
     private Renderer _highlightRenderer;
     private MaterialPropertyBlock _highlightBlock;
     private LevelObjectiveManager _manager;
+  
 
     private void Awake()
     {
