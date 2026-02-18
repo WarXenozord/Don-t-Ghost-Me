@@ -15,25 +15,25 @@ MonoBehaviour:
   roomType: 0
   floorProps:
   - prefab: {fileID: 7306335275045125360, guid: 5fb44d377fa19c246a2399d90f76a139, type: 3}
-    weight: 3
-    footprintX: 0
-    footprintZ: 0
-    prefersWall: 0
-    yOffset: 0
-  - prefab: {fileID: 3570680850630705159, guid: 4fbeb71f8d99da34db1bc26f61f6f632, type: 3}
     weight: 2
     footprintX: 0
     footprintZ: 0
     prefersWall: 0
     yOffset: 0
+  - prefab: {fileID: 3570680850630705159, guid: 4fbeb71f8d99da34db1bc26f61f6f632, type: 3}
+    weight: 3
+    footprintX: 0
+    footprintZ: 0
+    prefersWall: 0
+    yOffset: 0
   - prefab: {fileID: 3120683321880721924, guid: 8b2618ba71bed214d8dd6d0f7e786f60, type: 3}
-    weight: 4
+    weight: 3
     footprintX: 0
     footprintZ: 0
     prefersWall: 0
     yOffset: 0
   minFloorProps: 1
-  maxFloorProps: 4
+  maxFloorProps: 6
   wallProps:
   - prefab: {fileID: 828344217250804676, guid: 871cc1ddeda7a544f88bd2da5416a017, type: 3}
     weight: 3
