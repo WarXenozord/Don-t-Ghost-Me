@@ -130,6 +130,9 @@ public class ProceduralBuildingGenerator : MonoBehaviour
     [Tooltip("Assign the PropSpawner component. Leave null to skip prop generation.")]
     [SerializeField] private PropSpawner propSpawner;
 
+    [Tooltip("Assign the ObjectiveObjectSpawner for Floor 1 objectives.")]
+[SerializeField] private ObjectiveObjectSpawner objectiveSpawner;
+
     private List<BuildingRoom>    rooms     = new List<BuildingRoom>();
     private List<BuildingWall>    walls     = new List<BuildingWall>();
     private List<BuildingWall> activeWalls = new List<BuildingWall>();
@@ -270,6 +273,7 @@ sizePools = new Dictionary<RoomSize, List<RoomType>>();
         SpawnPlayerInRandomRoom();
         BuildMinimap();
         BuildProps();
+        BuildObjectives();  // ← ADD THIS LINE
         Debug.Log("Building generation complete!");
     }
 
@@ -2173,5 +2177,11 @@ foreach (var door in doors)
     if (propSpawner == null) return;
     propSpawner.Furnish(rooms, activeWalls, doors, buildingParentMap, roomGeometry, seed, wallGameObjects);
     Debug.Log("[Props] Furnishing complete.");
+}
+private void BuildObjectives()
+{
+    if (objectiveSpawner == null) return;
+    objectiveSpawner.SpawnObjectives(rooms, buildingParentMap, seed);
+    Debug.Log("[Objectives] Floor 1 objectives spawned.");
 }
 }

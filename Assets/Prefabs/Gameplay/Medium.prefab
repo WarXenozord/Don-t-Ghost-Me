@@ -72,7 +72,7 @@ Camera:
   m_Depth: 0
   m_CullingMask:
     serializedVersion: 2
-    m_Bits: 575
+    m_Bits: 2623
   m_RenderingPath: -1
   m_TargetTexture: {fileID: 0}
   m_TargetDisplay: 0
@@ -190,7 +190,6 @@ GameObject:
   - component: {fileID: 139811745504333480}
   - component: {fileID: 7748105258055757119}
   - component: {fileID: 5799300709077669421}
-  - component: {fileID: 9116663404897770135}
   m_Layer: 0
   m_Name: Medium
   m_TagString: Medium
@@ -337,25 +336,11 @@ MonoBehaviour:
   Gravity: 9.81
   Sneak: 0
   SneakSpeed: 0
---- !u!114 &9116663404897770135
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5652273883015588081}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 0280823020055554fabdcf5ce4718e6d, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  maxHealth: 100
-  currentHealth: 100
-  healthBarFill: {fileID: 0}
-  drainRadius: 10
-  maxDrainPerMedium: 15
-  regenPerSecond: 10
-  regenDelay: 2
+  interactionRange: 3
+  interactKey: 101
+  interactableLayer:
+    serializedVersion: 2
+    m_Bits: 2048
 --- !u!1 &6290174318891195069
 GameObject:
   m_ObjectHideFlags: 0

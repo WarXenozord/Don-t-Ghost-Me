@@ -26,7 +26,11 @@ public class MediumController : MonoBehaviour
     [Header("Sneaking")]
     [SerializeField] private bool Sneak = false;
     [SerializeField] private float SneakSpeed;
-
+    [Header("Interaction")]
+    [SerializeField] private float interactionRange = 3f;
+    [SerializeField] private KeyCode interactKey = KeyCode.E;
+    [SerializeField] private LayerMask interactableLayer; // set to "Interactable" layer
+    private Candle _currentAimedCandle;
     void Start()
     {
         Cursor.lockState = CursorLockMode.Locked;
@@ -64,6 +68,10 @@ public class MediumController : MonoBehaviour
             NetworkVelocity = Vector3.zero;
         }
         _lastWorldPos = transform.position;
+        CheckAimHighlight();  
+        HandleInteraction();
+
+
     }
     private void MovePlayer()
     {
@@ -103,5 +111,83 @@ public class MediumController : MonoBehaviour
 
         transform.Rotate(0f, PlayerMouseInput.x * Sensetivity, 0f);
         PlayerCamera.transform.localRotation = Quaternion.Euler(xRotation, 0f, 0f);
+    }
+    private void CheckAimHighlight()
+    {
+        Ray ray = new Ray(PlayerCamera.position, PlayerCamera.forward);
+        bool hit = interactableLayer.value != 0
+            ? Physics.Raycast(ray, out RaycastHit hitInfo, interactionRange, interactableLayer)
+            : Physics.Raycast(ray, out hitInfo, interactionRange);
+
+        if (hit)
+        {
+            Candle candle = hitInfo.collider.GetComponent<Candle>();
+
+            if (candle != null)
+            {
+                if (_currentAimedCandle != candle)
+                {
+                    if (_currentAimedCandle != null){
+                     Debug.Log("Bye candle, because now..");
+                        _currentAimedCandle.SetAimed(false);
+                        _currentAimedCandle.SetHighlight(false);
+                    }
+
+                    _currentAimedCandle = candle;
+                    _currentAimedCandle.SetAimed(true);
+                    _currentAimedCandle.SetHighlight(true);
+                    Debug.Log("New candle!");
+                }
+
+                return;
+            }
+        }
+
+        if (_currentAimedCandle != null)
+        {
+            _currentAimedCandle.SetAimed(false);
+            _currentAimedCandle.SetHighlight(false);
+            Debug.Log("Bye candle!");
+            _currentAimedCandle = null;
+        }
+}
+    private void HandleInteraction()
+    {
+        if (Input.GetKeyDown(interactKey))
+        {
+            TryInteract();
+        }
+    }
+
+    private void TryInteract()
+    {
+        Ray ray = new Ray(PlayerCamera.position, PlayerCamera.forward);
+        
+        bool hit = interactableLayer.value != 0
+            ? Physics.Raycast(ray, out RaycastHit hitInfo, interactionRange, interactableLayer)
+            : Physics.Raycast(ray, out hitInfo, interactionRange);
+
+        if (!hit) return;
+
+        // Check for Medium-specific interactables
+        var candle = hitInfo.collider.GetComponent<Candle>();
+        if (candle != null)
+        {
+            Debug.Log("col with can");
+            candle.CollectByMedium(this);
+            return;
+        }
+
+        // Can add more Medium-specific interactions here
+        // (keys, artifacts, switches, etc.)
+    }
+
+    private void OnDrawGizmosSelected()
+    {
+        if (PlayerCamera != null)
+        {
+            Gizmos.color = Color.green;
+            Gizmos.DrawRay(PlayerCamera.position, PlayerCamera.forward * interactionRange);
+        }
     }
 }

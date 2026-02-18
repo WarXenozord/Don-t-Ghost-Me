@@ -14,6 +14,8 @@ GameObject:
   - component: {fileID: 5342688327122664781}
   - component: {fileID: 1023229969626592785}
   - component: {fileID: 987081709109066427}
+  - component: {fileID: 293749387052256073}
+  - component: {fileID: 9034005542437368669}
   m_Layer: 0
   m_Name: GameController
   m_TagString: Untagged
@@ -48,8 +50,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e8f2e89fb7a609248a3a27784a6d4ebe, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  seed: 2241
-  targetNumRooms: 6
+  seed: 224
+  targetNumRooms: 12
   numFloors: 1
   floorHeight: 3.5
   buildingsPerRow: 3
@@ -72,6 +74,7 @@ MonoBehaviour:
   floorplanRenderer: {fileID: 4645658144665287632}
   minimapController: {fileID: 5342688327122664781}
   propSpawner: {fileID: 987081709109066427}
+  objectiveSpawner: {fileID: 9034005542437368669}
   player: {fileID: 0}
   playerHeightOffset: 1.1
 --- !u!114 &4645658144665287632
@@ -158,6 +161,9 @@ MonoBehaviour:
   furnishingProfiles:
   - {fileID: 11400000, guid: e2ce87ba480296142baf5a8984b5822d, type: 2}
   - {fileID: 11400000, guid: fc69113cadb6d2d43be9d797481207b7, type: 2}
+  - {fileID: 11400000, guid: ff96c282a033c2f468a472b9a3f52db7, type: 2}
+  - {fileID: 11400000, guid: f14219dd6060ebe46970537416d6dad9, type: 2}
+  - {fileID: 11400000, guid: d24c63f87b83ef440a2e4f387d960dbd, type: 2}
   materialProfiles:
   - {fileID: 11400000, guid: ccf01086d1a1af549b44458fc6400eee, type: 2}
   - {fileID: 11400000, guid: 5d0ae454f74207b408315e369a9adaad, type: 2}
@@ -167,7 +173,46 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 5ec98f76da5f5a94eb37e767c00c3aaa, type: 2}
   - {fileID: 11400000, guid: 05ddb1972197d31419ae5f180be9e5b9, type: 2}
   - {fileID: 11400000, guid: 11bce4f4190699b4b8a55be62216561c, type: 2}
+  ghostInteraction: {fileID: 0}
   wallThickness: 0.2
   wallMargin: 0.5
   propPadding: 0.1
   maxPlacementAttempts: 30
+--- !u!114 &293749387052256073
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 73163572864504066}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2b61ae34d44f2064c85b82e1bfd05ec1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  requiredCandles: 5
+  nextSceneName: Floor2
+  ritualMark: {fileID: 1545146029889798356, guid: 5254136349d392b41bc5cab0541a6753, type: 3}
+  objectiveText: {fileID: 0}
+  candleCountText: {fileID: 0}
+  completionPanel: {fileID: 0}
+  delayBeforeTransition: 3
+--- !u!114 &9034005542437368669
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 73163572864504066}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2995d6d1a1fd38242bf78bd14b19b84a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  candlePrefab: {fileID: 1405424410415669654, guid: f3d02d43013f2184e8ab9c031f26453d, type: 3}
+  ritualMarkPrefab: {fileID: 0}
+  candleCount: 5
+  candleHeightOnProp: 0.05
+  candleFloorHeight: 0.3
+  preferredMarkRoom: 4
+  markTableHeight: 0.75
