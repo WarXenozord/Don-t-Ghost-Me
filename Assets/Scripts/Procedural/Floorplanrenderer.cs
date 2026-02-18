@@ -27,7 +27,7 @@ public class FloorplanRenderer : MonoBehaviour
     public float wallSpriteThickness = 0.3f;
     public float doorSpriteSize      = 1.2f;
     public float playerMarkerSize    = 1.5f;
-    public bool isHidden = true;
+    private bool _isHidden = true;
 
     // ?? Runtime ????????????????????????????????????????????????????????????
     private Dictionary<int, GameObject>      floorParents  = new Dictionary<int, GameObject>();
@@ -39,7 +39,10 @@ public class FloorplanRenderer : MonoBehaviour
     private List<BuildingRoom>               _rooms; // kept for geometric wall registration
 
     // ?? Public API ?????????????????????????????????????????????????????????
+    public void SetRevealed(){
+        _isHidden = false;
 
+    }
     public void Build(
         List<BuildingWall> walls,
         List<BuildingDoor> doors,
@@ -66,7 +69,7 @@ public class FloorplanRenderer : MonoBehaviour
             parent.transform.SetParent(transform, worldPositionStays: false);
             SetLayerRecursively(parent, minimapLayer);
             floorParents[f] = parent;
-            if(isHidden) parent.SetActive(false);
+            if(_isHidden) parent.SetActive(false);
         }
 
         SpawnWallSprites(walls, floorHeight, minimapLayer);
@@ -99,7 +102,23 @@ public class FloorplanRenderer : MonoBehaviour
         foreach (var kv in floorParents)
             kv.Value.SetActive(kv.Key == floorIndex);
     }
+    public void RevealAllRooms()
+{
+    foreach (var kv in roomSprites)
+    {
+        foreach (var go in kv.Value)
+        {
+            if (go != null)
+                go.SetActive(true);
+        }
+    }
 
+    // Also ensure floor parents are visible
+    foreach (var kv in floorParents)
+        kv.Value.SetActive(true);
+
+    Debug.Log("[FloorplanRenderer] All rooms revealed.");
+}
     /// <summary>Move player marker every frame.</summary>
     public void UpdatePlayerMarker(Vector3 worldPos)
     {
@@ -145,7 +164,7 @@ public class FloorplanRenderer : MonoBehaviour
             created++;
 
             // Start hidden — RevealRoom will enable it
-            if(isHidden) go.SetActive(false);
+            if(_isHidden) go.SetActive(false);
 
             // Try roomA/roomB first (set by the refactored generator).
             // If both are -1 (older generator or exterior walls), fall back to a
@@ -251,7 +270,7 @@ public class FloorplanRenderer : MonoBehaviour
             SetLayerRecursively(go, layer);
 
             // Start hidden
-            if(isHidden) go.SetActive(false);
+            if(_isHidden) go.SetActive(false);
 
             // Door is revealed when either neighbouring room is entered
             RegisterSpriteToRoom(door.roomA, go);

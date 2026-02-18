@@ -66,7 +66,8 @@ private bool _isExhausted;
 
         Cursor.lockState = CursorLockMode.Locked;
         _lastWorldPos = transform.position;
-
+        MinimapController mp = GameObject.FindGameObjectWithTag("GameController").GetComponent<MinimapController>();
+        mp.SetPlayer(this.gameObject.GetComponent<Transform>());
         Transform canvas = GameObject.FindGameObjectWithTag("Canvas").GetComponent<Transform>();
         Transform child = Instantiate(staminaBar).GetComponent<Transform>();
         child.transform.SetParent(canvas);

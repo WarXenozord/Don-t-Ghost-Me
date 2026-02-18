@@ -61,7 +61,9 @@ public class MinimapController : MonoBehaviour
     private RenderTexture renderTexture;
 
     // ?? Unity lifecycle ????????????????????????????????????????????????????
-
+    public void SetPlayer(Transform p){
+        player =p;
+    }
     private void Awake()
     {
         if (floorplanRenderer == null)
@@ -185,11 +187,9 @@ public class MinimapController : MonoBehaviour
             revealCamera.transform.SetPositionAndRotation(camPos, camRot);
 
         // ?? Fit ortho size to cover entire map ????????????????????????????
-        float orthoSize = Mathf.Max(mapBoundsXZ.width, mapBoundsXZ.height) * 0.5f;
+        float orthoSize = mapBoundsXZ.height * 0.5f;
         minimapCamera.orthographicSize = orthoSize;
-        if (revealCamera != null)
-            revealCamera.orthographicSize = orthoSize;
-
+        
         // ?? Build RT at correct aspect ratio (no squish) ???????????????????
         int rtW, rtH;
         if (mapBoundsXZ.width >= mapBoundsXZ.height)
@@ -202,6 +202,14 @@ public class MinimapController : MonoBehaviour
             rtH = renderTextureSize;
             rtW = Mathf.Max(1, Mathf.RoundToInt(renderTextureSize * mapBoundsXZ.width / mapBoundsXZ.height));
         }
+        float aspect = (float)rtW / rtH;
+        // If width would be too small, expand vertically instead
+if (mapBoundsXZ.width > mapBoundsXZ.height * aspect)
+{
+    orthoSize = (mapBoundsXZ.width / aspect) * 0.5f;
+}
+if (revealCamera != null)
+            revealCamera.orthographicSize = orthoSize;
 
         if (renderTexture != null)
         {
@@ -248,6 +256,8 @@ public class MinimapController : MonoBehaviour
         minimapCamera.orthographic    = true;
         minimapCamera.orthographicSize = 100f; // overwritten by SetMapBounds
         minimapCamera.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
+        revealCamera.orthographic    = true;
+        revealCamera.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
 
         int minimapMask = LayerMask.GetMask("Minimap");
         if (minimapMask == 0)

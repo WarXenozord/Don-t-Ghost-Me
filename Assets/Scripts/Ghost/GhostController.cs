@@ -23,7 +23,10 @@ public class GhostController : MonoBehaviour
     private void Start()
     {
         Cursor.lockState = CursorLockMode.Locked;
-
+        FloorplanRenderer fp = GameObject.FindGameObjectWithTag("GameController").GetComponent<FloorplanRenderer>();
+        fp.RevealAllRooms();
+        MinimapController mp = GameObject.FindGameObjectWithTag("GameController").GetComponent<MinimapController>();
+        mp.SetPlayer(this.gameObject.GetComponent<Transform>());
         rb = GetComponent<Rigidbody>();
         rb.useGravity = false;
         rb.drag = 2f;              // slight float resistance
