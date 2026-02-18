@@ -1,21 +1,27 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
 
 public class MediumController : MonoBehaviour
 { 
     private Vector3 Velocity;
     private Vector3 PlayerMovementInput;
     private Vector2 PlayerMouseInput;
-    private bool Sneaking = false;
+    private bool Sprinting = false;
     private float xRotation;
     private Vector3 _lastWorldPos;
     public Vector3 NetworkVelocity { get; private set; }
-
+    [Header("Camera Effects")]
+[SerializeField] private float normalFOV = 60f;
+[SerializeField] private float sprintFOV = 75f;
+[SerializeField] private float fovSmoothSpeed = 8f;
+private Camera playerCam;
     [Header("Components Needed")]
-    [SerializeField] private Transform PlayerCamera;
     [SerializeField] private CharacterController Controller;
     [SerializeField] private Transform Player;
+    [SerializeField] private GameObject cameraObject;
+    private Transform PlayerCamera;
     [Space]
     [Header("Movement")]
     [SerializeField] private float Speed;
@@ -23,18 +29,50 @@ public class MediumController : MonoBehaviour
     [SerializeField] private float Sensetivity;
     [SerializeField] private float Gravity = 9.81f;
     [Space]
-    [Header("Sneaking")]
-    [SerializeField] private bool Sneak = false;
-    [SerializeField] private float SneakSpeed;
+    [Header("Sprint")]
+    [SerializeField] private float SprintSpeed;
+    [Header("Stamina")]
+    [SerializeField] private float maxStamina = 5f;
+    [SerializeField] private float staminaDrainRate = 1f;
+    [SerializeField] private float staminaRegenRate = 0.8f;
+    [SerializeField] private float staminaRegenDelay = 1f;
+    private Image staminaBarFill;
+    public GameObject staminaBar;
+
+    private float _currentStamina;
+    private float _regenTimer;
     [Header("Interaction")]
     [SerializeField] private float interactionRange = 3f;
     [SerializeField] private KeyCode interactKey = KeyCode.E;
     [SerializeField] private LayerMask interactableLayer; // set to "Interactable" layer
     private Candle _currentAimedCandle;
+    [Header("Audio")]
+[SerializeField] private AudioSource breathingSource;
+[SerializeField] private float lowStaminaThreshold = 1.5f;
+[SerializeField] private float heavyBreathVolume = 1f;
+[SerializeField] private float normalBreathVolume = 0f;
+[SerializeField] private float breathFadeSpeed = 2f;
+[Header("Exhaustion")]
+[SerializeField] private float exhaustionDuration = 2f;
+[SerializeField] private float exhaustionSpeedMultiplier = 0.5f;
+
+private float _exhaustionTimer;
+private bool _isExhausted;
     void Start()
     {
+        PlayerCamera= cameraObject.GetComponent<Transform>();
+        playerCam = cameraObject.GetComponent<Camera>();
+        playerCam.fieldOfView = normalFOV;
+
         Cursor.lockState = CursorLockMode.Locked;
         _lastWorldPos = transform.position;
+
+        Transform canvas = GameObject.FindGameObjectWithTag("Canvas").GetComponent<Transform>();
+        Transform child = Instantiate(staminaBar).GetComponent<Transform>();
+        child.transform.SetParent(canvas);
+        staminaBarFill= child.GetChild(0).GetComponent<Image>();
+        _currentStamina = maxStamina;
+        UpdateStaminaBar();
     }
 
     // Update is called once per frame
@@ -43,20 +81,11 @@ public class MediumController : MonoBehaviour
 
         PlayerMovementInput = new Vector3(Input.GetAxis("Horizontal"), 0f, Input.GetAxis("Vertical"));
         PlayerMouseInput = new Vector2(Input.GetAxis("Mouse X"), Input.GetAxis("Mouse Y"));
-
+        UpdateStaminaBar();
         MovePlayer();
         MoveCamera();
 
-        if (Input.GetKey(KeyCode.RightShift) && Sneak)
-        {
-            Player.localScale = new Vector3(1f, 0.5f, 1f);
-            Sneaking = true;
-        }
-        if (Input.GetKeyUp(KeyCode.RightShift))
-        {
-            Player.localScale = new Vector3(1f, 1f, 1f);
-            Sneaking = false;
-        }
+        HandleSprint();
 
         var dt = Time.deltaTime;
         if (dt > 0f)
@@ -70,9 +99,73 @@ public class MediumController : MonoBehaviour
         _lastWorldPos = transform.position;
         CheckAimHighlight();  
         HandleInteraction();
+        UpdateFOV();
+        UpdateBreathing();
 
 
     }
+    private void UpdateFOV()
+{
+    float targetFOV = Sprinting ? sprintFOV : normalFOV;
+    playerCam.fieldOfView = Mathf.Lerp(
+        playerCam.fieldOfView,
+        targetFOV,
+        fovSmoothSpeed * Time.deltaTime
+    );
+}
+private void UpdateBreathing()
+{
+    if (breathingSource == null) return;
+
+    float targetVolume = _currentStamina <= lowStaminaThreshold
+        ? heavyBreathVolume
+        : normalBreathVolume;
+
+    breathingSource.volume = Mathf.Lerp(
+        breathingSource.volume,
+        targetVolume,
+        breathFadeSpeed * Time.deltaTime
+    );
+}
+    private void HandleSprint()
+    {
+        if (_isExhausted)
+        {
+        _exhaustionTimer -= Time.deltaTime;
+
+        if (_exhaustionTimer <= 0f)
+            _isExhausted = false;
+        }
+     bool sprintInput = Input.GetKey(KeyCode.LeftShift);
+        if (_currentStamina <= 0f && !_isExhausted)
+        {
+        _isExhausted = true;
+        _exhaustionTimer = exhaustionDuration;
+        }
+
+        if (sprintInput && _currentStamina > 0f && PlayerMovementInput.magnitude > 0.1f)
+        {
+            Sprinting = true;
+            _currentStamina -= staminaDrainRate * Time.deltaTime;
+            _regenTimer = 0f;
+        }
+        else
+        {
+        Sprinting = false;
+
+            if (_currentStamina < maxStamina)
+            {
+                _regenTimer += Time.deltaTime;
+
+                if (_regenTimer >= staminaRegenDelay)
+                {
+                    _currentStamina += staminaRegenRate * Time.deltaTime;
+                }
+            }
+    }
+
+    _currentStamina = Mathf.Clamp(_currentStamina, 0f, maxStamina);
+}
     private void MovePlayer()
     {
         Vector3 MoveVector = transform.TransformDirection(PlayerMovementInput);
@@ -82,7 +175,7 @@ public class MediumController : MonoBehaviour
         {
             Velocity.y = -1f;
 
-            if (Input.GetKeyDown(KeyCode.Space) && Sneaking == false)
+            if (Input.GetKeyDown(KeyCode.Space) && Sprinting == false)
             {
                 Velocity.y = JumpForce;
             }
@@ -91,13 +184,15 @@ public class MediumController : MonoBehaviour
         {
             Velocity.y += Gravity * -2f * Time.deltaTime;
         }
-        if (Sneaking)
+        if (Sprinting)
         {
-            Controller.Move(MoveVector * SneakSpeed * Time.deltaTime);
+            Controller.Move(MoveVector * SprintSpeed * Time.deltaTime);
         }
         else
-        {
-            Controller.Move(MoveVector * Speed * Time.deltaTime);
+        {   if (_isExhausted)
+                Controller.Move(MoveVector * Speed*exhaustionSpeedMultiplier * Time.deltaTime);
+            else
+                Controller.Move(MoveVector * Speed * Time.deltaTime);
         }
         Controller.Move(Velocity * Time.deltaTime);
 
@@ -189,5 +284,13 @@ public class MediumController : MonoBehaviour
             Gizmos.color = Color.green;
             Gizmos.DrawRay(PlayerCamera.position, PlayerCamera.forward * interactionRange);
         }
+    }
+
+
+    void UpdateStaminaBar()
+    {
+        // Update the fill amount based on the health ratio
+        staminaBarFill.fillAmount = _currentStamina / maxStamina;
+        // If using a Slider: healthSlider.value = currentHealth / maxHealth;
     }
 }

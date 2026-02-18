@@ -327,20 +327,34 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a847eb31669300940aaaf9f91ea83a2d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  PlayerCamera: {fileID: 412409998115839473}
+  normalFOV: 60
+  sprintFOV: 75
+  fovSmoothSpeed: 8
   Controller: {fileID: 7748105258055757119}
   Player: {fileID: 8307503184249558993}
+  cameraObject: {fileID: 3064230707966075227}
   Speed: 2
   JumpForce: 8
   Sensetivity: 2
   Gravity: 9.81
-  Sneak: 0
-  SneakSpeed: 0
+  SprintSpeed: 4
+  maxStamina: 5
+  staminaDrainRate: 1
+  staminaRegenRate: 0.8
+  staminaRegenDelay: 1
+  staminaBar: {fileID: 3847393356819025840, guid: 338aa8f727ce3774683633a925a0dc21, type: 3}
   interactionRange: 3
   interactKey: 101
   interactableLayer:
     serializedVersion: 2
     m_Bits: 2048
+  breathingSource: {fileID: 0}
+  lowStaminaThreshold: 1.5
+  heavyBreathVolume: 1
+  normalBreathVolume: 0
+  breathFadeSpeed: 2
+  exhaustionDuration: 2
+  exhaustionSpeedMultiplier: 0.5
 --- !u!1 &6290174318891195069
 GameObject:
   m_ObjectHideFlags: 0
