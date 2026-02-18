@@ -26,8 +26,14 @@ MonoBehaviour:
     footprintZ: 0
     prefersWall: 1
     yOffset: 0
+  - prefab: {fileID: 5820235072877590829, guid: c8b7d6c7e53a052428119a938c318091, type: 3}
+    weight: 3
+    footprintX: 0
+    footprintZ: 0
+    prefersWall: 0
+    yOffset: 0
   minFloorProps: 1
-  maxFloorProps: 2
+  maxFloorProps: 3
   wallProps: []
   maxWallProps: 2
   wallPropHeight: 1.5

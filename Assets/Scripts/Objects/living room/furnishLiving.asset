@@ -21,13 +21,25 @@ MonoBehaviour:
     prefersWall: 0
     yOffset: 0
   - prefab: {fileID: 4417545005964817228, guid: 1de0ccc0a37456347877438a10609bf8, type: 3}
-    weight: 0
+    weight: 2
     footprintX: 0
     footprintZ: 0
     prefersWall: 0
     yOffset: 0
+  - prefab: {fileID: 2012107117822405360, guid: 5001859f2ddd7b2489c0c0b865fbb84e, type: 3}
+    weight: 2
+    footprintX: 0
+    footprintZ: 0
+    prefersWall: 0
+    yOffset: 0
+  - prefab: {fileID: 3570680850630705159, guid: 4fbeb71f8d99da34db1bc26f61f6f632, type: 3}
+    weight: 5
+    footprintX: 0
+    footprintZ: 0
+    prefersWall: 1
+    yOffset: 0
   minFloorProps: 1
-  maxFloorProps: 4
+  maxFloorProps: 8
   wallProps:
   - prefab: {fileID: 828344217250804676, guid: 871cc1ddeda7a544f88bd2da5416a017, type: 3}
     weight: 3

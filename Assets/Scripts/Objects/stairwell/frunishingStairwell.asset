@@ -10,40 +10,22 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 8f872ee2c8174f442b258a3a424c9e1f, type: 3}
-  m_Name: furnishHallway
+  m_Name: frunishingStairwell
   m_EditorClassIdentifier: 
-  roomType: 3
+  roomType: 7
   floorProps:
-  - prefab: {fileID: 6865629232166033351, guid: 8057204c89d75794bb5a6d14515667e8, type: 3}
-    weight: 2
-    footprintX: 0
-    footprintZ: 0
-    prefersWall: 1
-    yOffset: 0
-  - prefab: {fileID: 3120683321880721924, guid: 8b2618ba71bed214d8dd6d0f7e786f60, type: 3}
-    weight: 4
-    footprintX: 0
-    footprintZ: 0
-    prefersWall: 1
-    yOffset: 0
   - prefab: {fileID: 5820235072877590829, guid: c8b7d6c7e53a052428119a938c318091, type: 3}
-    weight: 3
-    footprintX: 0
-    footprintZ: 0
-    prefersWall: 1
-    yOffset: 0
-  minFloorProps: 1
-  maxFloorProps: 3
-  wallProps: []
-  maxWallProps: 2
-  wallPropHeight: 1.5
-  wallPropInset: 0.05
-  ceilingProps:
-  - prefab: {fileID: 7639312203187580989, guid: bc8712f31d5bf8c4b8fdd4ccb4296bf1, type: 3}
-    weight: 0
+    weight: 1
     footprintX: 0
     footprintZ: 0
     prefersWall: 0
     yOffset: 0
+  minFloorProps: 1
+  maxFloorProps: 1
+  wallProps: []
+  maxWallProps: 2
+  wallPropHeight: 1.5
+  wallPropInset: 0.05
+  ceilingProps: []
   singleLampAreaThreshold: 16
   ceilingPropYOffset: -0.1

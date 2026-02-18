@@ -164,6 +164,9 @@ MonoBehaviour:
   - {fileID: 11400000, guid: ff96c282a033c2f468a472b9a3f52db7, type: 2}
   - {fileID: 11400000, guid: f14219dd6060ebe46970537416d6dad9, type: 2}
   - {fileID: 11400000, guid: d24c63f87b83ef440a2e4f387d960dbd, type: 2}
+  - {fileID: 11400000, guid: 347178da0f4b0aa4393fbe7b7bc90dc7, type: 2}
+  - {fileID: 11400000, guid: e17d8c6f70c0ccc4c896a699f3c85d41, type: 2}
+  - {fileID: 11400000, guid: 8fb30d53c8d2fde459cf7aadfcae7cd9, type: 2}
   materialProfiles:
   - {fileID: 11400000, guid: ccf01086d1a1af549b44458fc6400eee, type: 2}
   - {fileID: 11400000, guid: 5d0ae454f74207b408315e369a9adaad, type: 2}
