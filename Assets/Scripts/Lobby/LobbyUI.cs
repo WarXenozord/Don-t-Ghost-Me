@@ -11,6 +11,7 @@ public class LobbyUI : MonoBehaviour
     public NakamaConnection conn;
     public MatchTransport transport;
     public HostAuthority hostAuthority;
+    public LobbyCameraMover lobbyCameraMover;
 
     [Header("Screens")]
     public GameObject lobbywindow;
@@ -45,6 +46,7 @@ public class LobbyUI : MonoBehaviour
         if (!conn) conn = FindObjectOfType<NakamaConnection>();
         if (!transport) transport = FindObjectOfType<MatchTransport>();
         if (!hostAuthority) hostAuthority = FindObjectOfType<HostAuthority>();
+        if (!lobbyCameraMover) lobbyCameraMover = FindObjectOfType<LobbyCameraMover>();
 
         if (hostBtn) hostBtn.onClick.AddListener(HostLobby);
         if (refreshBtn) refreshBtn.onClick.AddListener(RefreshLobbies);
@@ -98,6 +100,7 @@ public class LobbyUI : MonoBehaviour
 
         RebuildPlayersFromCurrentMatch();
         SetScreen(isInRoom: true);
+        if (lobbyCameraMover) lobbyCameraMover.OnJoinedOrStartedMatch();
         RefreshLobbyUi("Hosting match " + ShortId(match.Id));
     }
 
@@ -152,6 +155,7 @@ public class LobbyUI : MonoBehaviour
 
         RebuildPlayersFromCurrentMatch();
         SetScreen(isInRoom: true);
+        if (lobbyCameraMover) lobbyCameraMover.OnJoinedOrStartedMatch();
         RefreshLobbyUi("Joined match " + ShortId(match.Id));
     }
 
@@ -168,6 +172,7 @@ public class LobbyUI : MonoBehaviour
         conn.MatchCreatorUserId = string.Empty;
         players.Clear();
         SetScreen(isInRoom: false);
+        if (lobbyCameraMover) lobbyCameraMover.OnLeftMatch();
         RefreshLobbyUi("Left match.");
     }
 
