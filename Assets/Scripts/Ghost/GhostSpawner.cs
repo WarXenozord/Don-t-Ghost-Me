@@ -131,6 +131,16 @@ public class GhostSpawner : MonoBehaviour
             listeners[i].enabled = isLocalGhost;
         }
 
+        // Medium -> ghost transition: keep minimap following the new local body.
+        if (isLocalGhost)
+        {
+            var minimap = FindObjectOfType<MinimapController>();
+            if (minimap != null)
+            {
+                minimap.player = ghost != null ? ghost.transform : go.transform;
+            }
+        }
+
         if (enableDebugLogs)
         {
             Debug.Log("[GhostSpawner] SPAWN_GHOST user=" + msg.userId + " local=" + isLocalGhost);
