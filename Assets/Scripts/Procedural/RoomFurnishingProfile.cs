@@ -10,15 +10,27 @@ public class PropEntry
     [Tooltip("The prefab to spawn.")]
     public GameObject prefab;
 
-    [Tooltip("Relative spawn weight among props of the same category. Higher = more likely.")]
+    [Header("Spawn Count")]
+    [Tooltip("Minimum instances of this prop type in the room (e.g., 1 bed minimum in bedroom).")]
+    public int minCount = 0;
+
+    [Tooltip("Maximum instances of this prop type in the room (e.g., 1 bed maximum in bedroom).")]
+    public int maxCount = 10;
+
+    [Tooltip("Relative spawn weight among props of the same category. Higher = more likely. Only affects count between min-max.")]
     public float weight = 1f;
 
-    [Tooltip("World-unit footprint on the XZ plane (width).")]
+    [Header("Collision Bounds")]
+    [Tooltip("If true, automatically detect bounds from prefab's collider. If false, use manual footprint.")]
+    public bool useColliderBounds = true;
+
+    [Tooltip("Manual footprint on XZ plane (width). Only used if useColliderBounds = false.")]
     public float footprintX = 1f;
 
-    [Tooltip("World-unit footprint on the XZ plane (depth).")]
+    [Tooltip("Manual footprint on XZ plane (depth). Only used if useColliderBounds = false.")]
     public float footprintZ = 1f;
 
+    [Header("Placement")]
     [Tooltip("If true, this prop will try to place itself against a wall before falling back to center placement.")]
     public bool prefersWall = false;
 

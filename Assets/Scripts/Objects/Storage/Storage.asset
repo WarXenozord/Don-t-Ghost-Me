@@ -13,6 +13,6 @@ MonoBehaviour:
   m_Name: Storage
   m_EditorClassIdentifier: 
   roomType: 6
-  floorMaterial: {fileID: 2100000, guid: 51b03055ce930b646974fe93bc2a8a97, type: 2}
-  ceilingMaterial: {fileID: 2100000, guid: 57262dbb983cf8f4684872e71d26ef3b, type: 2}
-  wallMaterial: {fileID: 2100000, guid: fd07e088046bc8c46a2e48aa96f65efb, type: 2}
+  floorMaterial: {fileID: 2100000, guid: 2bb6b76c3edd4c549b282476564acdab, type: 2}
+  ceilingMaterial: {fileID: 2100000, guid: 78d40350a410b4d4cac8df0c5bd8bf68, type: 2}
+  wallMaterial: {fileID: 2100000, guid: 06370ae6211c08741915131689555bc5, type: 2}

@@ -15,20 +15,53 @@ MonoBehaviour:
   roomType: 2
   floorProps:
   - prefab: {fileID: 3225357978238862643, guid: 07372dd9483af7e4b80f3ebd461a8d50, type: 3}
+    minCount: 1
+    maxCount: 1
     weight: 2
+    useColliderBounds: 1
     footprintX: 0
     footprintZ: 0
     prefersWall: 1
     yOffset: 0
   - prefab: {fileID: 2068470984199497589, guid: d18423e0988a9c4458d8a6edde81842b, type: 3}
+    minCount: 0
+    maxCount: 3
     weight: 2
+    useColliderBounds: 1
+    footprintX: 0
+    footprintZ: 0
+    prefersWall: 1
+    yOffset: 0
+  - prefab: {fileID: 7336688647458860204, guid: 142deaaa5bef0624e99a1eb44797b25a, type: 3}
+    minCount: 1
+    maxCount: 10
+    weight: 3
+    useColliderBounds: 1
+    footprintX: 0
+    footprintZ: 0
+    prefersWall: 1
+    yOffset: 0
+  - prefab: {fileID: 8182157869782402805, guid: e11a9b23dd8b89143b2686af7928e973, type: 3}
+    minCount: 1
+    maxCount: 2
+    weight: 3
+    useColliderBounds: 1
     footprintX: 0
     footprintZ: 0
     prefersWall: 1
     yOffset: 0
   minFloorProps: 1
-  maxFloorProps: 3
-  wallProps: []
+  maxFloorProps: 5
+  wallProps:
+  - prefab: {fileID: 5410458613521195741, guid: b36a1e5334494ed4a99990faae58a9ce, type: 3}
+    minCount: 1
+    maxCount: 3
+    weight: 1
+    useColliderBounds: 0
+    footprintX: 0
+    footprintZ: 0
+    prefersWall: 0
+    yOffset: 0
   maxWallProps: 2
   wallPropHeight: 1.5
   wallPropInset: 0.05

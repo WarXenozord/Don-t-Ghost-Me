@@ -15,19 +15,28 @@ MonoBehaviour:
   roomType: 5
   floorProps:
   - prefab: {fileID: 7230160537893324779, guid: 756df322f5962a246b3f56a107b9c468, type: 3}
+    minCount: 0
+    maxCount: 2
     weight: 4
+    useColliderBounds: 1
     footprintX: 0
     footprintZ: 0
     prefersWall: 1
     yOffset: 0
   - prefab: {fileID: 2754875463290915081, guid: 61a054b243031a848a868197ea233867, type: 3}
+    minCount: 1
+    maxCount: 1
     weight: 3
+    useColliderBounds: 1
     footprintX: 0
     footprintZ: 0
     prefersWall: 1
     yOffset: 0
   - prefab: {fileID: 5820235072877590829, guid: c8b7d6c7e53a052428119a938c318091, type: 3}
+    minCount: 0
+    maxCount: 10
     weight: 3
+    useColliderBounds: 1
     footprintX: 0
     footprintZ: 0
     prefersWall: 0
@@ -40,7 +49,10 @@ MonoBehaviour:
   wallPropInset: 0.05
   ceilingProps:
   - prefab: {fileID: 6808661584344290269, guid: fc11921f3e04fbd48942add478ca27fe, type: 3}
+    minCount: 0
+    maxCount: 10
     weight: 0
+    useColliderBounds: 1
     footprintX: 0
     footprintZ: 0
     prefersWall: 0

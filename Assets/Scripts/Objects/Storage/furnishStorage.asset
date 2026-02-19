@@ -15,13 +15,37 @@ MonoBehaviour:
   roomType: 6
   floorProps:
   - prefab: {fileID: 3264765862372953571, guid: e8ec761d47e658f4da3d5533c39ba7a9, type: 3}
+    minCount: 1
+    maxCount: 10
     weight: 4
+    useColliderBounds: 1
     footprintX: 0
     footprintZ: 0
     prefersWall: 0
     yOffset: 0
   - prefab: {fileID: 7306335275045125360, guid: 5fb44d377fa19c246a2399d90f76a139, type: 3}
+    minCount: 0
+    maxCount: 10
     weight: 3
+    useColliderBounds: 1
+    footprintX: 0
+    footprintZ: 0
+    prefersWall: 1
+    yOffset: 0
+  - prefab: {fileID: 5309661147645066961, guid: 5eb0f99d3d7d30f4094e4572467fa746, type: 3}
+    minCount: 1
+    maxCount: 2
+    weight: 3
+    useColliderBounds: 1
+    footprintX: 0
+    footprintZ: 0
+    prefersWall: 1
+    yOffset: 0
+  - prefab: {fileID: 2032260507448972171, guid: 4fbbbfdc60d9d1044833dad7113a3ff2, type: 3}
+    minCount: 1
+    maxCount: 1
+    weight: 3
+    useColliderBounds: 1
     footprintX: 0
     footprintZ: 0
     prefersWall: 1
@@ -30,12 +54,24 @@ MonoBehaviour:
   maxFloorProps: 4
   wallProps:
   - prefab: {fileID: 8057757513600877654, guid: c2512dacacb8ee44592688939e84909b, type: 3}
+    minCount: 0
+    maxCount: 10
     weight: 1
+    useColliderBounds: 1
     footprintX: 0
     footprintZ: 0
     prefersWall: 0
     yOffset: 0
-  maxWallProps: 2
+  - prefab: {fileID: 6055567389376187897, guid: ee602f044ef0f944a8c0ddb64b564845, type: 3}
+    minCount: 1
+    maxCount: 2
+    weight: 1
+    useColliderBounds: 1
+    footprintX: 0
+    footprintZ: 0
+    prefersWall: 0
+    yOffset: 0
+  maxWallProps: 3
   wallPropHeight: 1.5
   wallPropInset: 0.05
   ceilingProps: []

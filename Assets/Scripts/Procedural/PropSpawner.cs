@@ -33,6 +33,9 @@ public class PropSpawner : MonoBehaviour
     [Tooltip("One RoomMaterialProfile per RoomType. First in array = highest wall priority.")]
     public RoomMaterialProfile[]   materialProfiles;
 
+    [Tooltip("Defines what small items spawn on furniture (tables, shelves, etc.). Applied to all rooms.")]
+    public FurnitureItemProfile furnitureItemProfile;
+
     [Tooltip("Assign GhostInteraction so it re-caches interactables after props are spawned.")]
     public GhostInteraction ghostInteraction;
 
@@ -57,8 +60,9 @@ public class PropSpawner : MonoBehaviour
     private List<BuildingDoor>                          _doors;
     private System.Random                               _rng;
 
-    // Per-room placed item footprints (XZ AABB) for overlap checking
-    private List<Rect> _placed;
+    // Per-room placed item tracking (for overlap checking)
+    // Changed from Rect to actual placed GameObject references for 3D collision checking
+    private List<GameObject> _placedObjects;
 
     // ── Public API ─────────────────────────────────────────────────────────
 
@@ -128,16 +132,18 @@ public class PropSpawner : MonoBehaviour
             // ── Props ─────────────────────────────────────────────────────
             if (!_furnishLookup.TryGetValue(room.roomType, out var profile)) continue;
 
-            _placed = new List<Rect>();
+            _placedObjects = new List<GameObject>();
 
             // Pre-block door clearance zones so no floor prop can land in a doorway.
-            // We add a rect around each door that borders this room so TryCommitPlacement
-            // automatically rejects any footprint that overlaps it.
-            AddDoorClearanceRects(room, i);
+            // Creates invisible blocker GameObjects that Physics.OverlapBox will detect.
+            AddDoorClearanceBlockers(room, i, parent);
 
             SpawnCeilingProps(room, profile, ceilingGO, parent);
             SpawnWallProps(room, i, profile, parent);
             SpawnFloorProps(room, profile, parent);
+            
+            // Spawn small items on furniture surfaces (tables, shelves, etc.)
+            SpawnFurnitureItems(parent);
         }
 
         // Notify GhostInteraction so newly spawned interactable props are detected
@@ -247,38 +253,60 @@ public class PropSpawner : MonoBehaviour
     {
         if (profile.floorProps == null || profile.floorProps.Length == 0) return;
 
-        int count = _rng.Next(profile.minFloorProps, profile.maxFloorProps + 1);
+        // Track how many of each prop type we've spawned
+        var spawnedCounts = new Dictionary<PropEntry, int>();
+        foreach (var entry in profile.floorProps)
+            spawnedCounts[entry] = 0;
 
-        for (int i = 0; i < count; i++)
+        // Phase 1: Spawn minimum required props for each type
+        foreach (var entry in profile.floorProps)
         {
+            if (entry?.prefab == null) continue;
+
+            for (int i = 0; i < entry.minCount; i++)
+            {
+                float propY = room.position.y + entry.yOffset;
+
+                bool placed = entry.prefersWall
+                    ? TryPlaceAgainstWallAny(room, entry, propY, parent)
+                    : TryPlaceRandom(room, entry, propY, parent);
+
+                if (placed)
+                    spawnedCounts[entry]++;
+                else
+                    Debug.LogWarning($"[PropSpawner] Failed to place required {entry.prefab.name} (min={entry.minCount})");
+            }
+        }
+
+        // Phase 2: Fill remaining space with weighted random props up to max
+        int attempts = 0;
+        int maxAttempts = profile.maxFloorProps * 3; // safety limit
+
+        while (attempts < maxAttempts)
+        {
+            attempts++;
+
+            // Pick a random prop respecting weights
             var entry = WeightedPick(profile.floorProps);
             if (entry?.prefab == null) continue;
 
+            // Check if we've hit max for this prop type
+            if (spawnedCounts[entry] >= entry.maxCount)
+                continue;
+
+            // Check if we've hit total room max
+            int totalSpawned = spawnedCounts.Values.Sum();
+            if (totalSpawned >= profile.maxFloorProps)
+                break;
+
             float propY = room.position.y + entry.yOffset;
 
-            if (entry.prefersWall)
-            {
-                // Try each of the 4 walls in random order
-                var sides = ShuffledSides();
-                bool wallPlaced = false;
+            bool placed = entry.prefersWall
+                ? TryPlaceAgainstWallAny(room, entry, propY, parent)
+                : TryPlaceRandom(room, entry, propY, parent);
 
-                foreach (int side in sides)
-                {
-                    if (TryPlaceAgainstWall(room, entry, side, propY, parent))
-                    {
-                        wallPlaced = true;
-                        break;
-                    }
-                }
-
-                // Fall back to random placement if no wall worked
-                if (!wallPlaced)
-                    TryPlaceRandom(room, entry, propY, parent);
-            }
-            else
-            {
-                TryPlaceRandom(room, entry, propY, parent);
-            }
+            if (placed)
+                spawnedCounts[entry]++;
         }
     }
 
@@ -306,7 +334,7 @@ public class PropSpawner : MonoBehaviour
                 yRot     = 90f;  // face right (+X)
                 clearZ   = RandomRange(spanMin, spanMax);
                 if (spanMax <= spanMin) return false;
-                return TryCommitPlacement(new Vector3(clearX, propY, clearZ), fw, fd, yRot, parent, entry.prefab);
+                return TryCommitPlacement(new Vector3(clearX, propY, clearZ), entry, yRot, parent);
 
             case 1: // right wall (x+)
                 clearX   = xMax - wallMargin - fd * 0.5f;
@@ -315,7 +343,7 @@ public class PropSpawner : MonoBehaviour
                 yRot     = -90f; // face left (-X)
                 clearZ   = RandomRange(spanMin, spanMax);
                 if (spanMax <= spanMin) return false;
-                return TryCommitPlacement(new Vector3(clearX, propY, clearZ), fw, fd, yRot, parent, entry.prefab);
+                return TryCommitPlacement(new Vector3(clearX, propY, clearZ), entry, yRot, parent);
 
             case 2: // front wall (z-)
                 clearZ   = zMin + wallMargin + fd * 0.5f;
@@ -324,8 +352,7 @@ public class PropSpawner : MonoBehaviour
                 yRot     = 0f;   // face forward (+Z)
                 clearX   = RandomRange(spanMin, spanMax);
                 if (spanMax <= spanMin) return false;
-                // Swap footprint dims since prop faces Z
-                return TryCommitPlacement(new Vector3(clearX, propY, clearZ), fd, fw, yRot, parent, entry.prefab);
+                return TryCommitPlacement(new Vector3(clearX, propY, clearZ), entry, yRot, parent);
 
             case 3: // back wall (z+)
                 clearZ   = zMax - wallMargin - fd * 0.5f;
@@ -334,7 +361,7 @@ public class PropSpawner : MonoBehaviour
                 yRot     = 180f; // face backward (-Z)
                 clearX   = RandomRange(spanMin, spanMax);
                 if (spanMax <= spanMin) return false;
-                return TryCommitPlacement(new Vector3(clearX, propY, clearZ), fd, fw, yRot, parent, entry.prefab);
+                return TryCommitPlacement(new Vector3(clearX, propY, clearZ), entry, yRot, parent);
 
             default: return false;
         }
@@ -360,7 +387,7 @@ public class PropSpawner : MonoBehaviour
         {
             float x = RandomRange(xMin, xMax);
             float z = RandomRange(zMin, zMax);
-            if (TryCommitPlacement(new Vector3(x, propY, z), fw, fd, yRot, parent, entry.prefab))
+            if (TryCommitPlacement(new Vector3(x, propY, z), entry, yRot, parent))
                 return true;
         }
         return false;
@@ -368,25 +395,73 @@ public class PropSpawner : MonoBehaviour
 
     // ── Commit placement ────────────────────────────────────────────────────
 
-    private bool TryCommitPlacement(Vector3 pos, float fw, float fd,
-                                     float yRot, Transform parent, GameObject prefab)
+    private bool TryCommitPlacement(Vector3 pos, PropEntry entry,
+                                     float yRot, Transform parent)
     {
-        var footprint = new Rect(pos.x - fw * 0.5f - propPadding,
-                                 pos.z - fd * 0.5f - propPadding,
-                                 fw + propPadding * 2f,
-                                 fd + propPadding * 2f);
+        // Get actual bounds from prefab collider or use manual footprint
+        Vector3 boundsSize = entry.useColliderBounds
+            ? GetColliderBounds(entry.prefab,yRot)
+            : new Vector3(entry.footprintX, 2f, entry.footprintZ);
 
-        if (OverlapsAny(footprint)) return false;
+        // Add padding to prevent props from touching
+        Vector3 checkSize = boundsSize + Vector3.one * propPadding * 2f;
 
-        _placed.Add(footprint);
-        PlaceProp(prefab, pos, yRot, parent);
+        // Check for overlap using Physics - much more accurate than Rect
+        Collider[] hits = Physics.OverlapBox(
+            pos,
+            checkSize * 0.5f,
+            Quaternion.Euler(0f, yRot, 0f),
+            ~0, // check all layers
+            QueryTriggerInteraction.Collide); // include door blockers
+
+        // Filter out hits that aren't props/blockers (like walls, floors, ceilings)
+        foreach (var hit in hits)
+        {
+            if (_placedObjects.Contains(hit.gameObject))
+                return false; // overlaps existing prop or door blocker
+        }
+
+        // Clear - place the prop
+        var go = PlaceProp(entry.prefab, pos, yRot, parent);
+        _placedObjects.Add(go);
         return true;
     }
 
-    private bool OverlapsAny(Rect r)
+    /// <summary>
+    /// Gets actual bounds from prefab's collider.
+    /// Returns (1,2,1) if no collider found.
+    /// </summary>
+    private Vector3 GetColliderBounds(GameObject prefab, float yRot)
+{
+    var temp = Instantiate(prefab);
+    temp.transform.rotation = Quaternion.Euler(0f, yRot, 0f);
+
+    var renderers = temp.GetComponentsInChildren<Renderer>();
+    if (renderers.Length == 0)
     {
-        foreach (var p in _placed)
-            if (r.Overlaps(p)) return true;
+        DestroyImmediate(temp);
+        return new Vector3(1f, 2f, 1f);
+    }
+
+    Bounds bounds = renderers[0].bounds;
+    foreach (var r in renderers)
+        bounds.Encapsulate(r.bounds);
+
+    Vector3 size = bounds.size;
+
+    DestroyImmediate(temp);
+    return size;
+}
+
+    // Helper: Try all 4 walls, return true if any succeeds
+    private bool TryPlaceAgainstWallAny(BuildingRoom room, PropEntry entry, float propY, Transform parent)
+    {
+        var sides = ShuffledSides();
+        foreach (int side in sides)
+        {
+            if (TryPlaceAgainstWall(room, entry, side, propY, parent))
+                return true;
+        }
         return false;
     }
 
@@ -590,17 +665,69 @@ public class PropSpawner : MonoBehaviour
         }
     }
 
+    // ── Furniture surface items ────────────────────────────────────────────
+
+    /// <summary>
+    /// Spawns small items (books, cups, decorations) on furniture spawn points.
+    /// Called after floor props are placed so furniture exists.
+    /// </summary>
+    private void SpawnFurnitureItems(Transform parent)
+    {
+        if (furnitureItemProfile == null || furnitureItemProfile.items == null)
+            return;
+
+        // Find all furniture with spawn points in this room
+        var furniture = parent.GetComponentsInChildren<FurnitureSpawnPoints>();
+        if (furniture.Length == 0) return;
+
+        foreach (var piece in furniture)
+        {
+            if (piece.TotalPoints == 0) continue;
+
+            // Determine how many items to spawn on this furniture piece
+            int itemCount = _rng.Next(
+                furnitureItemProfile.minItems, 
+                furnitureItemProfile.maxItems + 1);
+
+            // Cap by available spawn points
+            itemCount = Mathf.Min(itemCount, piece.AvailableCount);
+
+            for (int i = 0; i < itemCount; i++)
+            {
+                var spawnPoint = piece.GetRandomAvailablePoint();
+                if (spawnPoint == null) break; // no more available points
+
+                // Pick random item from profile
+                var entry = WeightedPick(furnitureItemProfile.items);
+                if (entry?.prefab == null) continue;
+
+                // Check fill probability
+                if (_rng.NextDouble() > furnitureItemProfile.fillProbability)
+                    continue;
+
+                // Spawn at the spawn point
+                float yRot = piece.inheritRotation 
+                    ? piece.transform.eulerAngles.y 
+                    : 0f;
+
+                var itemParent = piece.parentItems ? piece.transform : parent;
+                var item = PlaceProp(entry.prefab, spawnPoint.position, yRot, itemParent);
+
+                // Mark spawn point as occupied
+                piece.MarkOccupied(spawnPoint);
+            }
+        }
+    }
+
     // ── Door clearance for floor props ─────────────────────────────────────
 
     /// <summary>
-    /// Pre-seeds _placed with clearance rects around every door that borders
-    /// this room, so TryCommitPlacement automatically rejects any floor prop
-    /// footprint that overlaps a doorway.
-    /// doorClearance controls how far in front of the door is kept clear on
-    /// each side (default 1.0 so a bed can't block the entry from either side).
+    /// Creates invisible blocker GameObjects with colliders around doorways.
+    /// Physics.OverlapBox will detect these and prevent props from blocking doors.
+    /// Much larger clearance than before to account for prop rotation and actual size.
     /// </summary>
-    private void AddDoorClearanceRects(BuildingRoom room, int roomIndex,
-                                        float doorClearance = 1.0f)
+    private void AddDoorClearanceBlockers(BuildingRoom room, int roomIndex, Transform parent,
+                                           float doorClearance = 1.5f)
     {
         if (_doors == null) return;
 
@@ -609,29 +736,37 @@ public class PropSpawner : MonoBehaviour
             // Only care about doors that connect to this room
             if (door.roomA != roomIndex && door.roomB != roomIndex) continue;
 
-            // Build a clearance rect that covers the doorway opening plus
-            // doorClearance units into the room on the interior side.
-            float halfW, halfD;
+            // Create blocker dimensions - much more generous than before
+            Vector3 blockerSize;
             if (door.wallFacingX)
             {
-                // Door opening along Z — keep clear along Z and push into room on X
-                halfW = door.size.z * 0.5f + wallMargin;   // along Z
-                halfD = door.size.x * 0.5f + doorClearance; // into room along X
+                // Door opening along Z
+                float width = door.size.z + wallMargin * 2f;
+                float depth = door.size.x + doorClearance * 2f; // both sides of door
+                blockerSize = new Vector3(depth, 3f, width);
             }
             else
             {
-                // Door opening along X — keep clear along X and push into room on Z
-                halfW = door.size.x * 0.5f + wallMargin;   // along X
-                halfD = door.size.z * 0.5f + doorClearance; // into room along Z
+                // Door opening along X
+                float width = door.size.x + wallMargin * 2f;
+                float depth = door.size.z + doorClearance * 2f;
+                blockerSize = new Vector3(width, 3f, depth);
             }
 
-            var clearRect = new Rect(
-                door.position.x - halfW,
-                door.position.z - halfD,
-                halfW * 2f,
-                halfD * 2f);
+            // Create invisible blocker
+            var blocker = new GameObject("DoorBlocker");
+            blocker.transform.SetParent(parent, worldPositionStays: false);
+            blocker.transform.position = new Vector3(
+                door.position.x,
+                room.position.y + 0.5f, // center vertically in room
+                door.position.z);
 
-            _placed.Add(clearRect);
+            var collider = blocker.AddComponent<BoxCollider>();
+            collider.size = blockerSize;
+            collider.isTrigger = true; // trigger so it doesn't affect physics
+            blocker.layer = LayerMask.NameToLayer("Ignore Raycast"); // invisible to raycasts
+
+            _placedObjects.Add(blocker);
         }
     }
 
@@ -701,10 +836,11 @@ public class PropSpawner : MonoBehaviour
 
     // ── Utility ────────────────────────────────────────────────────────────
 
-    private void PlaceProp(GameObject prefab, Vector3 position, float yRotation, Transform parent)
+    private GameObject PlaceProp(GameObject prefab, Vector3 position, float yRotation, Transform parent)
     {
         var go = Instantiate(prefab, position, Quaternion.Euler(0f, yRotation, 0f), parent);
         go.name = prefab.name;
+        return go;
     }
 
     private PropEntry WeightedPick(PropEntry[] entries)

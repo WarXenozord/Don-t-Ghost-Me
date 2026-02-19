@@ -15,14 +15,35 @@ MonoBehaviour:
   roomType: 1
   floorProps:
   - prefab: {fileID: 3252142263488598284, guid: ff692dc132a28914897167b87f19e31b, type: 3}
+    minCount: 1
+    maxCount: 1
     weight: 1
+    useColliderBounds: 1
+    footprintX: 0
+    footprintZ: 0
+    prefersWall: 1
+    yOffset: 0
+  - prefab: {fileID: 7469513294137387311, guid: 353ede5a4c891c242a4460713986b920, type: 3}
+    minCount: 1
+    maxCount: 1
+    weight: 1
+    useColliderBounds: 1
     footprintX: 0
     footprintZ: 0
     prefersWall: 1
     yOffset: 0
   minFloorProps: 1
   maxFloorProps: 2
-  wallProps: []
+  wallProps:
+  - prefab: {fileID: 8057757513600877654, guid: c2512dacacb8ee44592688939e84909b, type: 3}
+    minCount: 1
+    maxCount: 0
+    weight: 0
+    useColliderBounds: 0
+    footprintX: 0
+    footprintZ: 0
+    prefersWall: 0
+    yOffset: 0
   maxWallProps: 2
   wallPropHeight: 1.5
   wallPropInset: 0.05
