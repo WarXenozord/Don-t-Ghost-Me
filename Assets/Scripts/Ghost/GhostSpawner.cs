@@ -116,9 +116,9 @@ public class GhostSpawner : MonoBehaviour
         go.name = "Ghost_" + ShortId(msg.userId);
         _ghostsByUserId[msg.userId] = go;
 
-        if (playerSpawner != null && !isLocalGhost)
+        if (playerSpawner != null)
         {
-            playerSpawner.RegisterSpawnedObject(msg.userId, go, isLocal: false);
+            playerSpawner.RegisterSpawnedObject(msg.userId, go, isLocalGhost);
         }
 
         var ghost = go.GetComponentInChildren<GhostController>(true);
