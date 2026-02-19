@@ -54,8 +54,9 @@ public class PlayerSpawnManager : MonoBehaviour
             Debug.LogError("[Spawn] localPlayerPrefab is not assigned.");
             return false;
         }
-
-        var safePos = ClampInsideMapBounds(pos);
+        var controler = FindObjectOfType<ProceduralBuildingGenerator>();
+        
+        var safePos = controler.SpawnPlayerInRandomRoom();
         var rot = Quaternion.Euler(0f, yaw, 0f);
         var go = Instantiate(localPlayerPrefab, safePos, rot);
         go.name = "Local_" + ShortId(userId);
