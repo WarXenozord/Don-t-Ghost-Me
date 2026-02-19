@@ -367,7 +367,7 @@ GameObject:
   - component: {fileID: 1856156699024026274}
   - component: {fileID: 8830915124485494234}
   m_Layer: 6
-  m_Name: Hexagon Flat-Top
+  m_Name: Marker
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -383,7 +383,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0.7071068, y: 0, z: 0, w: 0.7071068}
   m_LocalPosition: {x: 0, y: 2.09, z: 0}
-  m_LocalScale: {x: 0.23633, y: 0.23633, z: 0.23633}
+  m_LocalScale: {x: 0.40677118, y: 0.40677118, z: 0.40677118}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 8307503184249558993}
