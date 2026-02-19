@@ -66,7 +66,7 @@ public class Candle : MonoBehaviour
         if (_collected) return;
 
         _collected = true;
-        
+        Debug.Log($"[Candle] Collected by Medium: {medium.name}");
         if (highlightVisual != null)
             highlightVisual.SetActive(false);
 
@@ -78,12 +78,11 @@ public class Candle : MonoBehaviour
         // Optional effect
         if (collectEffect != null)
             collectEffect.Play();
-
         // Hide model but keep GameObject alive (manager tracks it)
         if (candleModel != null)
             candleModel.SetActive(false);
 
-        Debug.Log($"[Candle] Collected by Medium: {medium.name}");
+        
     }
 
     /// <summary>
@@ -91,6 +90,7 @@ public class Candle : MonoBehaviour
     /// </summary>
     public void AnimateToPosition(Vector3 targetPos, float delay)
     {
+        Debug.Log("Animating candles");
         if (candleModel != null)
             candleModel.SetActive(true); // show it again for the animation
 

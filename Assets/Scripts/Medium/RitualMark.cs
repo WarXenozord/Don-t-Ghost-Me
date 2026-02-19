@@ -24,29 +24,36 @@ public class RitualMark : MonoBehaviour, IInteractable
     [Header("Visual")]
     [SerializeField] private GameObject markModel; // the ritual symbol mesh
     [SerializeField] private ParticleSystem ritualEffect; // optional particles during animation
+    [SerializeField] private GameObject ritualLightPrefab;
+
+private GameObject _spawnedLight;
 
     // ?? IInteractable ??????????????????????????????????????????????????????
     public float EnergyCost => energyCost;
-    public bool  IsBusy     => _ritualActive || !_canActivate;
+    public bool  IsBusy     => _ritualActive || !cuAtivado;
 
     public void Interact(Transform ghostTransform)
     {
-        if (!_canActivate || _ritualActive) return;
+        if (!cuAtivado || _ritualActive) return;
         TriggerRitual();
     }
 
     // ?? Internal ???????????????????????????????????????????????????????????
 
-    private bool _canActivate   = false; // true once all candles collected
-    private bool _ritualActive  = false; // true during candle animation
+    [Header("Runtime State (Read-Only)")]
+    private bool cuAtivado = false; // true once all candles collected
+    private bool _ritualActive = false; // true during candle animation
+    
     private Renderer _highlightRenderer;
     private MaterialPropertyBlock _highlightBlock;
     private LevelObjectiveManager _manager;
-  
-
-    private void Awake()
+   
+    
+   
+    
+    private void Start()
     {
-        if (highlightVisual != null)
+         if (highlightVisual != null)
         {
             _highlightRenderer = highlightVisual.GetComponent<Renderer>();
             if (_highlightRenderer != null)
@@ -55,10 +62,18 @@ public class RitualMark : MonoBehaviour, IInteractable
         }
 
         _manager = FindObjectOfType<LevelObjectiveManager>();
+        
+        // Debug what we found
+        Debug.Log($"[RitualMark {GetInstanceID()}] Initialized at {transform.position}");
+        Debug.Log($"  - Manager found: {_manager != null}");
+        Debug.Log($"  - Highlight assigned: {highlightVisual != null}");
+        Debug.Log($"  - Layer: {LayerMask.LayerToName(gameObject.layer)}");
+        Debug.Log($"  - Collider: {GetComponent<Collider>() != null}");
     }
-
+    
     private void Update()
     {
+        // Only pulse highlight if active
         if (highlightVisual != null && highlightVisual.activeSelf)
             UpdateHighlightPulse();
     }
@@ -70,8 +85,28 @@ public class RitualMark : MonoBehaviour, IInteractable
     /// </summary>
     public void Activate()
     {
-        _canActivate = true;
-        Debug.Log("[RitualMark] Activated! Ghost can now trigger the ritual.");
+        if (_spawnedLight != null)
+            return; // already spawned
+        cuAtivado = true;
+        Debug.Log("[RitualMark] Spawning ritual light.");
+        // Enable spooky light
+        _spawnedLight = Instantiate(
+            ritualLightPrefab,
+            transform.position,
+            Quaternion.identity,
+            transform // optional: parent it to ritual mark
+        );
+        
+        
+        Debug.Log($"[RitualMark {GetInstanceID()}] ACTIVATED!");
+        Debug.Log($"  - cuAtivado: {cuAtivado}");
+        Debug.Log($"  - IsBusy: {IsBusy}");
+        Debug.Log($"  - Position: {transform.position}");
+        Debug.Log($"  - GameObject: {gameObject.name}");
+    }
+    public void bostaBostaBosta(){
+        cuAtivado = true;
+        Debug.Log("This is an altervative to Activate, but lets hope it does the same fucking thing.");
     }
 
     // ?? Ritual ?????????????????????????????????????????????????????????????
@@ -127,14 +162,27 @@ public class RitualMark : MonoBehaviour, IInteractable
         if (highlightVisual == null) return;
 
         // Only highlight if we're ready to activate
-        highlightVisual.SetActive(enabled && _canActivate && !_ritualActive);
+        bool shouldShow = enabled && cuAtivado && !_ritualActive;
+        
+        if (enabled && !cuAtivado)
+        {
+            Debug.Log($"[RitualMark {GetInstanceID()}] Ghost tried to highlight but cuAtivado=false. " +
+                      "Candles not collected yet?");
+        }
+        
+        if (enabled && shouldShow)
+        {
+            Debug.Log($"[RitualMark {GetInstanceID()}] Highlight ON!");
+        }
+        
+        highlightVisual.SetActive(shouldShow);
     }
 
     private void UpdateHighlightPulse()
     {
         if (_highlightRenderer == null || _highlightBlock == null) return;
 
-        Color baseColor = _canActivate ? activeColor : inactiveColor;
+        Color baseColor = cuAtivado ? activeColor : inactiveColor;
         float pulse     = (Mathf.Sin(Time.time * highlightPulseSpeed) + 1f) * 0.5f;
         float intensity = Mathf.Lerp(highlightIntensityMin, highlightIntensityMax, pulse);
         Color emissive  = baseColor * intensity;

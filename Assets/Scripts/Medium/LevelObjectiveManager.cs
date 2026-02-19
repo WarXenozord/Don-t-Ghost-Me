@@ -17,8 +17,7 @@ public class LevelObjectiveManager : MonoBehaviour
     [SerializeField] private int requiredCandles = 5;
     [SerializeField] private string nextSceneName = "Floor2";
 
-    [Header("References")]
-    [SerializeField] private RitualMark ritualMark;
+    private RitualMark ritualMark;
 
     [Header("UI")]
     [SerializeField] private Text objectiveText;
@@ -35,10 +34,44 @@ public class LevelObjectiveManager : MonoBehaviour
 
     // ?? Unity lifecycle ????????????????????????????????????????????????????
 
+    public void SetMark(GameObject m){
+        ritualMark = m.GetComponent<RitualMark>();
+        Debug.Log($"[LevelObjective] Sent RitualMark: {ritualMark.gameObject.name} " +
+                          $"(InstanceID: {ritualMark.GetInstanceID()}) at {ritualMark.transform.position}");
+    }
     private void Start()
     {
         if (ritualMark == null)
+        {
             ritualMark = FindObjectOfType<RitualMark>();
+            if (ritualMark != null)
+            {
+                Debug.Log($"[LevelObjective] Auto-found RitualMark: {ritualMark.gameObject.name} " +
+                          $"(InstanceID: {ritualMark.GetInstanceID()}) at {ritualMark.transform.position}");
+            }
+            else
+            {
+                Debug.LogError("[LevelObjective] No RitualMark found in scene!");
+            }
+        }
+        else
+        {
+            Debug.Log($"[LevelObjective] Using assigned RitualMark: {ritualMark.gameObject.name} " +
+                      $"(InstanceID: {ritualMark.GetInstanceID()})");
+        }
+
+        // Check for multiple instances (common bug)
+        var allMarks = FindObjectsOfType<RitualMark>();
+        if (allMarks.Length > 1)
+        {
+            Debug.LogWarning($"[LevelObjective] Found {allMarks.Length} RitualMark instances! " +
+                           "There should only be 1. This may cause interaction issues.");
+            for (int i = 0; i < allMarks.Length; i++)
+            {
+                Debug.LogWarning($"  [{i}] {allMarks[i].gameObject.name} (ID: {allMarks[i].GetInstanceID()}) " +
+                               $"at {allMarks[i].transform.position}");
+            }
+        }
 
         if (completionPanel != null)
             completionPanel.SetActive(false);
@@ -60,12 +93,20 @@ public class LevelObjectiveManager : MonoBehaviour
         // Activate ritual mark once all candles are collected
         if (_collectedCandles.Count >= requiredCandles)
         {
-            if (ritualMark != null){
+            if (ritualMark != null)
+            {
                 ritualMark.Activate();
-                Debug.Log("[LevelObjective] All candles collected! Find the Ritual Mark!");
+                
+                Debug.Log($"[LevelObjective] Activated RitualMark (ID: {ritualMark.GetInstanceID()}) " +
+                          $"at {ritualMark.transform.position}");
+                ritualMark.bostaBostaBosta();
+            }
+            else
+            {
+                Debug.LogError("[LevelObjective] All candles collected but ritualMark is null!");
             }
 
-            
+            Debug.Log("[LevelObjective] All candles collected! Find the Ritual Mark!");
         }
     }
 

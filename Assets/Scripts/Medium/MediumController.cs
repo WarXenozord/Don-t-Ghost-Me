@@ -131,7 +131,7 @@ private void UpdateBreathing()
         breathFadeSpeed * Time.deltaTime
     );
 }
-    private void HandleSprint()
+private void HandleSprint()
     {
         if (_isExhausted)
         {

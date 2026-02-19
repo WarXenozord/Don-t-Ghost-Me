@@ -215,6 +215,7 @@ MonoBehaviour:
   highlightIntensityMax: 5
   markModel: {fileID: 3046028196658326484}
   ritualEffect: {fileID: 0}
+  ritualLightPrefab: {fileID: 7753253491665897492, guid: 78ffc089f27dda44387327388527e6a5, type: 3}
 --- !u!65 &2505421549788673470
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -234,8 +235,8 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 0.02441224, y: 0.8752739, z: 0.009999999}
-  m_Center: {x: 0.000047284255, y: -0.43763694, z: 0}
+  m_Size: {x: 0.017964378, y: 0.8752739, z: 0.009999999}
+  m_Center: {x: -0.00007168648, y: -0.43763694, z: 0}
 --- !u!1 &7509203050266927125
 GameObject:
   m_ObjectHideFlags: 0
@@ -264,7 +265,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: -0.5, y: -0.5, z: -0.5, w: 0.5}
   m_LocalPosition: {x: -0.00013, y: -0.054, z: 0.00012}
-  m_LocalScale: {x: 0.0068486957, y: 0.0068486957, z: 1}
+  m_LocalScale: {x: 0.0068486957, y: 0.005085773, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 2764903983627092162}

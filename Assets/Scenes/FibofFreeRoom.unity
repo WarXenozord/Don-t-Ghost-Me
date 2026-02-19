@@ -361,9 +361,17 @@ PrefabInstance:
       propertyPath: m_Layer
       value: 10
       objectReference: {fileID: 0}
+    - target: {fileID: 2101878484288253936, guid: 471d28b91db188e4b9691095125224f5, type: 3}
+      propertyPath: m_Enabled
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 3064230707966075227, guid: 471d28b91db188e4b9691095125224f5, type: 3}
       propertyPath: m_Layer
       value: 10
+      objectReference: {fileID: 0}
+    - target: {fileID: 3064230707966075227, guid: 471d28b91db188e4b9691095125224f5, type: 3}
+      propertyPath: m_IsActive
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 5652273883015588081, guid: 471d28b91db188e4b9691095125224f5, type: 3}
       propertyPath: m_Name
@@ -375,7 +383,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 5652273883015588081, guid: 471d28b91db188e4b9691095125224f5, type: 3}
       propertyPath: m_IsActive
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 6290174318891195069, guid: 471d28b91db188e4b9691095125224f5, type: 3}
       propertyPath: m_Layer
@@ -426,7 +434,8 @@ PrefabInstance:
       value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
-    m_RemovedGameObjects: []
+    m_RemovedGameObjects:
+    - {fileID: 5694886668738989471, guid: 471d28b91db188e4b9691095125224f5, type: 3}
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 471d28b91db188e4b9691095125224f5, type: 3}
@@ -2118,15 +2127,15 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8307503184249558993, guid: c9bbaba696bdecb4f81e61a5f1d77782, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 5.2
+      value: 1.842
       objectReference: {fileID: 0}
     - target: {fileID: 8307503184249558993, guid: c9bbaba696bdecb4f81e61a5f1d77782, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 1.4749
+      value: 1.308
       objectReference: {fileID: 0}
     - target: {fileID: 8307503184249558993, guid: c9bbaba696bdecb4f81e61a5f1d77782, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 20.09
+      value: 1.48
       objectReference: {fileID: 0}
     - target: {fileID: 8307503184249558993, guid: c9bbaba696bdecb4f81e61a5f1d77782, type: 3}
       propertyPath: m_LocalRotation.w
@@ -2159,7 +2168,8 @@ PrefabInstance:
     m_RemovedComponents:
     - {fileID: 828825025350812066, guid: c9bbaba696bdecb4f81e61a5f1d77782, type: 3}
     - {fileID: 9116663404897770135, guid: c9bbaba696bdecb4f81e61a5f1d77782, type: 3}
-    m_RemovedGameObjects: []
+    m_RemovedGameObjects:
+    - {fileID: 4727883458450257715, guid: c9bbaba696bdecb4f81e61a5f1d77782, type: 3}
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: c9bbaba696bdecb4f81e61a5f1d77782, type: 3}
@@ -2801,6 +2811,10 @@ PrefabInstance:
       propertyPath: candleCountText
       value: 
       objectReference: {fileID: 355263566}
+    - target: {fileID: 293749387052256073, guid: 3b4ec7472d45f3c4f9bd2ffe57d02ad3, type: 3}
+      propertyPath: requiredCandles
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 987081709109066427, guid: 3b4ec7472d45f3c4f9bd2ffe57d02ad3, type: 3}
       propertyPath: ghostInteraction
       value: 
@@ -2879,16 +2893,24 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8338342181003095868, guid: 3b4ec7472d45f3c4f9bd2ffe57d02ad3, type: 3}
       propertyPath: seed
-      value: 22187
+      value: 19
       objectReference: {fileID: 0}
     - target: {fileID: 8338342181003095868, guid: 3b4ec7472d45f3c4f9bd2ffe57d02ad3, type: 3}
       propertyPath: player
       value: 
       objectReference: {fileID: 418782591}
     - target: {fileID: 9034005542437368669, guid: 3b4ec7472d45f3c4f9bd2ffe57d02ad3, type: 3}
+      propertyPath: candleCount
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 9034005542437368669, guid: 3b4ec7472d45f3c4f9bd2ffe57d02ad3, type: 3}
+      propertyPath: ghostInteraction
+      value: 
+      objectReference: {fileID: 1796316057}
+    - target: {fileID: 9034005542437368669, guid: 3b4ec7472d45f3c4f9bd2ffe57d02ad3, type: 3}
       propertyPath: ritualMarkPrefab
       value: 
-      objectReference: {fileID: 0}
+      objectReference: {fileID: 3046028196658326484, guid: 5254136349d392b41bc5cab0541a6753, type: 3}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
