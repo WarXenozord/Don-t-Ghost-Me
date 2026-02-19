@@ -19,7 +19,7 @@ public class FloorplanRenderer : MonoBehaviour
     [Tooltip("Door arc symbol. Arc should open toward +X in the source PNG.")]
     public GameObject doorSpritePrefab;
     [Tooltip("Player marker sprite.")]
-    public GameObject playerMarkerPrefab;
+    private List<GameObject> enemyMarkers;
 
     [Header("Minimap Settings")]
     [Tooltip("World Y where all floorplan sprites are placed. Must be above your tallest building.")]
@@ -74,11 +74,15 @@ public class FloorplanRenderer : MonoBehaviour
 
         SpawnWallSprites(walls, floorHeight, minimapLayer);
         SpawnDoorSprites(doors, floorHeight, minimapLayer);
-        SpawnPlayerMarker(minimapLayer);
+ 
 
         SetActiveFloor(0);
     }
+    public void SetEnemyMarkers(GameObject marker){
+        enemyMarkers.Add(marker);
 
+
+    }
     /// <summary>
     /// Permanently reveals all minimap sprites that border roomIndex.
     /// Safe to call multiple times — subsequent calls are no-ops.
@@ -111,6 +115,10 @@ public class FloorplanRenderer : MonoBehaviour
             if (go != null)
                 go.SetActive(true);
         }
+    }
+    foreach (var m in enemyMarkers){
+        m.SetActive(true);
+
     }
 
     // Also ensure floor parents are visible
@@ -278,25 +286,6 @@ public class FloorplanRenderer : MonoBehaviour
         }
     }
 
-    private void SpawnPlayerMarker(int layer)
-    {
-        if (playerMarkerPrefab == null) return;
-
-        playerMarkerInstance      = Instantiate(playerMarkerPrefab, transform);
-        playerMarkerInstance.name = "Minimap_Player";
-        playerMarkerInstance.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
-
-        Vector2 nativeSize = GetSpriteNativeSize(playerMarkerPrefab);
-        if (nativeSize != Vector2.zero)
-            playerMarkerInstance.transform.localScale = new Vector3(
-                playerMarkerSize / nativeSize.x,
-                playerMarkerSize / nativeSize.y,
-                1f);
-
-        SetLayerRecursively(playerMarkerInstance, layer);
-        // Player marker is always visible — not part of reveal system
-        playerMarkerInstance.SetActive(true);
-    }
 
     // ?? Helpers ????????????????????????????????????????????????????????????
 

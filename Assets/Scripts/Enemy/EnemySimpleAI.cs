@@ -95,6 +95,10 @@ public class EnemySimpleAI : SoundAgroListener
         _generator = FindObjectOfType<ProceduralBuildingGenerator>();
         _netIdentity = GetComponent<EnemyNetIdentity>();
         _ghostSpawner = GhostSpawner.Instance != null ? GhostSpawner.Instance : FindObjectOfType<GhostSpawner>();
+
+        GameObject _marker = this.gameObject.GetComponent<Transform>().GetChild(0).gameObject;
+        FloorplanRenderer _floorRenderer = FindObjectOfType<FloorplanRenderer>();
+        _floorRenderer.SetEnemyMarkers(_marker);
     }
 
     void Start()

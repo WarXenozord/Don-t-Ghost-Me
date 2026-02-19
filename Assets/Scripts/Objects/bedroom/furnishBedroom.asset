@@ -21,7 +21,7 @@ MonoBehaviour:
     prefersWall: 1
     yOffset: 0
   - prefab: {fileID: 2754875463290915081, guid: 61a054b243031a848a868197ea233867, type: 3}
-    weight: 5
+    weight: 3
     footprintX: 0
     footprintZ: 0
     prefersWall: 1
