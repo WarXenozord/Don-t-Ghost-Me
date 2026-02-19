@@ -19,6 +19,7 @@ public class MatchTransport : MonoBehaviour
     public const long OPCODE_GHOST_SPAWN = 30;
     public const long OPCODE_LAMP_FLICKER = 31;
     public const long OPCODE_OBJECTIVE_STATE = 32;
+    public const long OPCODE_CHAT = 33;
 
     public NakamaConnection conn;
 
@@ -34,6 +35,7 @@ public class MatchTransport : MonoBehaviour
     public event Action<GhostSpawnMsg> OnGhostSpawn;
     public event Action<LampFlickerMsg> OnLampFlicker;
     public event Action<ObjectiveStateMsg> OnObjectiveState;
+    public event Action<ChatMsg> OnChat;
     private bool _isBound;
     private NakamaConnection _boundConn;
 
@@ -195,6 +197,16 @@ public class MatchTransport : MonoBehaviour
                 Debug.Log("[MatchTransport] RECV_OBJECTIVE_STATE candles=" + msg.collectedCount + " ritual=" + msg.ritualComplete);
             }
         }
+        else if (state.OpCode == OPCODE_CHAT)
+        {
+            var msg = JsonUtility.FromJson<ChatMsg>(json);
+            msg.senderUserId = state.UserPresence.UserId;
+            OnChat?.Invoke(msg);
+            if (enableDebugLogs)
+            {
+                Debug.Log("[MatchTransport] RECV_CHAT from=" + msg.senderUserId + " target=" + msg.target);
+            }
+        }
     }
 
     public async void SendInput(InputMsg msg)
@@ -307,6 +319,17 @@ public class MatchTransport : MonoBehaviour
         }
     }
 
+    public async void SendChat(ChatMsg msg)
+    {
+        if (conn?.Socket == null || conn.Match == null) return;
+        var bytes = Encoding.UTF8.GetBytes(JsonUtility.ToJson(msg));
+        await conn.Socket.SendMatchStateAsync(conn.Match.Id, OPCODE_CHAT, bytes);
+        if (enableDebugLogs)
+        {
+            Debug.Log("[MatchTransport] SEND_CHAT target=" + msg.target);
+        }
+    }
+
     [Serializable]
     public class InputMsg
     {
@@ -336,6 +359,7 @@ public class MatchTransport : MonoBehaviour
         public int seed;
         public SpawnPoint[] spawns;
         public Vector3 goalPos;
+        public string mediumUserId;
     }
 
     [Serializable]
@@ -424,6 +448,17 @@ public class MatchTransport : MonoBehaviour
         public string candleId;
         public int collectedCount;
         public bool ritualComplete;
+        [NonSerialized] public string senderUserId;
+    }
+
+    [Serializable]
+    public class ChatMsg
+    {
+        public int initId;
+        public string senderRole;
+        public string text;
+        public string target;
+        public int cost;
         [NonSerialized] public string senderUserId;
     }
 

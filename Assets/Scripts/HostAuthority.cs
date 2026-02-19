@@ -41,6 +41,7 @@ public class HostAuthority : MonoBehaviour
     private int _processedInitId = -1;
     private string _processedInitMatchId = string.Empty;
     private string _runtimeMatchId = string.Empty;
+    private string _mediumUserId = string.Empty;
     private Vector3 _goalPos;
     private MatchTransport.SpawnPoint[] _cachedInitSpawns;
     private bool _spawnPassComplete;
@@ -61,6 +62,9 @@ public class HostAuthority : MonoBehaviour
     private float _nextSnapshotLogAt;
     private float _nextSnapshotPayloadLogAt;
     private bool _initialEnemiesSpawned;
+
+    public string CurrentMediumUserId => _mediumUserId;
+    public int ActiveInitId => _activeInitId;
 
     void Awake()
     {
@@ -203,13 +207,27 @@ public class HostAuthority : MonoBehaviour
         var seed = Random.Range(1, int.MaxValue);
         var goalPos = GetGoalPositionPlaceholder();
         var spawns = BuildSpawnPointsPlaceholder();
+        var mediumUserId = DetermineMediumUserId();
         return new MatchTransport.InitMsg
         {
             initId = initId,
             seed = seed,
             spawns = spawns,
-            goalPos = goalPos
+            goalPos = goalPos,
+            mediumUserId = mediumUserId
         };
+    }
+
+    private string DetermineMediumUserId()
+    {
+        var creator = conn != null ? conn.MatchCreatorUserId : string.Empty;
+        if (!string.IsNullOrEmpty(creator)) return creator;
+
+        var self = conn != null ? conn.SelfUserId : string.Empty;
+        if (!string.IsNullOrEmpty(self)) return self;
+
+        var users = GetPresentUserIds();
+        return users.Count > 0 ? users[0] : string.Empty;
     }
 
     private MatchTransport.SpawnPoint[] BuildSpawnPointsPlaceholder()
@@ -250,6 +268,7 @@ public class HostAuthority : MonoBehaviour
         _processedInitId = msg.initId;
         _processedInitMatchId = conn?.Match?.Id ?? string.Empty;
         _activeInitId = msg.initId;
+        _mediumUserId = msg.mediumUserId;
         _gameplayStarted = false;
         _initSent = true;
 
@@ -264,6 +283,11 @@ public class HostAuthority : MonoBehaviour
         _cachedInitSpawns = msg.spawns;
         _spawnPassComplete = false;
         _initialEnemiesSpawned = false;
+
+        if (string.IsNullOrEmpty(_mediumUserId))
+        {
+            _mediumUserId = DetermineMediumUserId();
+        }
 
         if (msg.spawns != null)
         {
@@ -311,6 +335,7 @@ public class HostAuthority : MonoBehaviour
         _activeInitId = -1;
         _processedInitId = -1;
         _processedInitMatchId = string.Empty;
+        _mediumUserId = string.Empty;
 
         _readyUserIds.Clear();
         _spawnByUserId.Clear();
@@ -736,14 +761,9 @@ public class HostAuthority : MonoBehaviour
 
     private float GetLocalYaw()
     {
-        var selfId = conn != null ? conn.SelfUserId : string.Empty;
-        if (!string.IsNullOrEmpty(selfId))
+        if (TryGetLocalControlledTransform(out var controlled))
         {
-            if (!spawner) spawner = PlayerSpawnManager.Instance != null ? PlayerSpawnManager.Instance : FindObjectOfType<PlayerSpawnManager>();
-            if (spawner != null && spawner.TryGet(selfId, out var localGo) && localGo != null)
-            {
-                return localGo.transform.eulerAngles.y;
-            }
+            return controlled.eulerAngles.y;
         }
 
         return transform.eulerAngles.y;
@@ -759,6 +779,8 @@ public class HostAuthority : MonoBehaviour
             {
                 var controller = localGo.GetComponentInChildren<MediumController>(true);
                 if (controller != null) return controller.NetworkVelocity;
+                var ghost = localGo.GetComponentInChildren<GhostController>(true);
+                if (ghost != null) return ghost.NetworkVelocity;
             }
         }
 
@@ -767,17 +789,39 @@ public class HostAuthority : MonoBehaviour
 
     private Vector3 GetLocalNetworkPosition()
     {
-        var selfId = conn != null ? conn.SelfUserId : string.Empty;
-        if (!string.IsNullOrEmpty(selfId))
+        if (TryGetLocalControlledTransform(out var controlled))
         {
-            if (!spawner) spawner = PlayerSpawnManager.Instance != null ? PlayerSpawnManager.Instance : FindObjectOfType<PlayerSpawnManager>();
-            if (spawner != null && spawner.TryGet(selfId, out var localGo) && localGo != null)
-            {
-                return localGo.transform.position;
-            }
+            return controlled.position;
         }
 
         return transform.position;
+    }
+
+    private bool TryGetLocalControlledTransform(out Transform controlledTransform)
+    {
+        controlledTransform = null;
+        var selfId = conn != null ? conn.SelfUserId : string.Empty;
+        if (string.IsNullOrEmpty(selfId)) return false;
+
+        if (!spawner) spawner = PlayerSpawnManager.Instance != null ? PlayerSpawnManager.Instance : FindObjectOfType<PlayerSpawnManager>();
+        if (spawner == null || !spawner.TryGet(selfId, out var localGo) || localGo == null) return false;
+
+        var medium = localGo.GetComponentInChildren<MediumController>(true);
+        if (medium != null && medium.enabled)
+        {
+            controlledTransform = medium.transform;
+            return true;
+        }
+
+        var ghost = localGo.GetComponentInChildren<GhostController>(true);
+        if (ghost != null && ghost.enabled)
+        {
+            controlledTransform = ghost.transform;
+            return true;
+        }
+
+        controlledTransform = localGo.transform;
+        return true;
     }
 
     private void OnSnapshotReceived(MatchTransport.SnapshotMsg snap)

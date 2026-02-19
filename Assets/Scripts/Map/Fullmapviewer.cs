@@ -83,7 +83,7 @@ public class FullMapViewer : MonoBehaviour
 
     private void Update()
     {
-        if (Input.GetKeyDown(toggleKey))
+        if (!ChatUI.IsChatFocused && Input.GetKeyDown(toggleKey))
             Toggle();
 
         if (!_isOpen) return;

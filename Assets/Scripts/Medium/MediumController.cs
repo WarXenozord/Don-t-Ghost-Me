@@ -59,7 +59,9 @@ private HalfLifeEffect _halfLifeEffect;
 private bool _hasBeenHit = false;
 
 private float _exhaustionTimer;
-private bool _isExhausted;
+    private bool _isExhausted;
+
+    public float CurrentStamina => _currentStamina;
     void Start()
     {
         PlayerCamera= cameraObject.GetComponent<Transform>();
@@ -82,9 +84,18 @@ private bool _isExhausted;
     // Update is called once per frame
     void Update()
     {
+        var chatFocused = ChatUI.IsChatFocused;
 
-        PlayerMovementInput = new Vector3(Input.GetAxis("Horizontal"), 0f, Input.GetAxis("Vertical"));
-        PlayerMouseInput = new Vector2(Input.GetAxis("Mouse X"), Input.GetAxis("Mouse Y"));
+        if (chatFocused)
+        {
+            PlayerMovementInput = Vector3.zero;
+            PlayerMouseInput = Vector2.zero;
+        }
+        else
+        {
+            PlayerMovementInput = new Vector3(Input.GetAxis("Horizontal"), 0f, Input.GetAxis("Vertical"));
+            PlayerMouseInput = new Vector2(Input.GetAxis("Mouse X"), Input.GetAxis("Mouse Y"));
+        }
         UpdateStaminaBar();
         MovePlayer();
         MoveCamera();
@@ -101,8 +112,11 @@ private bool _isExhausted;
             NetworkVelocity = Vector3.zero;
         }
         _lastWorldPos = transform.position;
-        CheckAimHighlight();  
-        HandleInteraction();
+        if (!chatFocused)
+        {
+            CheckAimHighlight();
+            HandleInteraction();
+        }
         UpdateFOV();
         UpdateBreathing();
 
@@ -172,6 +186,7 @@ private void HandleSprint()
 }
     private void MovePlayer()
     {
+        var chatFocused = ChatUI.IsChatFocused;
         Vector3 MoveVector = transform.TransformDirection(PlayerMovementInput);
 
 
@@ -179,7 +194,7 @@ private void HandleSprint()
         {
             Velocity.y = -1f;
 
-            if (Input.GetKeyDown(KeyCode.Space) && Sprinting == false)
+            if (!chatFocused && Input.GetKeyDown(KeyCode.Space) && Sprinting == false)
             {
                 Velocity.y = JumpForce;
             }
@@ -203,7 +218,7 @@ private void HandleSprint()
     }
     private void MoveCamera()
     {
-        if (FullMapViewer.IsOpen) return; // ? add this line, done
+        if (FullMapViewer.IsOpen || ChatUI.IsChatFocused) return; // ? add this line, done
 
         xRotation -= PlayerMouseInput.y * Sensetivity;
         xRotation = Mathf.Clamp(xRotation, -90f, 90f);
@@ -293,9 +308,22 @@ private void HandleSprint()
 
     void UpdateStaminaBar()
     {
+        if (staminaBarFill == null) return;
         // Update the fill amount based on the health ratio
         staminaBarFill.fillAmount = _currentStamina / maxStamina;
         // If using a Slider: healthSlider.value = currentHealth / maxHealth;
+    }
+
+    public bool TryConsumeStamina(float amount)
+    {
+        if (amount <= 0f) return true;
+        if (_currentStamina < amount) return false;
+
+        _currentStamina -= amount;
+        _currentStamina = Mathf.Clamp(_currentStamina, 0f, maxStamina);
+        _regenTimer = 0f;
+        UpdateStaminaBar();
+        return true;
     }
     public void EnterHalfLife()
 {

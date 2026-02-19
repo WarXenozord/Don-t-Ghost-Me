@@ -13,6 +13,7 @@ public class GhostController : MonoBehaviour
     
     private Rigidbody rb;
     [SerializeField] private float energy = 100f;
+    public Vector3 NetworkVelocity { get; private set; }
 
     [Header("Movement")]
     [SerializeField] private float moveSpeed = 8f;
@@ -52,7 +53,12 @@ public class GhostController : MonoBehaviour
 
     private void Update()
     {
-        if (FullMapViewer.IsOpen) return; // ? Don't move when map is open
+        if (FullMapViewer.IsOpen || ChatUI.IsChatFocused)
+        {
+            movementInput = Vector3.zero;
+            mouseInput = Vector2.zero;
+            return;
+        }
         
         movementInput = new Vector3(
             Input.GetAxis("Horizontal"),
@@ -70,23 +76,35 @@ public class GhostController : MonoBehaviour
 
     private void FixedUpdate()
     {
-        if (FullMapViewer.IsOpen) return; // ? Don't move when map is open
+        if (FullMapViewer.IsOpen || ChatUI.IsChatFocused)
+        {
+            movementInput = Vector3.zero;
+            if (rb != null)
+            {
+                rb.velocity = Vector3.Lerp(rb.velocity, Vector3.zero, acceleration * Time.fixedDeltaTime);
+            }
+            NetworkVelocity = rb != null ? rb.velocity : Vector3.zero;
+            return;
+        }
         
         MoveGhost();
+        if (rb != null) NetworkVelocity = rb.velocity;
+        else NetworkVelocity = Vector3.zero;
     }
 
     private void MoveGhost()
     {
         if (rb == null) return;
+        var chatFocused = ChatUI.IsChatFocused;
 
         // Horizontal movement relative to where we look
         Vector3 horizontalMove = transform.TransformDirection(movementInput) * moveSpeed;
 
         // Vertical movement
         float vertical = 0f;
-        if (Input.GetKey(KeyCode.Space))
+        if (!chatFocused && Input.GetKey(KeyCode.Space))
             vertical = verticalSpeed;
-        if (Input.GetKey(KeyCode.LeftControl))
+        if (!chatFocused && Input.GetKey(KeyCode.LeftControl))
             vertical = -verticalSpeed;
 
         Vector3 desiredVelocity = new Vector3(
