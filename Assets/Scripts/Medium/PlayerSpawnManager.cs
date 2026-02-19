@@ -191,6 +191,31 @@ public class PlayerSpawnManager : MonoBehaviour
         return false;
     }
 
+    public bool RegisterSpawnedObject(string userId, GameObject go, bool isLocal)
+    {
+        if (string.IsNullOrEmpty(userId) || go == null) return false;
+
+        if (_playersById.TryGetValue(userId, out var existing) && existing != null && existing != go)
+        {
+            Destroy(existing);
+        }
+
+        _playersById[userId] = go;
+
+        if (isLocal)
+        {
+            _localUserId = userId;
+            spawnedLocal = true;
+        }
+        else if (_localUserId == userId)
+        {
+            _localUserId = null;
+            spawnedLocal = false;
+        }
+
+        return true;
+    }
+
     public void ApplyAuthoritativePose(string userId, Vector3 pos, float yaw)
     {
         if (!TryGet(userId, out var go)) return;
