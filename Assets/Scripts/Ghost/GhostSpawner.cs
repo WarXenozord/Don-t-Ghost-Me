@@ -124,6 +124,18 @@ public class GhostSpawner : MonoBehaviour
         var ghost = go.GetComponentInChildren<GhostController>(true);
         if (ghost) ghost.enabled = isLocalGhost;
 
+        var interactions = go.GetComponentsInChildren<GhostInteraction>(true);
+        for (var i = 0; i < interactions.Length; i++)
+        {
+            interactions[i].enabled = isLocalGhost;
+        }
+
+        var energies = go.GetComponentsInChildren<GhostEnergy>(true);
+        for (var i = 0; i < energies.Length; i++)
+        {
+            energies[i].enabled = isLocalGhost;
+        }
+
         var cameras = go.GetComponentsInChildren<Camera>(true);
         for (var i = 0; i < cameras.Length; i++)
         {

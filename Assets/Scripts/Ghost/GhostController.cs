@@ -22,16 +22,32 @@ public class GhostController : MonoBehaviour
 
     private void Start()
     {
-        Cursor.lockState = CursorLockMode.Locked;
-        FloorplanRenderer fp = GameObject.FindGameObjectWithTag("GameController").GetComponent<FloorplanRenderer>();
-        fp.RevealAllRooms();
-        MinimapController mp = GameObject.FindGameObjectWithTag("GameController").GetComponent<MinimapController>();
-        mp.SetPlayer(this.gameObject.GetComponent<Transform>());
         rb = GetComponent<Rigidbody>();
+        if (rb == null) rb = GetComponentInParent<Rigidbody>();
+        if (rb == null) rb = gameObject.AddComponent<Rigidbody>();
+
         rb.useGravity = false;
         rb.drag = 2f;              // slight float resistance
         rb.angularDrag = 5f;
         rb.constraints = RigidbodyConstraints.FreezeRotation;
+
+        Cursor.lockState = CursorLockMode.Locked;
+
+        var gc = GameObject.FindGameObjectWithTag("GameController");
+        if (gc != null)
+        {
+            var fp = gc.GetComponent<FloorplanRenderer>();
+            if (fp != null) fp.RevealAllRooms();
+
+            var mp = gc.GetComponent<MinimapController>();
+            if (mp != null) mp.SetPlayer(transform);
+        }
+
+        if (playerCamera == null)
+        {
+            var cam = GetComponentInChildren<Camera>(true);
+            if (cam != null) playerCamera = cam.transform;
+        }
     }
 
     private void Update()
@@ -61,6 +77,8 @@ public class GhostController : MonoBehaviour
 
     private void MoveGhost()
     {
+        if (rb == null) return;
+
         // Horizontal movement relative to where we look
         Vector3 horizontalMove = transform.TransformDirection(movementInput) * moveSpeed;
 
@@ -87,6 +105,8 @@ public class GhostController : MonoBehaviour
 
     private void HandleCamera()
     {
+        if (playerCamera == null) return;
+
         xRotation -= mouseInput.y * sensitivity;
         xRotation = Mathf.Clamp(xRotation, -90f, 90f);
 
