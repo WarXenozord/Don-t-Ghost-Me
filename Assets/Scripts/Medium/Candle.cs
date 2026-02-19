@@ -7,6 +7,9 @@ using UnityEngine;
 /// </summary>
 public class Candle : MonoBehaviour
 {
+    [Header("Sync")]
+    [SerializeField] private string syncId;
+
     [Header("Highlight - Always Visible to Mediums")]
     [SerializeField] private GameObject highlightVisual;
     [SerializeField] private Color highlightColor = new Color(1f, 0.8f, 0f); // golden glow
@@ -27,6 +30,11 @@ public class Candle : MonoBehaviour
 
     private void Awake()
     {
+        if (string.IsNullOrEmpty(syncId))
+        {
+            syncId = BuildSyncIdFromPosition(transform.position);
+        }
+
         if (highlightVisual != null)
         {
             _highlightRenderer = highlightVisual.GetComponent<Renderer>();
@@ -85,6 +93,25 @@ public class Candle : MonoBehaviour
         
     }
 
+    public string GetSyncId()
+    {
+        if (string.IsNullOrEmpty(syncId))
+        {
+            syncId = BuildSyncIdFromPosition(transform.position);
+        }
+        return syncId;
+    }
+
+    public void ApplyRemoteCollectedVisuals()
+    {
+        if (_collected) return;
+
+        _collected = true;
+        if (highlightVisual != null) highlightVisual.SetActive(false);
+        if (candleModel != null) candleModel.SetActive(false);
+        if (collectEffect != null) collectEffect.Play();
+    }
+
     /// <summary>
     /// Called by RitualMark animation to move this candle to a circle position.
     /// </summary>
@@ -133,5 +160,13 @@ public class Candle : MonoBehaviour
         _highlightBlock.SetColor("_BaseColor", highlightColor);
         _highlightBlock.SetColor("_Color", highlightColor);
         _highlightRenderer.SetPropertyBlock(_highlightBlock);
+    }
+
+    private static string BuildSyncIdFromPosition(Vector3 p)
+    {
+        var x = Mathf.RoundToInt(p.x * 10f);
+        var y = Mathf.RoundToInt(p.y * 10f);
+        var z = Mathf.RoundToInt(p.z * 10f);
+        return "candle:" + x + ":" + y + ":" + z;
     }
 }

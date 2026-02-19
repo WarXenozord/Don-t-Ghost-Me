@@ -18,6 +18,7 @@ public class MatchTransport : MonoBehaviour
     public const long OPCODE_ENEMY_FX = 23;
     public const long OPCODE_GHOST_SPAWN = 30;
     public const long OPCODE_LAMP_FLICKER = 31;
+    public const long OPCODE_OBJECTIVE_STATE = 32;
 
     public NakamaConnection conn;
 
@@ -32,6 +33,7 @@ public class MatchTransport : MonoBehaviour
     public event Action<EnemyFxMsg> OnEnemyFx;
     public event Action<GhostSpawnMsg> OnGhostSpawn;
     public event Action<LampFlickerMsg> OnLampFlicker;
+    public event Action<ObjectiveStateMsg> OnObjectiveState;
     private bool _isBound;
     private NakamaConnection _boundConn;
 
@@ -183,6 +185,16 @@ public class MatchTransport : MonoBehaviour
                 Debug.Log("[MatchTransport] RECV_LAMP_FLICKER lampId=" + msg.lampId);
             }
         }
+        else if (state.OpCode == OPCODE_OBJECTIVE_STATE)
+        {
+            var msg = JsonUtility.FromJson<ObjectiveStateMsg>(json);
+            msg.senderUserId = state.UserPresence.UserId;
+            OnObjectiveState?.Invoke(msg);
+            if (enableDebugLogs)
+            {
+                Debug.Log("[MatchTransport] RECV_OBJECTIVE_STATE candles=" + msg.collectedCount + " ritual=" + msg.ritualComplete);
+            }
+        }
     }
 
     public async void SendInput(InputMsg msg)
@@ -281,6 +293,17 @@ public class MatchTransport : MonoBehaviour
         if (enableDebugLogs)
         {
             Debug.Log("[MatchTransport] SEND_LAMP_FLICKER lampId=" + msg.lampId);
+        }
+    }
+
+    public async void BroadcastObjectiveState(ObjectiveStateMsg msg)
+    {
+        if (conn?.Socket == null || conn.Match == null) return;
+        var bytes = Encoding.UTF8.GetBytes(JsonUtility.ToJson(msg));
+        await conn.Socket.SendMatchStateAsync(conn.Match.Id, OPCODE_OBJECTIVE_STATE, bytes);
+        if (enableDebugLogs)
+        {
+            Debug.Log("[MatchTransport] SEND_OBJECTIVE_STATE candles=" + msg.collectedCount + " ritual=" + msg.ritualComplete);
         }
     }
 
@@ -392,6 +415,15 @@ public class MatchTransport : MonoBehaviour
     public class LampFlickerMsg
     {
         public string lampId;
+        [NonSerialized] public string senderUserId;
+    }
+
+    [Serializable]
+    public class ObjectiveStateMsg
+    {
+        public string candleId;
+        public int collectedCount;
+        public bool ritualComplete;
         [NonSerialized] public string senderUserId;
     }
 
