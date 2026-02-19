@@ -27,9 +27,15 @@ public class LevelObjectiveManager : MonoBehaviour
     [Header("Scene Transition")]
     [SerializeField] private float delayBeforeTransition = 3f;
 
+    [Header("Network Sync")]
+    [SerializeField] private MatchTransport transport;
+    [SerializeField] private NakamaConnection conn;
+
     // ?? Internal ???????????????????????????????????????????????????????????
 
     private List<Candle> _collectedCandles = new List<Candle>();
+    private readonly HashSet<string> _collectedCandleIds = new HashSet<string>();
+    private readonly Dictionary<string, Candle> _candlesById = new Dictionary<string, Candle>();
     private bool _ritualComplete = false;
 
     // ?? Unity lifecycle ????????????????????????????????????????????????????
@@ -41,6 +47,12 @@ public class LevelObjectiveManager : MonoBehaviour
     }
     private void Start()
     {
+        if (conn == null) conn = NakamaConnection.Instance != null ? NakamaConnection.Instance : FindObjectOfType<NakamaConnection>();
+        if (transport == null) transport = MatchTransport.Instance != null ? MatchTransport.Instance : FindObjectOfType<MatchTransport>();
+        if (transport != null) transport.OnObjectiveState += OnObjectiveStateReceived;
+
+        BuildCandleRegistry();
+
         if (ritualMark == null)
         {
             ritualMark = FindObjectOfType<RitualMark>();
@@ -79,35 +91,33 @@ public class LevelObjectiveManager : MonoBehaviour
         UpdateUI();
     }
 
+    private void OnDestroy()
+    {
+        if (transport != null)
+        {
+            transport.OnObjectiveState -= OnObjectiveStateReceived;
+        }
+    }
+
     // ?? Candle Collection ??????????????????????????????????????????????????
 
     public void OnCandleCollected(Candle candle)
     {
-        if (_collectedCandles.Contains(candle)) return;
+        if (candle == null) return;
 
+        var candleId = candle.GetSyncId();
+        if (string.IsNullOrEmpty(candleId)) return;
+        if (_collectedCandleIds.Contains(candleId)) return;
+
+        _collectedCandleIds.Add(candleId);
         _collectedCandles.Add(candle);
+        candle.ApplyRemoteCollectedVisuals();
         UpdateUI();
 
         Debug.Log($"[LevelObjective] Candle collected! {_collectedCandles.Count}/{requiredCandles}");
 
-        // Activate ritual mark once all candles are collected
-        if (_collectedCandles.Count >= requiredCandles)
-        {
-            if (ritualMark != null)
-            {
-                ritualMark.Activate();
-                
-                Debug.Log($"[LevelObjective] Activated RitualMark (ID: {ritualMark.GetInstanceID()}) " +
-                          $"at {ritualMark.transform.position}");
-                ritualMark.bostaBostaBosta();
-            }
-            else
-            {
-                Debug.LogError("[LevelObjective] All candles collected but ritualMark is null!");
-            }
-
-            Debug.Log("[LevelObjective] All candles collected! Find the Ritual Mark!");
-        }
+        TryActivateRitualIfReady();
+        BroadcastObjectiveState(candleId);
     }
 
     public List<Candle> GetCollectedCandles() => _collectedCandles;
@@ -128,6 +138,7 @@ public class LevelObjectiveManager : MonoBehaviour
         Invoke(nameof(LoadNextScene), delayBeforeTransition);
 
         Debug.Log("[LevelObjective] Ritual complete! Loading next floor...");
+        BroadcastObjectiveState(string.Empty);
     }
 
     private void LoadNextScene()
@@ -166,6 +177,110 @@ public class LevelObjectiveManager : MonoBehaviour
                 objectiveText.text = $"Find and collect {requiredCandles - _collectedCandles.Count} more candles.";
             }
         }
+    }
+
+    private void BuildCandleRegistry()
+    {
+        _candlesById.Clear();
+        var allCandles = FindObjectsOfType<Candle>(true);
+        for (var i = 0; i < allCandles.Length; i++)
+        {
+            var candle = allCandles[i];
+            if (candle == null) continue;
+            var id = candle.GetSyncId();
+            if (string.IsNullOrEmpty(id)) continue;
+            _candlesById[id] = candle;
+        }
+    }
+
+    private void TryActivateRitualIfReady()
+    {
+        if (_collectedCandleIds.Count < requiredCandles) return;
+
+        if (ritualMark != null)
+        {
+            ritualMark.Activate();
+            Debug.Log($"[LevelObjective] Activated RitualMark (ID: {ritualMark.GetInstanceID()}) at {ritualMark.transform.position}");
+            ritualMark.bostaBostaBosta();
+        }
+        else
+        {
+            Debug.LogError("[LevelObjective] All candles collected but ritualMark is null!");
+        }
+
+        Debug.Log("[LevelObjective] All candles collected! Find the Ritual Mark!");
+    }
+
+    private void OnObjectiveStateReceived(MatchTransport.ObjectiveStateMsg msg)
+    {
+        if (msg == null) return;
+        if (conn != null &&
+            !string.IsNullOrEmpty(msg.senderUserId) &&
+            !string.IsNullOrEmpty(conn.SelfUserId) &&
+            msg.senderUserId == conn.SelfUserId)
+        {
+            return;
+        }
+
+        if (!string.IsNullOrEmpty(msg.candleId))
+        {
+            ApplyCollectedCandleById(msg.candleId);
+        }
+
+        if (msg.ritualComplete && !_ritualComplete)
+        {
+            ApplyRitualCompleteFromNetwork();
+            return;
+        }
+
+        UpdateUI();
+    }
+
+    private void ApplyCollectedCandleById(string candleId)
+    {
+        if (string.IsNullOrEmpty(candleId) || _collectedCandleIds.Contains(candleId)) return;
+
+        _collectedCandleIds.Add(candleId);
+
+        if (!_candlesById.TryGetValue(candleId, out var candle) || candle == null)
+        {
+            BuildCandleRegistry();
+            _candlesById.TryGetValue(candleId, out candle);
+        }
+
+        if (candle != null)
+        {
+            candle.ApplyRemoteCollectedVisuals();
+            if (!_collectedCandles.Contains(candle))
+            {
+                _collectedCandles.Add(candle);
+            }
+        }
+
+        TryActivateRitualIfReady();
+        UpdateUI();
+    }
+
+    private void ApplyRitualCompleteFromNetwork()
+    {
+        if (_ritualComplete) return;
+        _ritualComplete = true;
+        UpdateUI();
+        if (completionPanel != null) completionPanel.SetActive(true);
+        CancelInvoke(nameof(LoadNextScene));
+        Invoke(nameof(LoadNextScene), delayBeforeTransition);
+        Debug.Log("[LevelObjective] Ritual complete synced from network.");
+    }
+
+    private void BroadcastObjectiveState(string candleId)
+    {
+        if (transport == null || conn == null || conn.Match == null) return;
+        transport.BroadcastObjectiveState(new MatchTransport.ObjectiveStateMsg
+        {
+            candleId = candleId,
+            collectedCount = _collectedCandleIds.Count,
+            ritualComplete = _ritualComplete
+        });
     }
 
     // ?? Debug ??????????????????????????????????????????????????????????????
