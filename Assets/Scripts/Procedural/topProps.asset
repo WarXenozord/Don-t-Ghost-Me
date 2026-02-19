@@ -10,17 +10,32 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: a9573ba2a4a9190479e85170400a1993, type: 3}
-  m_Name: kitchenCabinet
+  m_Name: topProps
   m_EditorClassIdentifier: 
   items:
   - prefab: {fileID: 1591566994160901294, guid: 4789c1f87ca67b94f943273d9da83b7a, type: 3}
-    weight: 2
+    minCount: 0
+    maxCount: 10
+    weight: 1
+    useColliderBounds: 1
+    footprintX: 0
+    footprintZ: 0
+    prefersWall: 0
+    yOffset: 0
+  - prefab: {fileID: 7174248132944054477, guid: c4a6e0a4f03db7c4f92d27daf0ed02fe, type: 3}
+    minCount: 0
+    maxCount: 10
+    weight: 1
+    useColliderBounds: 1
     footprintX: 0
     footprintZ: 0
     prefersWall: 0
     yOffset: 0
   - prefab: {fileID: 1310114057938363165, guid: 50be5fe60088ab441820e475c63783f6, type: 3}
+    minCount: 0
+    maxCount: 10
     weight: 1
+    useColliderBounds: 1
     footprintX: 0
     footprintZ: 0
     prefersWall: 0

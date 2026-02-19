@@ -608,6 +608,7 @@ public class EnemySimpleAI : SoundAgroListener
         _touchCountByMedium.TryGetValue(mediumId, out var count);
         count++;
         _touchCountByMedium[mediumId] = count;
+        medium.EnterHalfLife();
 
         if (count == 1)
         {

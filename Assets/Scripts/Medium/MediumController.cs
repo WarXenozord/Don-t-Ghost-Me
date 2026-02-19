@@ -55,12 +55,15 @@ private Camera playerCam;
 [Header("Exhaustion")]
 [SerializeField] private float exhaustionDuration = 2f;
 [SerializeField] private float exhaustionSpeedMultiplier = 0.5f;
+private HalfLifeEffect _halfLifeEffect;
+private bool _hasBeenHit = false;
 
 private float _exhaustionTimer;
 private bool _isExhausted;
     void Start()
     {
         PlayerCamera= cameraObject.GetComponent<Transform>();
+        _halfLifeEffect = PlayerCamera.GetComponent<HalfLifeEffect>();
         playerCam = cameraObject.GetComponent<Camera>();
         playerCam.fieldOfView = normalFOV;
 
@@ -294,4 +297,15 @@ private void UpdateBreathing()
         staminaBarFill.fillAmount = _currentStamina / maxStamina;
         // If using a Slider: healthSlider.value = currentHealth / maxHealth;
     }
+    public void EnterHalfLife()
+{
+    if (_hasBeenHit) return;
+
+    _hasBeenHit = true;
+
+    if (_halfLifeEffect != null)
+        _halfLifeEffect.isHalfLife = true;
+
+    Debug.Log("Half Life mode activated!");
+}
 }

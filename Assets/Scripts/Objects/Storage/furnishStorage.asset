@@ -33,9 +33,9 @@ MonoBehaviour:
     prefersWall: 1
     yOffset: 0
   - prefab: {fileID: 5309661147645066961, guid: 5eb0f99d3d7d30f4094e4572467fa746, type: 3}
-    minCount: 1
+    minCount: 0
     maxCount: 2
-    weight: 3
+    weight: 0
     useColliderBounds: 1
     footprintX: 0
     footprintZ: 0
