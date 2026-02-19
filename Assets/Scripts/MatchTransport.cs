@@ -17,6 +17,7 @@ public class MatchTransport : MonoBehaviour
     public const long OPCODE_ENEMY_TELEPORT = 22;
     public const long OPCODE_ENEMY_FX = 23;
     public const long OPCODE_GHOST_SPAWN = 30;
+    public const long OPCODE_LAMP_FLICKER = 31;
 
     public NakamaConnection conn;
 
@@ -30,6 +31,7 @@ public class MatchTransport : MonoBehaviour
     public event Action<EnemyTeleportMsg> OnEnemyTeleport;
     public event Action<EnemyFxMsg> OnEnemyFx;
     public event Action<GhostSpawnMsg> OnGhostSpawn;
+    public event Action<LampFlickerMsg> OnLampFlicker;
     private bool _isBound;
     private NakamaConnection _boundConn;
 
@@ -171,6 +173,16 @@ public class MatchTransport : MonoBehaviour
                 Debug.Log("[MatchTransport] RECV_GHOST_SPAWN user=" + msg.userId);
             }
         }
+        else if (state.OpCode == OPCODE_LAMP_FLICKER)
+        {
+            var msg = JsonUtility.FromJson<LampFlickerMsg>(json);
+            msg.senderUserId = state.UserPresence.UserId;
+            OnLampFlicker?.Invoke(msg);
+            if (enableDebugLogs)
+            {
+                Debug.Log("[MatchTransport] RECV_LAMP_FLICKER lampId=" + msg.lampId);
+            }
+        }
     }
 
     public async void SendInput(InputMsg msg)
@@ -258,6 +270,17 @@ public class MatchTransport : MonoBehaviour
         if (enableDebugLogs)
         {
             Debug.Log("[MatchTransport] SEND_GHOST_SPAWN user=" + msg.userId);
+        }
+    }
+
+    public async void BroadcastLampFlicker(LampFlickerMsg msg)
+    {
+        if (conn?.Socket == null || conn.Match == null) return;
+        var bytes = Encoding.UTF8.GetBytes(JsonUtility.ToJson(msg));
+        await conn.Socket.SendMatchStateAsync(conn.Match.Id, OPCODE_LAMP_FLICKER, bytes);
+        if (enableDebugLogs)
+        {
+            Debug.Log("[MatchTransport] SEND_LAMP_FLICKER lampId=" + msg.lampId);
         }
     }
 
@@ -362,6 +385,13 @@ public class MatchTransport : MonoBehaviour
         public string userId;
         public float x, y, z;
         public float yaw;
+        [NonSerialized] public string senderUserId;
+    }
+
+    [Serializable]
+    public class LampFlickerMsg
+    {
+        public string lampId;
         [NonSerialized] public string senderUserId;
     }
 
