@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Collections.Generic;
 
 /// <summary>
 /// Attach to lamp prefabs. Handles flickering behavior when triggered by the ghost.
@@ -7,8 +8,14 @@ using UnityEngine;
 [RequireComponent(typeof(Light))]
 public class LampFlicker : MonoBehaviour, IInteractable
 {
+    private static readonly Dictionary<string, LampFlicker> Registry = new Dictionary<string, LampFlicker>();
+    private static MatchTransport _transport;
+    private static NakamaConnection _conn;
+    private static bool _transportBound;
+
     [Header("Interaction")]
     [SerializeField] private float energyCost = 20f;
+    [SerializeField] private string lampId;
 
     // ?? IInteractable ??????????????????????????????????????????????????????
     public float EnergyCost => energyCost;
@@ -17,6 +24,7 @@ public class LampFlicker : MonoBehaviour, IInteractable
     public void Interact(UnityEngine.Transform ghostTransform)
     {
         StartFlicker();
+        BroadcastFlicker();
         SetHighlight(false);
     }
     [Header("Flicker Settings")]
@@ -45,6 +53,15 @@ public class LampFlicker : MonoBehaviour, IInteractable
     
     private void Awake()
     {
+        ResolveTransport();
+        EnsureTransportBound();
+
+        if (string.IsNullOrEmpty(lampId))
+        {
+            lampId = BuildLampIdFromPosition();
+        }
+        Registry[lampId] = this;
+
         lampLight = GetComponent<Light>();
         if (lampLight == null)
             lampLight = GetComponentInChildren<Light>();
@@ -87,6 +104,17 @@ public class LampFlicker : MonoBehaviour, IInteractable
             UpdateHighlightPulse();
         }
     }
+
+    private void OnDestroy()
+    {
+        if (!string.IsNullOrEmpty(lampId))
+        {
+            if (Registry.TryGetValue(lampId, out var current) && current == this)
+            {
+                Registry.Remove(lampId);
+            }
+        }
+    }
     
     /// <summary>
     /// Trigger the lamp to flicker. Called by GhostInteraction when ghost activates it.
@@ -98,6 +126,18 @@ public class LampFlicker : MonoBehaviour, IInteractable
         isFlickering = true;
         flickerTimer = flickerDuration;
         nextFlickerTime = 0f;
+    }
+
+    private void BroadcastFlicker()
+    {
+        ResolveTransport();
+        if (_transport == null || _conn == null || _conn.Match == null) return;
+        if (string.IsNullOrEmpty(lampId)) return;
+
+        _transport.BroadcastLampFlicker(new MatchTransport.LampFlickerMsg
+        {
+            lampId = lampId
+        });
     }
     
     private void UpdateFlicker()
@@ -159,5 +199,53 @@ public class LampFlicker : MonoBehaviour, IInteractable
         highlightPropertyBlock.SetColor("_BaseColor", highlightColor);  // for URP
         highlightPropertyBlock.SetColor("_Color", highlightColor);      // for Standard
         highlightRenderer.SetPropertyBlock(highlightPropertyBlock);
+    }
+
+    private static void OnLampFlickerReceived(MatchTransport.LampFlickerMsg msg)
+    {
+        if (msg == null || string.IsNullOrEmpty(msg.lampId)) return;
+        ResolveTransport();
+
+        if (_conn != null &&
+            !string.IsNullOrEmpty(msg.senderUserId) &&
+            !string.IsNullOrEmpty(_conn.SelfUserId) &&
+            msg.senderUserId == _conn.SelfUserId)
+        {
+            return;
+        }
+
+        if (!Registry.TryGetValue(msg.lampId, out var lamp) || lamp == null) return;
+        lamp.StartFlicker();
+        lamp.SetHighlight(false);
+    }
+
+    private static void ResolveTransport()
+    {
+        if (_transport == null)
+        {
+            _transport = MatchTransport.Instance != null ? MatchTransport.Instance : FindObjectOfType<MatchTransport>();
+        }
+        if (_conn == null)
+        {
+            _conn = NakamaConnection.Instance != null ? NakamaConnection.Instance : FindObjectOfType<NakamaConnection>();
+        }
+    }
+
+    private static void EnsureTransportBound()
+    {
+        if (_transportBound) return;
+        ResolveTransport();
+        if (_transport == null) return;
+        _transport.OnLampFlicker += OnLampFlickerReceived;
+        _transportBound = true;
+    }
+
+    private string BuildLampIdFromPosition()
+    {
+        var p = transform.position;
+        var x = Mathf.RoundToInt(p.x * 10f);
+        var y = Mathf.RoundToInt(p.y * 10f);
+        var z = Mathf.RoundToInt(p.z * 10f);
+        return "lamp:" + x + ":" + y + ":" + z;
     }
 }
