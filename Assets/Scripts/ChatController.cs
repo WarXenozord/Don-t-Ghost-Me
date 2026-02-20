@@ -134,7 +134,6 @@ public class ChatController : MonoBehaviour
 
         var senderRole = ResolveRole(msg.senderUserId);
         var localRole = GetLocalRole();
-        var isHostViewer = conn != null && conn.IsCurrentPlayerMatchCreator;
         var target = NormalizeTarget(msg.target);
 
         if (senderRole == RoleGhost && target == TargetMediums)
@@ -146,11 +145,13 @@ public class ChatController : MonoBehaviour
         var shouldDisplay = false;
         if (target == TargetMediums)
         {
-            shouldDisplay = localRole == RoleMedium || isHostViewer;
+            shouldDisplay = localRole == RoleMedium;
         }
         else if (target == TargetGhosts || target == TargetAllGhosts)
         {
-            shouldDisplay = localRole == RoleGhost || isHostViewer;
+            // Medium -> Ghosts is shown to both sides (red).
+            // Ghost -> Ghosts stays ghost-only.
+            shouldDisplay = senderRole == RoleMedium || localRole == RoleGhost;
         }
 
         if (!shouldDisplay) return;
@@ -159,6 +160,10 @@ public class ChatController : MonoBehaviour
         if (string.IsNullOrEmpty(safeText)) return;
 
         var line = "[" + senderRole + "] " + ShortId(msg.senderUserId) + ": " + safeText;
+        if (senderRole == RoleMedium && target == TargetGhosts)
+        {
+            line = "<color=#FF4D4D>" + line + "</color>";
+        }
         OnChatLine?.Invoke(line);
     }
 
