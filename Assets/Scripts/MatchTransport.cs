@@ -342,6 +342,7 @@ public class MatchTransport : MonoBehaviour
         public float velY;
         public float velZ;
         public int buttons;
+        public int animState;
         [NonSerialized] public string senderUserId;
     }
 

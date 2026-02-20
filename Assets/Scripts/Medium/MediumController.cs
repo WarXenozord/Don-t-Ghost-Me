@@ -57,7 +57,27 @@ private Camera playerCam;
 [SerializeField] private float exhaustionSpeedMultiplier = 0.5f;
 private HalfLifeEffect _halfLifeEffect;
 private bool _hasBeenHit = false;
+[Header("Animation State (Network Sync)")]
+[SerializeField] private bool _isWalking = false;
+[SerializeField] private bool _isRunning = false;
+[SerializeField] private bool _isJumping = false;
 
+// Animation state constants
+private const int ANIM_IDLE = 0;
+private const int ANIM_WALK = 1;
+private const int ANIM_RUN = 2;
+private const int ANIM_JUMP = 3;
+
+/// <summary>
+/// Gets current animation state for network sync
+/// </summary>
+public int GetAnimState()
+{
+    if (_isJumping) return ANIM_JUMP;
+    if (_isRunning) return ANIM_RUN;
+    if (_isWalking) return ANIM_WALK;
+    return ANIM_IDLE;
+}
 private float _exhaustionTimer;
     private bool _isExhausted;
 
@@ -95,6 +115,19 @@ private float _exhaustionTimer;
         {
             PlayerMovementInput = new Vector3(Input.GetAxis("Horizontal"), 0f, Input.GetAxis("Vertical"));
             PlayerMouseInput = new Vector2(Input.GetAxis("Mouse X"), Input.GetAxis("Mouse Y"));
+        }
+        // Update animation states based on input
+        float inputMagnitude = PlayerMovementInput.magnitude;
+        _isWalking = inputMagnitude > 0.1f && !Sprinting;
+        _isRunning = inputMagnitude > 0.1f && Sprinting;
+        _isJumping = !Controller.isGrounded; // In air = jumping
+        var animator = GetComponentInChildren<Animator>();
+        if (animator != null)
+        {
+            animator.SetBool("IsWalking", _isWalking);
+            animator.SetBool("IsRunning", _isRunning);
+            if (Input.GetButtonDown("Jump"))
+                animator.SetTrigger("Jump");
         }
         UpdateStaminaBar();
         MovePlayer();
@@ -194,7 +227,7 @@ private void HandleSprint()
         {
             Velocity.y = -1f;
 
-            if (!chatFocused && Input.GetKeyDown(KeyCode.Space) && Sprinting == false)
+            if (!chatFocused && Input.GetKeyDown(KeyCode.Space))
             {
                 Velocity.y = JumpForce;
             }

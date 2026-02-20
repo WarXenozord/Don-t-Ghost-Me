@@ -21,11 +21,20 @@ public class SnapshotInterpolation : MonoBehaviour
     public float debugLogInterval = 1f;
     public bool verboseMotionDebug = false;
 
+    // ?? Animation State Constants (must match HostAuthority) ??????????????
+    private const int ANIM_IDLE = 0;
+    private const int ANIM_WALK = 1;
+    private const int ANIM_RUN = 2;
+    private const int ANIM_JUMP = 3;
+    // Track last animation state per player (to detect changes)
+    private readonly Dictionary<string, int> _lastAnimState = new Dictionary<string, int>();
+
     private struct NetSample
     {
         public float recvTime;
         public Vector3 pos;
         public float yaw;
+        public int animState; // ? ADD THIS
     }
 
     private readonly Dictionary<string, List<NetSample>> _buffersByUser = new Dictionary<string, List<NetSample>>();
@@ -87,7 +96,7 @@ public class SnapshotInterpolation : MonoBehaviour
             var tYaw = 1f - Mathf.Exp(-yawLerpGain * Time.deltaTime);
             var smoothedYaw = Mathf.LerpAngle(currentYaw, targetYaw, tYaw);
             go.transform.rotation = Quaternion.Euler(0f, smoothedYaw, 0f);
-
+            ApplyAnimationState(go, userId, samples);
             if (enableDebugLogs && verboseMotionDebug && Time.unscaledTime >= _nextMotionLogAt)
             {
                 _nextMotionLogAt = Time.unscaledTime + Mathf.Max(0.1f, debugLogInterval);
@@ -140,7 +149,8 @@ public class SnapshotInterpolation : MonoBehaviour
             {
                 recvTime = now,
                 pos = pos,
-                yaw = yaw
+                yaw = yaw,
+                animState = ps.state // ? ADD THIS LINE
             });
 
             while (samples.Count > Mathf.Max(2, maxSamplesPerPlayer))
@@ -219,5 +229,56 @@ public class SnapshotInterpolation : MonoBehaviour
         if (!transport || _bound) return;
         transport.OnSnapshot += OnSnapshot;
         _bound = true;
+    }
+    private void ApplyAnimationState(GameObject playerGo, string userId, List<NetSample> samples)
+    {
+        if (samples == null || samples.Count == 0) return;
+
+        // Get the most recent animation state
+        int currentAnimState = samples[samples.Count - 1].animState;
+
+        // Find the Animator component on the remote player
+        var animator = playerGo.GetComponentInChildren<Animator>();
+        if (animator == null) return;
+
+        // Check if state changed (to avoid spamming SetBool every frame)
+        bool stateChanged = false;
+        if (!_lastAnimState.TryGetValue(userId, out int lastState) || lastState != currentAnimState)
+        {
+            stateChanged = true;
+            _lastAnimState[userId] = currentAnimState;
+        }
+
+        if (!stateChanged) return; // No change, skip update
+
+        // Apply animation parameters based on state
+        switch (currentAnimState)
+        {
+            case ANIM_IDLE:
+                animator.SetBool("IsWalking", false);
+                animator.SetBool("IsRunning", false);
+                break;
+
+            case ANIM_WALK:
+                animator.SetBool("IsWalking", true);
+                animator.SetBool("IsRunning", false);
+                break;
+
+            case ANIM_RUN:
+                animator.SetBool("IsWalking", false);
+                animator.SetBool("IsRunning", true);
+                break;
+
+            case ANIM_JUMP:
+                // Keep current walk/run state but trigger jump
+                animator.SetTrigger("Jump");
+                break;
+        }
+
+        if (enableDebugLogs && verboseMotionDebug)
+        {
+            Debug.Log($"[SnapshotInterp] ANIM user={userId} state={currentAnimState} " +
+                      $"(idle=0,walk=1,run=2,jump=3)");
+        }
     }
 }

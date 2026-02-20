@@ -8,6 +8,7 @@ public class HostAuthority : MonoBehaviour
     public MatchTransport transport;
     public PlayerSpawnManager spawner;
     public EnemySpawnManager enemySpawner;
+    private readonly Dictionary<string, int> _animState = new Dictionary<string, int>();
 
     [Header("Host")]
     public bool isHost = false;
@@ -429,6 +430,7 @@ public class HostAuthority : MonoBehaviour
         var yaw = GetLocalYaw();
         var vel = GetLocalNetworkVelocity();
         var pos = GetLocalNetworkPosition();
+        var animState = GetLocalAnimState();
 
         return new MatchTransport.InputMsg
         {
@@ -440,7 +442,8 @@ public class HostAuthority : MonoBehaviour
             velX = vel.x,
             velY = vel.y,
             velZ = vel.z,
-            buttons = 0
+            buttons = 0,
+            animState = animState
         };
     }
 
@@ -477,6 +480,7 @@ public class HostAuthority : MonoBehaviour
         _lastInputRecvAt[msg.senderUserId] = Time.unscaledTime;
         _pos[msg.senderUserId] = new Vector3(msg.posX, msg.posY, msg.posZ);
         _yaw[msg.senderUserId] = msg.yaw;
+        _animState[msg.senderUserId] = msg.animState;
         if (!_hostVisualPos.ContainsKey(msg.senderUserId))
         {
             _hostVisualPos[msg.senderUserId] = _pos[msg.senderUserId];
@@ -563,7 +567,7 @@ public class HostAuthority : MonoBehaviour
                 y = p.y,
                 z = p.z,
                 yaw = _yaw.TryGetValue(id, out var y) ? y : 0f,
-                state = 0
+                state = _animState.TryGetValue(id, out var s) ? s : 0
             };
         }
 
@@ -939,4 +943,21 @@ public class HostAuthority : MonoBehaviour
 
         return bestFallback;
     }
+    private int GetLocalAnimState()
+{
+    var selfId = conn != null ? conn.SelfUserId : string.Empty;
+    if (string.IsNullOrEmpty(selfId)) return 0;
+    
+    if (!spawner) spawner = PlayerSpawnManager.Instance;
+    if (spawner != null && spawner.TryGet(selfId, out var localGo) && localGo != null)
+    {
+        var controller = localGo.GetComponentInChildren<MediumController>(true);
+        if (controller != null) return controller.GetAnimState();
+        
+        var ghost = localGo.GetComponentInChildren<GhostController>(true);
+        //if (ghost != null) return ghost.GetAnimState(); // If you add it to GhostController too
+    }
+    
+    return 0; // IDLE fallback
+}
 }

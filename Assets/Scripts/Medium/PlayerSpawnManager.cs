@@ -60,9 +60,16 @@ public class PlayerSpawnManager : MonoBehaviour
         var rot = Quaternion.Euler(0f, yaw, 0f);
         var go = Instantiate(localPlayerPrefab, safePos, rot);
         go.name = "Local_" + ShortId(userId);
+        var randomizer = go.GetComponent<CharacterModelRandomizer>();
+        if (randomizer != null)
+            randomizer.SpawnModelFromUserId(userId); // Deterministic = consistent across clients!
         _playersById[userId] = go;
+
         _localUserId = userId;
         spawnedLocal = true;
+         
+    
+    
 
         var localController = go.GetComponentInChildren<MediumController>(true);
         if (localController) localController.enabled = true;
@@ -129,6 +136,10 @@ public class PlayerSpawnManager : MonoBehaviour
         if (remoteProxyPrefab)
         {
             go = Instantiate(remoteProxyPrefab, safePos, rot);
+            var randomizer = go.GetComponent<CharacterModelRandomizer>();
+            if (randomizer != null)
+                randomizer.SpawnModelFromUserId(userId); // Deterministic = consistent across clients!
+    
         }
         else
         {
