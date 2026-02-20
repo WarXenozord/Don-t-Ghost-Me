@@ -310,7 +310,12 @@ public class Throwablechair : MonoBehaviour, IInteractable
 
         chair._originPos = new Vector3(msg.startPosX, msg.startPosY, msg.startPosZ);
         var syncedOriginRot = new Quaternion(msg.startRotX, msg.startRotY, msg.startRotZ, msg.startRotW);
-        if (syncedOriginRot.sqrMagnitude > 0.0001f)
+        var rotMagSq =
+            syncedOriginRot.x * syncedOriginRot.x +
+            syncedOriginRot.y * syncedOriginRot.y +
+            syncedOriginRot.z * syncedOriginRot.z +
+            syncedOriginRot.w * syncedOriginRot.w;
+        if (rotMagSq > 0.0001f)
         {
             chair._originRot = syncedOriginRot.normalized;
         }
