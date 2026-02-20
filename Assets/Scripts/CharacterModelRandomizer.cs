@@ -101,14 +101,14 @@ public class CharacterModelRandomizer : MonoBehaviour
             }
         }
         // Get Animator from new skin
-            Animator skinAnimator = _spawnedModel.GetComponent<Animator>();
+           // Animator skinAnimator = _spawnedModel.GetComponent<Animator>();
 
             // Assign avatar to main animator
-            _rootAnimator.avatar = skinAnimator.avatar;
+            //_rootAnimator.avatar = skinAnimator.avatar;
 
             // Force rebind
-            _rootAnimator.Rebind();
-_rootAnimator.Update(0f);
+            //_rootAnimator.Rebind();
+//_rootAnimator.Update(0f);
         Debug.Log($"[CharacterModelRandomizer] Spawned model {_chosenIndex}: {chosenPrefab.name}");
     }
 

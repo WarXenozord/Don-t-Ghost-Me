@@ -240,16 +240,16 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   characterModels:
-  - {fileID: 919132149155446097, guid: 3e6ccfca7b350f540a2a1913b01d95a5, type: 3}
-  - {fileID: 919132149155446097, guid: a87a5ec3a5a31ee439910d3ad8832e50, type: 3}
-  - {fileID: 919132149155446097, guid: 760499d725d02534d8735ebe1a73950f, type: 3}
-  - {fileID: 919132149155446097, guid: 2a62da8cd021bf34b961f83eecd0a5e3, type: 3}
-  - {fileID: 919132149155446097, guid: b2b3af5bc7e0ff04f99466331eb77799, type: 3}
-  - {fileID: 919132149155446097, guid: 7af560b67833090439ae4b0e36906b50, type: 3}
-  - {fileID: 919132149155446097, guid: 87c47f857423f214cab27b0c329627a5, type: 3}
-  - {fileID: 919132149155446097, guid: 96f91208ecfa14944bb945da07f471b2, type: 3}
-  - {fileID: 919132149155446097, guid: 19564060569f3ae4f86ce0e87ecd30cd, type: 3}
-  - {fileID: 919132149155446097, guid: 1840ba139a08d91408667f74992587f0, type: 3}
+  - {fileID: 3711141201571452385, guid: d6d1984a88c59c4419783177e7e23694, type: 3}
+  - {fileID: 6912157806141262450, guid: 913bdd503093ad543bae463cf655384e, type: 3}
+  - {fileID: 3289548559581264679, guid: 7cba412d95da6484fb8d37b89936d480, type: 3}
+  - {fileID: 2973706639377403291, guid: 4b01c997950a6904e8c315880962fa5f, type: 3}
+  - {fileID: 3299134134136695585, guid: 61e8a47a12814aa4a960ada0cd33b658, type: 3}
+  - {fileID: 729411461588115412, guid: 841a54538794a1244b4ed3adf13e6ec0, type: 3}
+  - {fileID: 6411990685003856822, guid: 2238bfa38f159e4408209323a2832f50, type: 3}
+  - {fileID: 530670200112039962, guid: 0bde0fe923aefe646a41625300680b6b, type: 3}
+  - {fileID: 2798548680400462057, guid: 4c010f0f24ae1dd4685cbca0575cda9f, type: 3}
+  - {fileID: 4841168221460830197, guid: c09ddaf7c4cbef3459f6b1791ba2ebd8, type: 3}
   useResourcesFolder: 0
   resourcesPath: CharacterModels
   modelParent: {fileID: 4212863037726733882}
@@ -264,8 +264,8 @@ Animator:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 7926306406141672409}
-  m_Enabled: 1
-  m_Avatar: {fileID: 0}
+  m_Enabled: 0
+  m_Avatar: {fileID: 9000000, guid: 3e5e2656a85bb6341bc9e42698c0e4bc, type: 3}
   m_Controller: {fileID: 9100000, guid: 70f63ddba34d2484a8cce784fc360bef, type: 2}
   m_CullingMode: 0
   m_UpdateMode: 0
