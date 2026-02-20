@@ -16,6 +16,7 @@ public class ChatController : MonoBehaviour
     public int mediumToGhostMaxLength = 10;
 
     public event Action<string> OnChatLine;
+    public string LocalRole => GetLocalRole();
 
     private const string RoleMedium = "Medium";
     private const string RoleGhost = "Ghost";
@@ -182,14 +183,38 @@ public class ChatController : MonoBehaviour
     private string GetLocalRole()
     {
         var self = conn != null ? conn.SelfUserId : string.Empty;
+        if (IsUserCurrentlyGhost(self)) return RoleGhost;
+
         var mediumUserId = hostAuthority != null ? hostAuthority.CurrentMediumUserId : string.Empty;
         return (!string.IsNullOrEmpty(self) && self == mediumUserId) ? RoleMedium : RoleGhost;
     }
 
     private string ResolveRole(string userId)
     {
+        if (IsUserCurrentlyGhost(userId)) return RoleGhost;
+
         var mediumUserId = hostAuthority != null ? hostAuthority.CurrentMediumUserId : string.Empty;
         return (!string.IsNullOrEmpty(userId) && userId == mediumUserId) ? RoleMedium : RoleGhost;
+    }
+
+    private bool IsUserCurrentlyGhost(string userId)
+    {
+        if (string.IsNullOrEmpty(userId)) return false;
+
+        if (playerSpawner == null)
+        {
+            playerSpawner = PlayerSpawnManager.Instance != null ? PlayerSpawnManager.Instance : FindObjectOfType<PlayerSpawnManager>();
+        }
+        if (playerSpawner == null) return false;
+        if (!playerSpawner.TryGet(userId, out var go) || go == null) return false;
+
+        var ghost = go.GetComponentInChildren<GhostController>(true);
+        if (ghost == null) return false;
+
+        var medium = go.GetComponentInChildren<MediumController>(true);
+        if (medium != null && medium.enabled) return false;
+
+        return true;
     }
 
     private void ResolveRefs()

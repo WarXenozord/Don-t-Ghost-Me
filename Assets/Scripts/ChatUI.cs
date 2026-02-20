@@ -31,6 +31,7 @@ public class ChatUI : MonoBehaviour
     private bool _boundChat;
     private bool _boundInputFieldEvents;
     private bool _sanitizeSlashNextFrame;
+    private string _lastResolvedRole = string.Empty;
 
     void Awake()
     {
@@ -62,6 +63,7 @@ public class ChatUI : MonoBehaviour
     {
         ResolveRefs();
         BindChat();
+        RefreshRoleIfChanged();
         HandleSlashToggle();
         SanitizeSlashIfNeeded();
 
@@ -250,9 +252,18 @@ public class ChatUI : MonoBehaviour
 
     private string GetLocalRole()
     {
+        if (chatController != null) return chatController.LocalRole;
         var selfId = conn != null ? conn.SelfUserId : string.Empty;
         var mediumId = hostAuthority != null ? hostAuthority.CurrentMediumUserId : string.Empty;
         return (!string.IsNullOrEmpty(selfId) && selfId == mediumId) ? "Medium" : "Ghost";
+    }
+
+    private void RefreshRoleIfChanged()
+    {
+        var role = GetLocalRole();
+        if (role == _lastResolvedRole) return;
+        _lastResolvedRole = role;
+        RefreshRoleUI();
     }
 
     private void UpdateTargetIndicators()
