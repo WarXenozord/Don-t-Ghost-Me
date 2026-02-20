@@ -179,7 +179,9 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 
+  m_text: '
+
+'
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -315,7 +317,7 @@ MonoBehaviour:
   logText: {fileID: 243157185}
   toMediumsIndicator: {fileID: 1472976500}
   toGhostsIndicator: {fileID: 2001037722}
-  maxLines: 30
+  maxLines: 9
 --- !u!1 &441758614
 GameObject:
   m_ObjectHideFlags: 0
@@ -818,6 +820,7 @@ MonoBehaviour:
   playerSpawner: {fileID: 1594733321}
   ghostMessageCost: 5
   maxMessageLength: 40
+  mediumToGhostMaxLength: 10
 --- !u!1 &1027122380
 GameObject:
   m_ObjectHideFlags: 0
