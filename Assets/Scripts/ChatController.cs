@@ -184,19 +184,27 @@ public class ChatController : MonoBehaviour
     private string GetLocalRole()
     {
         var self = conn != null ? conn.SelfUserId : string.Empty;
-        if (IsUserCurrentlyMedium(self)) return RoleMedium;
         if (IsUserCurrentlyGhost(self)) return RoleGhost;
+        if (IsUserCurrentlyMedium(self)) return RoleMedium;
 
         var mediumUserId = hostAuthority != null ? hostAuthority.CurrentMediumUserId : string.Empty;
-        return (!string.IsNullOrEmpty(self) && self == mediumUserId) ? RoleMedium : RoleGhost;
+        if (!string.IsNullOrEmpty(self) && self == mediumUserId) return RoleMedium;
+
+        // Fail-safe: if we cannot resolve from runtime objects yet, prefer Medium so
+        // alive players are not silently filtered from medium channel.
+        return RoleMedium;
     }
 
     private string ResolveRole(string userId)
     {
         if (IsUserCurrentlyGhost(userId)) return RoleGhost;
+        if (IsUserCurrentlyMedium(userId)) return RoleMedium;
 
         var mediumUserId = hostAuthority != null ? hostAuthority.CurrentMediumUserId : string.Empty;
-        return (!string.IsNullOrEmpty(userId) && userId == mediumUserId) ? RoleMedium : RoleGhost;
+        if (!string.IsNullOrEmpty(userId) && userId == mediumUserId) return RoleMedium;
+
+        // Default unknown peers to Medium until explicitly ghosted.
+        return RoleMedium;
     }
 
     private bool IsUserCurrentlyGhost(string userId)
@@ -211,9 +219,7 @@ public class ChatController : MonoBehaviour
         if (!playerSpawner.TryGet(userId, out var go) || go == null) return false;
 
         var ghost = go.GetComponentInChildren<GhostController>(true);
-        if (ghost == null || !ghost.enabled) return false;
-
-        return !IsUserCurrentlyMedium(userId);
+        return ghost != null;
     }
 
     private bool IsUserCurrentlyMedium(string userId)
@@ -228,7 +234,13 @@ public class ChatController : MonoBehaviour
         if (!playerSpawner.TryGet(userId, out var go) || go == null) return false;
 
         var medium = go.GetComponentInChildren<MediumController>(true);
-        return medium != null && medium.enabled;
+        if (medium != null) return true;
+
+        // If avatar is explicitly ghost, don't classify as medium.
+        var ghost = go.GetComponentInChildren<GhostController>(true);
+        if (ghost != null) return false;
+
+        return false;
     }
 
     private void ResolveRefs()
