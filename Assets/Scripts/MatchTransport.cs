@@ -22,6 +22,7 @@ public class MatchTransport : MonoBehaviour
     public const long OPCODE_CHAT = 33;
     public const long OPCODE_ANIM = 34;
     public const long OPCODE_CHAIR_THROW = 35;
+    public const long OPCODE_DISPLAY_NAME = 34;
 
     public NakamaConnection conn;
 
@@ -40,6 +41,7 @@ public class MatchTransport : MonoBehaviour
     public event Action<ChatMsg> OnChat;
     public event Action<AnimMsg> OnAnim;
     public event Action<ChairThrowMsg> OnChairThrow;
+    public event Action<DisplayNameMsg> OnDisplayName;
     private bool _isBound;
     private NakamaConnection _boundConn;
 
@@ -223,6 +225,16 @@ public class MatchTransport : MonoBehaviour
             msg.senderUserId = state.UserPresence.UserId;
             OnChairThrow?.Invoke(msg);
         }
+        else if (state.OpCode == OPCODE_DISPLAY_NAME)
+        {
+            var msg = JsonUtility.FromJson<DisplayNameMsg>(json);
+            msg.senderUserId = state.UserPresence.UserId;
+            OnDisplayName?.Invoke(msg);
+            if (enableDebugLogs)
+            {
+                Debug.Log("[MatchTransport] RECV_DISPLAY_NAME from=" + msg.senderUserId + " name=" + msg.displayName);
+            }
+        }
     }
 
     public async void SendInput(InputMsg msg)
@@ -365,6 +377,16 @@ public class MatchTransport : MonoBehaviour
         if (conn?.Socket == null || conn.Match == null) return;
         var bytes = Encoding.UTF8.GetBytes(JsonUtility.ToJson(msg));
         await conn.Socket.SendMatchStateAsync(conn.Match.Id, OPCODE_CHAIR_THROW, bytes);
+    }
+    public async void BroadcastDisplayName(DisplayNameMsg msg)
+    {
+        if (conn?.Socket == null || conn.Match == null) return;
+        var bytes = Encoding.UTF8.GetBytes(JsonUtility.ToJson(msg));
+        await conn.Socket.SendMatchStateAsync(conn.Match.Id, OPCODE_DISPLAY_NAME, bytes);
+        if (enableDebugLogs)
+        {
+            Debug.Log("[MatchTransport] SEND_DISPLAY_NAME name=" + msg.displayName);
+        }
     }
 
     [Serializable]
@@ -532,6 +554,12 @@ public class MatchTransport : MonoBehaviour
         public float torqueX;
         public float torqueY;
         public float torqueZ;
+        [NonSerialized] public string senderUserId;
+    }
+     [Serializable]
+    public class DisplayNameMsg
+    {
+        public string displayName;
         [NonSerialized] public string senderUserId;
     }
 }
