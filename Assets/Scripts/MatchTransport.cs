@@ -22,6 +22,7 @@ public class MatchTransport : MonoBehaviour
     public const long OPCODE_CHAT = 33;
     public const long OPCODE_ANIM = 34;
     public const long OPCODE_CHAIR_THROW = 35;
+    public const long OPCODE_CHAIR_STATE = 36;
 
     public NakamaConnection conn;
 
@@ -40,6 +41,7 @@ public class MatchTransport : MonoBehaviour
     public event Action<ChatMsg> OnChat;
     public event Action<AnimMsg> OnAnim;
     public event Action<ChairThrowMsg> OnChairThrow;
+    public event Action<ChairStateMsg> OnChairState;
     private bool _isBound;
     private NakamaConnection _boundConn;
 
@@ -223,6 +225,12 @@ public class MatchTransport : MonoBehaviour
             msg.senderUserId = state.UserPresence.UserId;
             OnChairThrow?.Invoke(msg);
         }
+        else if (state.OpCode == OPCODE_CHAIR_STATE)
+        {
+            var msg = JsonUtility.FromJson<ChairStateMsg>(json);
+            msg.senderUserId = state.UserPresence.UserId;
+            OnChairState?.Invoke(msg);
+        }
     }
 
     public async void SendInput(InputMsg msg)
@@ -365,6 +373,13 @@ public class MatchTransport : MonoBehaviour
         if (conn?.Socket == null || conn.Match == null) return;
         var bytes = Encoding.UTF8.GetBytes(JsonUtility.ToJson(msg));
         await conn.Socket.SendMatchStateAsync(conn.Match.Id, OPCODE_CHAIR_THROW, bytes);
+    }
+
+    public async void BroadcastChairState(ChairStateMsg msg)
+    {
+        if (conn?.Socket == null || conn.Match == null) return;
+        var bytes = Encoding.UTF8.GetBytes(JsonUtility.ToJson(msg));
+        await conn.Socket.SendMatchStateAsync(conn.Match.Id, OPCODE_CHAIR_STATE, bytes);
     }
 
     [Serializable]
@@ -532,6 +547,27 @@ public class MatchTransport : MonoBehaviour
         public float torqueX;
         public float torqueY;
         public float torqueZ;
+        [NonSerialized] public string senderUserId;
+    }
+
+    [Serializable]
+    public class ChairStateMsg
+    {
+        public string chairId;
+        public int state;
+        public float posX;
+        public float posY;
+        public float posZ;
+        public float rotX;
+        public float rotY;
+        public float rotZ;
+        public float rotW;
+        public float velX;
+        public float velY;
+        public float velZ;
+        public float angVelX;
+        public float angVelY;
+        public float angVelZ;
         [NonSerialized] public string senderUserId;
     }
 }
