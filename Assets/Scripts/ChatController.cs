@@ -134,6 +134,7 @@ public class ChatController : MonoBehaviour
 
         var senderRole = ResolveRole(msg.senderUserId);
         var localRole = GetLocalRole();
+        var isHostViewer = conn != null && conn.IsCurrentPlayerMatchCreator;
         var target = NormalizeTarget(msg.target);
 
         if (senderRole == RoleGhost && target == TargetMediums)
@@ -145,11 +146,11 @@ public class ChatController : MonoBehaviour
         var shouldDisplay = false;
         if (target == TargetMediums)
         {
-            shouldDisplay = localRole == RoleMedium;
+            shouldDisplay = localRole == RoleMedium || isHostViewer;
         }
         else if (target == TargetGhosts || target == TargetAllGhosts)
         {
-            shouldDisplay = localRole == RoleGhost;
+            shouldDisplay = localRole == RoleGhost || isHostViewer;
         }
 
         if (!shouldDisplay) return;
