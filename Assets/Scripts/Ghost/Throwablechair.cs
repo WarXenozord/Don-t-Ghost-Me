@@ -69,6 +69,7 @@ public class Throwablechair : MonoBehaviour, IInteractable
     public void Interact(Transform ghostTransform)
     {
         if (_state != State.Fixed || ghostTransform == null) return;
+        _authorityUserId = _conn != null ? _conn.SelfUserId : string.Empty;
 
         SetHighlight(false);
 
@@ -125,14 +126,17 @@ public class Throwablechair : MonoBehaviour, IInteractable
             UpdateRemoteDrivenPose();
         }
 
-        switch (_state)
+        if (IsLocalAuthority() || !_remoteDriven)
         {
-            case State.Settling:
-                UpdateSettling();
-                break;
-            case State.Returning:
-                UpdateReturning();
-                break;
+            switch (_state)
+            {
+                case State.Settling:
+                    UpdateSettling();
+                    break;
+                case State.Returning:
+                    UpdateReturning();
+                    break;
+            }
         }
 
         if (CanSendStateUpdates())
