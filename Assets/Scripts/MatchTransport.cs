@@ -236,6 +236,7 @@ public class MatchTransport : MonoBehaviour
             {
                 Debug.Log("[MatchTransport] RECV_DISPLAY_NAME from=" + msg.senderUserId + " name=" + msg.displayName);
             }
+        }
         else if (state.OpCode == OPCODE_CHAIR_STATE)
         {
             var msg = JsonUtility.FromJson<ChairStateMsg>(json);
@@ -574,7 +575,8 @@ public class MatchTransport : MonoBehaviour
     public class DisplayNameMsg
     {
         public string displayName;
-
+        [NonSerialized] public string senderUserId;
+        }
     [Serializable]
     public class ChairStateMsg
     {
@@ -596,3 +598,4 @@ public class MatchTransport : MonoBehaviour
         [NonSerialized] public string senderUserId;
     }
 }
+
