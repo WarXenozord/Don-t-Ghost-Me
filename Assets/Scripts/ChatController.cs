@@ -183,6 +183,7 @@ public class ChatController : MonoBehaviour
     private string GetLocalRole()
     {
         var self = conn != null ? conn.SelfUserId : string.Empty;
+        if (IsUserCurrentlyMedium(self)) return RoleMedium;
         if (IsUserCurrentlyGhost(self)) return RoleGhost;
 
         var mediumUserId = hostAuthority != null ? hostAuthority.CurrentMediumUserId : string.Empty;
@@ -209,12 +210,24 @@ public class ChatController : MonoBehaviour
         if (!playerSpawner.TryGet(userId, out var go) || go == null) return false;
 
         var ghost = go.GetComponentInChildren<GhostController>(true);
-        if (ghost == null) return false;
+        if (ghost == null || !ghost.enabled) return false;
+
+        return !IsUserCurrentlyMedium(userId);
+    }
+
+    private bool IsUserCurrentlyMedium(string userId)
+    {
+        if (string.IsNullOrEmpty(userId)) return false;
+
+        if (playerSpawner == null)
+        {
+            playerSpawner = PlayerSpawnManager.Instance != null ? PlayerSpawnManager.Instance : FindObjectOfType<PlayerSpawnManager>();
+        }
+        if (playerSpawner == null) return false;
+        if (!playerSpawner.TryGet(userId, out var go) || go == null) return false;
 
         var medium = go.GetComponentInChildren<MediumController>(true);
-        if (medium != null && medium.enabled) return false;
-
-        return true;
+        return medium != null && medium.enabled;
     }
 
     private void ResolveRefs()
