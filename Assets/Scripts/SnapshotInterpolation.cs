@@ -262,7 +262,11 @@ public class SnapshotInterpolation : MonoBehaviour
     private void ApplyAnimationState(GameObject playerGo, string userId, int currentAnimState)
     {
         var animator = playerGo.GetComponentInChildren<Animator>();
-        if (animator == null) return;
+        if (animator == null){ 
+            Debug.Log("Oh naayyy, children no animator has.");
+        return;
+
+        }
 
         if (!_lastAnimState.TryGetValue(userId, out var lastState) || lastState != currentAnimState)
         {
