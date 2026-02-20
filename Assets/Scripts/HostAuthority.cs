@@ -31,6 +31,7 @@ public class HostAuthority : MonoBehaviour
 
     private float _inputTimer;
     private float _snapTimer;
+    private float _animTimer;
 
     private int _seq;
     private int _tick;
@@ -63,6 +64,8 @@ public class HostAuthority : MonoBehaviour
     private float _nextSnapshotLogAt;
     private float _nextSnapshotPayloadLogAt;
     private bool _initialEnemiesSpawned;
+    private int _lastSentAnimState = -1;
+    private int _lastBroadcastHostAnimState = -1;
 
     public string CurrentMediumUserId => _mediumUserId;
     public int ActiveInitId => _activeInitId;
@@ -84,6 +87,7 @@ public class HostAuthority : MonoBehaviour
             transport.OnInit -= OnInitReceived;
             transport.OnReady -= OnReadyReceived;
             transport.OnStart -= OnStartReceived;
+            transport.OnAnim -= OnAnimReceived;
             _transportBound = false;
         }
 
@@ -138,10 +142,16 @@ public class HostAuthority : MonoBehaviour
         if (!isHost)
         {
             _inputTimer += Time.deltaTime;
+            _animTimer += Time.deltaTime;
             if (_inputTimer >= 1f / inputSendHz)
             {
                 _inputTimer = 0f;
                 transport.SendInput(BuildLocalInput());
+            }
+            if (_animTimer >= 1f / inputSendHz)
+            {
+                _animTimer = 0f;
+                TrySendLocalAnimTransition();
             }
         }
         else
@@ -276,10 +286,13 @@ public class HostAuthority : MonoBehaviour
         _pos.Clear();
         _yaw.Clear();
         _lastInput.Clear();
+        _animState.Clear();
         _lastInputRecvAt.Clear();
         _hostVisualPos.Clear();
         _hostVisualYaw.Clear();
         _tick = 0;
+        _lastSentAnimState = -1;
+        _lastBroadcastHostAnimState = -1;
         _spawnByUserId.Clear();
         _cachedInitSpawns = msg.spawns;
         _spawnPassComplete = false;
@@ -345,10 +358,14 @@ public class HostAuthority : MonoBehaviour
         _pos.Clear();
         _yaw.Clear();
         _lastInput.Clear();
+        _animState.Clear();
         _lastInputRecvAt.Clear();
         _hostVisualPos.Clear();
         _hostVisualYaw.Clear();
         _tick = 0;
+        _animTimer = 0f;
+        _lastSentAnimState = -1;
+        _lastBroadcastHostAnimState = -1;
         _initialEnemiesSpawned = false;
 
         if (!spawner) spawner = PlayerSpawnManager.Instance != null ? PlayerSpawnManager.Instance : FindObjectOfType<PlayerSpawnManager>();
@@ -430,7 +447,6 @@ public class HostAuthority : MonoBehaviour
         var yaw = GetLocalYaw();
         var vel = GetLocalNetworkVelocity();
         var pos = GetLocalNetworkPosition();
-        var animState = GetLocalAnimState();
 
         return new MatchTransport.InputMsg
         {
@@ -442,8 +458,7 @@ public class HostAuthority : MonoBehaviour
             velX = vel.x,
             velY = vel.y,
             velZ = vel.z,
-            buttons = 0,
-            animState = animState
+            buttons = 0
         };
     }
 
@@ -480,7 +495,6 @@ public class HostAuthority : MonoBehaviour
         _lastInputRecvAt[msg.senderUserId] = Time.unscaledTime;
         _pos[msg.senderUserId] = new Vector3(msg.posX, msg.posY, msg.posZ);
         _yaw[msg.senderUserId] = msg.yaw;
-        _animState[msg.senderUserId] = msg.animState;
         if (!_hostVisualPos.ContainsKey(msg.senderUserId))
         {
             _hostVisualPos[msg.senderUserId] = _pos[msg.senderUserId];
@@ -511,6 +525,18 @@ public class HostAuthority : MonoBehaviour
         _lastInput[selfId] = selfInput;
         _yaw[selfId] = selfInput.yaw;
         _pos[selfId] = new Vector3(selfInput.posX, selfInput.posY, selfInput.posZ);
+        var selfAnimState = GetLocalAnimState();
+        _animState[selfId] = selfAnimState;
+        if (transport != null && selfAnimState != _lastBroadcastHostAnimState)
+        {
+            _lastBroadcastHostAnimState = selfAnimState;
+            transport.BroadcastAnim(new MatchTransport.AnimMsg
+            {
+                userId = selfId,
+                state = selfAnimState,
+                tick = _tick
+            });
+        }
 
         // Host-side visual update for remotes, so host doesn't depend on receiving its own snapshots.
         if (!spawner) spawner = PlayerSpawnManager.Instance != null ? PlayerSpawnManager.Instance : FindObjectOfType<PlayerSpawnManager>();
@@ -566,8 +592,7 @@ public class HostAuthority : MonoBehaviour
                 x = p.x,
                 y = p.y,
                 z = p.z,
-                yaw = _yaw.TryGetValue(id, out var y) ? y : 0f,
-                state = _animState.TryGetValue(id, out var s) ? s : 0
+                yaw = _yaw.TryGetValue(id, out var y) ? y : 0f
             };
         }
 
@@ -738,6 +763,7 @@ public class HostAuthority : MonoBehaviour
             transport.OnInit += OnInitReceived;
             transport.OnReady += OnReadyReceived;
             transport.OnStart += OnStartReceived;
+            transport.OnAnim += OnAnimReceived;
             _transportBound = true;
         }
 
@@ -944,20 +970,52 @@ public class HostAuthority : MonoBehaviour
         return bestFallback;
     }
     private int GetLocalAnimState()
-{
-    var selfId = conn != null ? conn.SelfUserId : string.Empty;
-    if (string.IsNullOrEmpty(selfId)) return 0;
-    
-    if (!spawner) spawner = PlayerSpawnManager.Instance;
-    if (spawner != null && spawner.TryGet(selfId, out var localGo) && localGo != null)
     {
-        var controller = localGo.GetComponentInChildren<MediumController>(true);
-        if (controller != null) return controller.GetAnimState();
-        
-        var ghost = localGo.GetComponentInChildren<GhostController>(true);
-        //if (ghost != null) return ghost.GetAnimState(); // If you add it to GhostController too
+        var selfId = conn != null ? conn.SelfUserId : string.Empty;
+        if (string.IsNullOrEmpty(selfId)) return 0;
+
+        if (!spawner) spawner = PlayerSpawnManager.Instance != null ? PlayerSpawnManager.Instance : FindObjectOfType<PlayerSpawnManager>();
+        if (spawner != null && spawner.TryGet(selfId, out var localGo) && localGo != null)
+        {
+            var controller = localGo.GetComponentInChildren<MediumController>(true);
+            if (controller != null) return controller.GetAnimState();
+        }
+
+        return 0;
     }
-    
-    return 0; // IDLE fallback
-}
+
+    private void TrySendLocalAnimTransition()
+    {
+        if (transport == null || conn == null || conn.Match == null || string.IsNullOrEmpty(conn.SelfUserId)) return;
+
+        var animState = GetLocalAnimState();
+        if (animState == _lastSentAnimState) return;
+
+        _lastSentAnimState = animState;
+        transport.SendAnim(new MatchTransport.AnimMsg
+        {
+            userId = conn.SelfUserId,
+            state = animState,
+            tick = _tick
+        });
+    }
+
+    private void OnAnimReceived(MatchTransport.AnimMsg msg)
+    {
+        if (msg == null) return;
+        var actorUserId = !string.IsNullOrEmpty(msg.userId) ? msg.userId : msg.senderUserId;
+        if (string.IsNullOrEmpty(actorUserId)) return;
+
+        if (conn != null && conn.IsCurrentPlayerMatchCreator)
+        {
+            if (!string.IsNullOrEmpty(msg.senderUserId) && msg.senderUserId == conn.SelfUserId) return;
+            _animState[actorUserId] = msg.state;
+            transport.BroadcastAnim(new MatchTransport.AnimMsg
+            {
+                userId = actorUserId,
+                state = msg.state,
+                tick = _tick
+            });
+        }
+    }
 }

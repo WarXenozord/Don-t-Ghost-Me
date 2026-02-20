@@ -20,6 +20,7 @@ public class MatchTransport : MonoBehaviour
     public const long OPCODE_LAMP_FLICKER = 31;
     public const long OPCODE_OBJECTIVE_STATE = 32;
     public const long OPCODE_CHAT = 33;
+    public const long OPCODE_ANIM = 34;
 
     public NakamaConnection conn;
 
@@ -36,6 +37,7 @@ public class MatchTransport : MonoBehaviour
     public event Action<LampFlickerMsg> OnLampFlicker;
     public event Action<ObjectiveStateMsg> OnObjectiveState;
     public event Action<ChatMsg> OnChat;
+    public event Action<AnimMsg> OnAnim;
     private bool _isBound;
     private NakamaConnection _boundConn;
 
@@ -207,6 +209,12 @@ public class MatchTransport : MonoBehaviour
                 Debug.Log("[MatchTransport] RECV_CHAT from=" + msg.senderUserId + " target=" + msg.target);
             }
         }
+        else if (state.OpCode == OPCODE_ANIM)
+        {
+            var msg = JsonUtility.FromJson<AnimMsg>(json);
+            msg.senderUserId = state.UserPresence.UserId;
+            OnAnim?.Invoke(msg);
+        }
     }
 
     public async void SendInput(InputMsg msg)
@@ -330,6 +338,20 @@ public class MatchTransport : MonoBehaviour
         }
     }
 
+    public async void SendAnim(AnimMsg msg)
+    {
+        if (conn?.Socket == null || conn.Match == null) return;
+        var bytes = Encoding.UTF8.GetBytes(JsonUtility.ToJson(msg));
+        await conn.Socket.SendMatchStateAsync(conn.Match.Id, OPCODE_ANIM, bytes);
+    }
+
+    public async void BroadcastAnim(AnimMsg msg)
+    {
+        if (conn?.Socket == null || conn.Match == null) return;
+        var bytes = Encoding.UTF8.GetBytes(JsonUtility.ToJson(msg));
+        await conn.Socket.SendMatchStateAsync(conn.Match.Id, OPCODE_ANIM, bytes);
+    }
+
     [Serializable]
     public class InputMsg
     {
@@ -342,7 +364,6 @@ public class MatchTransport : MonoBehaviour
         public float velY;
         public float velZ;
         public int buttons;
-        public int animState;
         [NonSerialized] public string senderUserId;
     }
 
@@ -469,6 +490,14 @@ public class MatchTransport : MonoBehaviour
         public string id;
         public float x, y, z;
         public float yaw;
+    }
+
+    [Serializable]
+    public class AnimMsg
+    {
+        public string userId;
         public int state;
+        public int tick;
+        [NonSerialized] public string senderUserId;
     }
 }

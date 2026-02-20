@@ -21,20 +21,19 @@ public class SnapshotInterpolation : MonoBehaviour
     public float debugLogInterval = 1f;
     public bool verboseMotionDebug = false;
 
-    // ?? Animation State Constants (must match HostAuthority) ??????????????
     private const int ANIM_IDLE = 0;
     private const int ANIM_WALK = 1;
     private const int ANIM_RUN = 2;
     private const int ANIM_JUMP = 3;
-    // Track last animation state per player (to detect changes)
+
     private readonly Dictionary<string, int> _lastAnimState = new Dictionary<string, int>();
+    private readonly Dictionary<string, int> _targetAnimState = new Dictionary<string, int>();
 
     private struct NetSample
     {
         public float recvTime;
         public Vector3 pos;
         public float yaw;
-        public int animState; // ? ADD THIS
     }
 
     private readonly Dictionary<string, List<NetSample>> _buffersByUser = new Dictionary<string, List<NetSample>>();
@@ -53,6 +52,7 @@ public class SnapshotInterpolation : MonoBehaviour
         if (transport != null && _bound)
         {
             transport.OnSnapshot -= OnSnapshot;
+            transport.OnAnim -= OnAnim;
             _bound = false;
         }
     }
@@ -96,7 +96,10 @@ public class SnapshotInterpolation : MonoBehaviour
             var tYaw = 1f - Mathf.Exp(-yawLerpGain * Time.deltaTime);
             var smoothedYaw = Mathf.LerpAngle(currentYaw, targetYaw, tYaw);
             go.transform.rotation = Quaternion.Euler(0f, smoothedYaw, 0f);
-            ApplyAnimationState(go, userId, samples);
+            if (_targetAnimState.TryGetValue(userId, out var animState))
+            {
+                ApplyAnimationState(go, userId, animState);
+            }
             if (enableDebugLogs && verboseMotionDebug && Time.unscaledTime >= _nextMotionLogAt)
             {
                 _nextMotionLogAt = Time.unscaledTime + Mathf.Max(0.1f, debugLogInterval);
@@ -149,8 +152,7 @@ public class SnapshotInterpolation : MonoBehaviour
             {
                 recvTime = now,
                 pos = pos,
-                yaw = yaw,
-                animState = ps.state // ? ADD THIS LINE
+                yaw = yaw
             });
 
             while (samples.Count > Mathf.Max(2, maxSamplesPerPlayer))
@@ -228,30 +230,49 @@ public class SnapshotInterpolation : MonoBehaviour
     {
         if (!transport || _bound) return;
         transport.OnSnapshot += OnSnapshot;
+        transport.OnAnim += OnAnim;
         _bound = true;
     }
-    private void ApplyAnimationState(GameObject playerGo, string userId, List<NetSample> samples)
+
+    private void OnAnim(MatchTransport.AnimMsg msg)
     {
-        if (samples == null || samples.Count == 0) return;
+        if (msg == null) return;
+        ResolveRefs();
+        if (conn == null) return;
 
-        // Get the most recent animation state
-        int currentAnimState = samples[samples.Count - 1].animState;
+        // Clients only trust host animation transitions.
+        if (!conn.IsCurrentPlayerMatchCreator &&
+            !string.IsNullOrEmpty(conn.MatchCreatorUserId) &&
+            msg.senderUserId != conn.MatchCreatorUserId)
+        {
+            return;
+        }
 
-        // Find the Animator component on the remote player
+        var actorUserId = !string.IsNullOrEmpty(msg.userId) ? msg.userId : msg.senderUserId;
+        if (string.IsNullOrEmpty(actorUserId)) return;
+        if (!string.IsNullOrEmpty(conn.SelfUserId) && actorUserId == conn.SelfUserId) return;
+
+        _targetAnimState[actorUserId] = msg.state;
+        if (spawner != null && spawner.TryGet(actorUserId, out var go) && go != null)
+        {
+            ApplyAnimationState(go, actorUserId, msg.state);
+        }
+    }
+
+    private void ApplyAnimationState(GameObject playerGo, string userId, int currentAnimState)
+    {
         var animator = playerGo.GetComponentInChildren<Animator>();
         if (animator == null) return;
 
-        // Check if state changed (to avoid spamming SetBool every frame)
-        bool stateChanged = false;
-        if (!_lastAnimState.TryGetValue(userId, out int lastState) || lastState != currentAnimState)
+        if (!_lastAnimState.TryGetValue(userId, out var lastState) || lastState != currentAnimState)
         {
-            stateChanged = true;
             _lastAnimState[userId] = currentAnimState;
         }
+        else
+        {
+            return;
+        }
 
-        if (!stateChanged) return; // No change, skip update
-
-        // Apply animation parameters based on state
         switch (currentAnimState)
         {
             case ANIM_IDLE:
@@ -270,7 +291,6 @@ public class SnapshotInterpolation : MonoBehaviour
                 break;
 
             case ANIM_JUMP:
-                // Keep current walk/run state but trigger jump
                 animator.SetTrigger("Jump");
                 break;
         }
