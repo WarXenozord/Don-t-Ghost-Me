@@ -38,6 +38,10 @@ public class Throwablechair : MonoBehaviour, IInteractable
     [SerializeField] private float highlightIntensityMin = 2f;
     [SerializeField] private float highlightIntensityMax = 8f;
     [SerializeField] private Color highlightColor = new Color(1f, 0.4f, 0f);
+    [Header("Network Sync")]
+    [SerializeField] private float stateSendHz = 15f;
+    [SerializeField] private float remoteLerpGain = 18f;
+    [SerializeField] private float remoteSnapDistance = 2.5f;
 
     public float EnergyCost => energyCost;
     public bool IsBusy => _state != State.Fixed;
@@ -53,6 +57,14 @@ public class Throwablechair : MonoBehaviour, IInteractable
 
     private Renderer _highlightRenderer;
     private MaterialPropertyBlock _highlightBlock;
+    private float _stateSendTimer;
+    private bool _remoteDriven;
+    private bool _hadRemoteState;
+    private Vector3 _remotePos;
+    private Quaternion _remoteRot = Quaternion.identity;
+    private Vector3 _remoteVel;
+    private Vector3 _remoteAngVel;
+    private string _authorityUserId = string.Empty;
 
     public void Interact(Transform ghostTransform)
     {
@@ -108,6 +120,11 @@ public class Throwablechair : MonoBehaviour, IInteractable
 
     private void Update()
     {
+        if (_remoteDriven)
+        {
+            UpdateRemoteDrivenPose();
+        }
+
         switch (_state)
         {
             case State.Settling:
@@ -116,6 +133,20 @@ public class Throwablechair : MonoBehaviour, IInteractable
             case State.Returning:
                 UpdateReturning();
                 break;
+        }
+
+        if (CanSendStateUpdates())
+        {
+            _stateSendTimer += Time.deltaTime;
+            if (_stateSendTimer >= 1f / Mathf.Max(1f, stateSendHz))
+            {
+                _stateSendTimer = 0f;
+                BroadcastState();
+            }
+        }
+        else
+        {
+            _stateSendTimer = 0f;
         }
 
         if (highlightVisual != null && highlightVisual.activeSelf)
@@ -188,6 +219,12 @@ public class Throwablechair : MonoBehaviour, IInteractable
             _rb.drag = 0f;
             _rb.angularDrag = 0.05f;
             _state = State.Fixed;
+            if (IsLocalAuthority())
+            {
+                BroadcastState();
+                _authorityUserId = string.Empty;
+            }
+            _remoteDriven = false;
         }
     }
 
@@ -244,6 +281,8 @@ public class Throwablechair : MonoBehaviour, IInteractable
             torqueY = torque.y,
             torqueZ = torque.z
         });
+
+        _authorityUserId = _conn != null ? _conn.SelfUserId : string.Empty;
     }
 
     private static void OnChairThrowReceived(MatchTransport.ChairThrowMsg msg)
@@ -264,6 +303,7 @@ public class Throwablechair : MonoBehaviour, IInteractable
         chair._originPos = new Vector3(msg.startPosX, msg.startPosY, msg.startPosZ);
         chair._originRot = Quaternion.Euler(0f, msg.startYaw, 0f);
         chair.SetHighlight(false);
+        chair._authorityUserId = msg.senderUserId;
 
         chair.ThrowWithParams(
             new Vector3(msg.dirX, msg.dirY, msg.dirZ),
@@ -271,6 +311,9 @@ public class Throwablechair : MonoBehaviour, IInteractable
             msg.upward,
             new Vector3(msg.torqueX, msg.torqueY, msg.torqueZ),
             snapToOriginStart: true);
+
+        chair._remoteDriven = true;
+        chair._hadRemoteState = false;
     }
 
     private static void ResolveTransport()
@@ -293,7 +336,110 @@ public class Throwablechair : MonoBehaviour, IInteractable
         if (_transport == null) return;
 
         _transport.OnChairThrow += OnChairThrowReceived;
+        _transport.OnChairState += OnChairStateReceived;
         _transportBound = true;
+    }
+
+    private static void OnChairStateReceived(MatchTransport.ChairStateMsg msg)
+    {
+        if (msg == null || string.IsNullOrEmpty(msg.chairId)) return;
+        ResolveTransport();
+
+        if (_conn != null &&
+            !string.IsNullOrEmpty(msg.senderUserId) &&
+            !string.IsNullOrEmpty(_conn.SelfUserId) &&
+            msg.senderUserId == _conn.SelfUserId)
+        {
+            return;
+        }
+
+        if (!Registry.TryGetValue(msg.chairId, out var chair) || chair == null) return;
+
+        chair._authorityUserId = msg.senderUserId;
+        chair._state = (State)Mathf.Clamp(msg.state, 0, 3);
+        chair._remotePos = new Vector3(msg.posX, msg.posY, msg.posZ);
+        chair._remoteRot = new Quaternion(msg.rotX, msg.rotY, msg.rotZ, msg.rotW);
+        if (chair._remoteRot == Quaternion.identity)
+        {
+            chair._remoteRot = Quaternion.Euler(0f, chair.transform.eulerAngles.y, 0f);
+        }
+        chair._remoteVel = new Vector3(msg.velX, msg.velY, msg.velZ);
+        chair._remoteAngVel = new Vector3(msg.angVelX, msg.angVelY, msg.angVelZ);
+        chair._remoteDriven = chair._state != State.Fixed;
+        chair._hadRemoteState = true;
+
+        if (chair._state == State.Fixed)
+        {
+            chair.transform.position = chair._originPos;
+            chair.transform.rotation = chair._originRot;
+            chair.SetKinematic(true);
+            chair._remoteDriven = false;
+            chair._authorityUserId = string.Empty;
+        }
+    }
+
+    private bool CanSendStateUpdates()
+    {
+        if (!IsLocalAuthority()) return false;
+        return _state != State.Fixed;
+    }
+
+    private bool IsLocalAuthority()
+    {
+        if (_conn == null || string.IsNullOrEmpty(_conn.SelfUserId)) return true;
+        if (string.IsNullOrEmpty(_authorityUserId)) return true;
+        return _authorityUserId == _conn.SelfUserId;
+    }
+
+    private void BroadcastState()
+    {
+        ResolveTransport();
+        if (_transport == null || _conn == null || _conn.Match == null) return;
+        if (string.IsNullOrEmpty(chairId)) return;
+
+        var rot = transform.rotation;
+        var vel = _rb != null ? _rb.velocity : Vector3.zero;
+        var angVel = _rb != null ? _rb.angularVelocity : Vector3.zero;
+        _transport.BroadcastChairState(new MatchTransport.ChairStateMsg
+        {
+            chairId = chairId,
+            state = (int)_state,
+            posX = transform.position.x,
+            posY = transform.position.y,
+            posZ = transform.position.z,
+            rotX = rot.x,
+            rotY = rot.y,
+            rotZ = rot.z,
+            rotW = rot.w,
+            velX = vel.x,
+            velY = vel.y,
+            velZ = vel.z,
+            angVelX = angVel.x,
+            angVelY = angVel.y,
+            angVelZ = angVel.z
+        });
+    }
+
+    private void UpdateRemoteDrivenPose()
+    {
+        if (IsLocalAuthority()) return;
+        if (!_hadRemoteState) return;
+
+        SetKinematic(true);
+
+        var currentPos = transform.position;
+        var dist = Vector3.Distance(currentPos, _remotePos);
+        if (dist >= remoteSnapDistance)
+        {
+            transform.position = _remotePos;
+        }
+        else
+        {
+            var t = 1f - Mathf.Exp(-Mathf.Max(0.1f, remoteLerpGain) * Time.deltaTime);
+            transform.position = Vector3.Lerp(currentPos, _remotePos, t);
+        }
+        var rt = 1f - Mathf.Exp(-Mathf.Max(0.1f, remoteLerpGain) * Time.deltaTime);
+        transform.rotation = Quaternion.Slerp(transform.rotation, _remoteRot, rt);
     }
 
     private string BuildChairIdFromPosition()
