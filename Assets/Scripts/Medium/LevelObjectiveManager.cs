@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
 using System.Collections.Generic;
+using TMPro;
 
 /// <summary>
 /// Manages Floor 1 objectives:
@@ -20,8 +21,8 @@ public class LevelObjectiveManager : MonoBehaviour
     private RitualMark ritualMark;
 
     [Header("UI")]
-    [SerializeField] private Text objectiveText;
-    [SerializeField] private Text candleCountText;
+    [SerializeField] private TMP_Text objectiveText;
+    [SerializeField] private TMP_Text candleCountText;
     [SerializeField] private GameObject completionPanel; // optional "Level Complete!" panel
 
     [Header("Scene Transition")]

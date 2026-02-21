@@ -78,26 +78,28 @@ public class PlayerNameTag : MonoBehaviour
         }
 
         // Billboard effect - always face camera
-        if (_mainCameraTransform != null && nameCanvas != null)
+        if (_mainCameraTransform != null && nameText != null)
 {
-    Transform parent = nameCanvas.transform.parent;
+    Transform textTransform = nameText.transform;
+    Transform parent = textTransform.parent;
 
-    // Direction from tag to camera
-    Vector3 lookDir = nameCanvas.transform.position - _mainCameraTransform.position;
-    lookDir.y = 0f;
+    // Direction from text to camera
+    Vector3 lookDir = textTransform.position - _mainCameraTransform.position;
+    lookDir.y = 0f; // keep upright
 
     Quaternion worldLook = Quaternion.LookRotation(lookDir);
 
     if (parent != null)
     {
-        // Cancel parent rotation influence
-        nameCanvas.transform.localRotation =
+        // Cancel parent (bone) rotation
+        textTransform.localRotation =
             Quaternion.Inverse(parent.rotation) * worldLook;
     }
     else
     {
-        nameCanvas.transform.rotation = worldLook;
+        textTransform.rotation = worldLook;
     }
+
 }
 
     

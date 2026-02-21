@@ -1,5 +1,6 @@
-using UnityEngine;
 
+using UnityEngine;
+using System.Collections;
 /// <summary>
 /// Manages floor progression, difficulty scaling, and highscore tracking.
 /// Each completed floor increases room count and enemy count.
@@ -75,6 +76,7 @@ public class FloorProgressionManager : MonoBehaviour
     /// </summary>
     public void AdvanceToNextFloor()
     {
+        Debug.Log("[FloorProgression] Attempting to advance from floor ...");   
         if (!_runActive)
         {
             Debug.LogWarning("[FloorProgression] Cannot advance - run not active");

@@ -131,7 +131,7 @@ public class MatchTransport : MonoBehaviour
             if (enableDebugLogs && Time.unscaledTime >= _nextRecvSnapshotLogAt)
             {
                 _nextRecvSnapshotLogAt = Time.unscaledTime + Mathf.Max(0.1f, debugLogInterval);
-                Debug.Log("[MatchTransport] RECV_SNAPSHOT players=" + (msg.players == null ? 0 : msg.players.Length));
+                //Debug.Log("[MatchTransport] RECV_SNAPSHOT players=" + (msg.players == null ? 0 : msg.players.Length));
             }
         }
         else if (state.OpCode == OPCODE_INIT)
@@ -163,7 +163,7 @@ public class MatchTransport : MonoBehaviour
             if (enableDebugLogs && Time.unscaledTime >= _nextRecvEnemySnapshotLogAt)
             {
                 _nextRecvEnemySnapshotLogAt = Time.unscaledTime + Mathf.Max(0.1f, debugLogInterval);
-                Debug.Log("[MatchTransport] RECV_ENEMY_SNAPSHOT enemies=" + (msg.enemies == null ? 0 : msg.enemies.Length));
+                //Debug.Log("[MatchTransport] RECV_ENEMY_SNAPSHOT enemies=" + (msg.enemies == null ? 0 : msg.enemies.Length));
             }
         }
         else if (state.OpCode == OPCODE_ENEMY_TELEPORT)
@@ -179,7 +179,7 @@ public class MatchTransport : MonoBehaviour
             OnEnemyFx?.Invoke(msg);
             if (enableDebugLogs)
             {
-                Debug.Log("[MatchTransport] RECV_ENEMY_FX id=" + msg.spawnId + " fx=" + msg.fxId);
+                //Debug.Log("[MatchTransport] RECV_ENEMY_FX id=" + msg.spawnId + " fx=" + msg.fxId);
             }
         }
         else if (state.OpCode == OPCODE_GHOST_SPAWN)
@@ -189,7 +189,7 @@ public class MatchTransport : MonoBehaviour
             OnGhostSpawn?.Invoke(msg);
             if (enableDebugLogs)
             {
-                Debug.Log("[MatchTransport] RECV_GHOST_SPAWN user=" + msg.userId);
+                //Debug.Log("[MatchTransport] RECV_GHOST_SPAWN user=" + msg.userId);
             }
         }
         else if (state.OpCode == OPCODE_LAMP_FLICKER)
@@ -199,7 +199,7 @@ public class MatchTransport : MonoBehaviour
             OnLampFlicker?.Invoke(msg);
             if (enableDebugLogs)
             {
-                Debug.Log("[MatchTransport] RECV_LAMP_FLICKER lampId=" + msg.lampId);
+                //Debug.Log("[MatchTransport] RECV_LAMP_FLICKER lampId=" + msg.lampId);
             }
         }
         else if (state.OpCode == OPCODE_OBJECTIVE_STATE)
@@ -209,7 +209,7 @@ public class MatchTransport : MonoBehaviour
             OnObjectiveState?.Invoke(msg);
             if (enableDebugLogs)
             {
-                Debug.Log("[MatchTransport] RECV_OBJECTIVE_STATE candles=" + msg.collectedCount + " ritual=" + msg.ritualComplete);
+                //Debug.Log("[MatchTransport] RECV_OBJECTIVE_STATE candles=" + msg.collectedCount + " ritual=" + msg.ritualComplete);
             }
         }
         else if (state.OpCode == OPCODE_CHAT)
@@ -219,7 +219,7 @@ public class MatchTransport : MonoBehaviour
             OnChat?.Invoke(msg);
             if (enableDebugLogs)
             {
-                Debug.Log("[MatchTransport] RECV_CHAT from=" + msg.senderUserId + " target=" + msg.target);
+                //Debug.Log("[MatchTransport] RECV_CHAT from=" + msg.senderUserId + " target=" + msg.target);
             }
         }
         else if (state.OpCode == OPCODE_ANIM)
@@ -241,7 +241,7 @@ public class MatchTransport : MonoBehaviour
             OnDisplayName?.Invoke(msg);
             if (enableDebugLogs)
             {
-                Debug.Log("[MatchTransport] RECV_DISPLAY_NAME from=" + msg.senderUserId + " name=" + msg.displayName);
+                //Debug.Log("[MatchTransport] RECV_DISPLAY_NAME from=" + msg.senderUserId + " name=" + msg.displayName);
             }
         }
         else if (state.OpCode == OPCODE_CHAIR_STATE)
@@ -269,7 +269,7 @@ public class MatchTransport : MonoBehaviour
             OnRitualComplete?.Invoke(msg);
             if (enableDebugLogs)
             {
-                Debug.Log("[MatchTransport] RECV_RITUAL_COMPLETE from=" + msg.senderUserId);
+                //Debug.Log("[MatchTransport] RECV_RITUAL_COMPLETE from=" + msg.senderUserId);
             }
         }
     }

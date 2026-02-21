@@ -879,7 +879,7 @@ public class HostAuthority : MonoBehaviour
     private void LogDebug(string message)
     {
         if (!enableDebugLogs) return;
-        Debug.Log("[HostAuthority] " + message);
+       // Debug.Log("[HostAuthority] " + message);
     }
 
     private void LogInputDebug(string userId, string message)
@@ -888,7 +888,7 @@ public class HostAuthority : MonoBehaviour
         var now = Time.unscaledTime;
         if (_nextInputLogAt.TryGetValue(userId, out var nextAt) && now < nextAt) return;
         _nextInputLogAt[userId] = now + Mathf.Max(0.1f, debugLogInterval);
-        Debug.Log("[HostAuthority] " + message + " | user=" + userId);
+        //Debug.Log("[HostAuthority] " + message + " | user=" + userId);
     }
 
     private float GetLocalYaw()

@@ -24,7 +24,7 @@ public class FloorTransitionManager : MonoBehaviour
     [Header("Debug")]
     public bool enableDebugLogs = true;
 
-    private FloorProgressionManager _progressionManager;
+    public FloorProgressionManager _progressionManager;
     private HostAuthority _hostAuthority;
     private NakamaConnection _conn;
     private bool _transitionInProgress = false;
@@ -98,6 +98,7 @@ public class FloorTransitionManager : MonoBehaviour
         // Advance to next floor
         if (_progressionManager != null)
         {
+             Debug.Log($"[FloorTransition] WE HAVE PROGRESSION MANAGER");
             _progressionManager.AdvanceToNextFloor();
         }
 
