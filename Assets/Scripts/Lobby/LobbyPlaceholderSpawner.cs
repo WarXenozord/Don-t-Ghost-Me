@@ -74,8 +74,8 @@ public class LobbyPlaceholderSpawner : MonoBehaviour
 
     private int GetMaxSlots()
     {
-        if (slotAnchors != null && slotAnchors.Length > 0) return slotAnchors.Length;
-        return 4;
+        var configured = slotAnchors != null ? slotAnchors.Length : 0;
+        return Mathf.Max(4, configured);
     }
 
     private SlotPose GetSlotPose(int slotIndex)

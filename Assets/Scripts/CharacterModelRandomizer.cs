@@ -152,6 +152,27 @@ public class CharacterModelRandomizer : MonoBehaviour
         _spawnedModel.transform.localPosition = modelOffset;
         _spawnedModel.transform.localRotation = Quaternion.identity;
 
+        // Link animator/avatar exactly like SpawnRandomModel so deterministic paths animate too.
+        if (_rootAnimator != null)
+        {
+            var skinnedRenderer = _spawnedModel.GetComponentInChildren<SkinnedMeshRenderer>();
+            if (skinnedRenderer == null)
+            {
+                Debug.LogWarning($"[CharacterModelRandomizer] Model '{chosenPrefab.name}' has no SkinnedMeshRenderer.");
+            }
+
+            var skinAnimator = _spawnedModel.GetComponent<Animator>();
+            if (skinAnimator != null && skinAnimator.avatar != null)
+            {
+                _rootAnimator.avatar = skinAnimator.avatar;
+                _rootAnimator.Rebind();
+            }
+            else
+            {
+                Debug.LogWarning($"[CharacterModelRandomizer] Model '{chosenPrefab.name}' has no Animator/avatar for rebind.");
+            }
+        }
+
         Debug.Log($"[CharacterModelRandomizer] Spawned model {index}: {chosenPrefab.name}");
     }
 
