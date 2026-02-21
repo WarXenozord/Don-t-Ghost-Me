@@ -28,6 +28,8 @@ public class FloorTransitionManager : MonoBehaviour
     private HostAuthority _hostAuthority;
     private NakamaConnection _conn;
     private bool _transitionInProgress = false;
+    private bool _pendingFallbackBootstrap;
+    private int _pendingSeed;
 
     void Awake()
     {
@@ -39,11 +41,13 @@ public class FloorTransitionManager : MonoBehaviour
 
         Instance = this;
         DontDestroyOnLoad(gameObject);
+        SceneManager.sceneLoaded += OnSceneLoaded;
     }
 
     void OnDestroy()
     {
         if (Instance == this) Instance = null;
+        SceneManager.sceneLoaded -= OnSceneLoaded;
     }
 
     void Start()
@@ -170,6 +174,8 @@ public class FloorTransitionManager : MonoBehaviour
                 + " seed=" + context.lastInit.seed
                 + " spawns=" + (context.lastInit.spawns == null ? 0 : context.lastInit.spawns.Length));
         }
+        _pendingSeed = nextSeed;
+        _pendingFallbackBootstrap = true;
 
         var activeScene = SceneManager.GetActiveScene().name;
         if (enableDebugLogs)
@@ -179,6 +185,102 @@ public class FloorTransitionManager : MonoBehaviour
         Debug.Log("[SceneFlow] Loading scene now: " + activeScene);
         SceneManager.LoadScene(activeScene);
         _transitionInProgress = false;
+    }
+
+    private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+    {
+        if (!_pendingFallbackBootstrap) return;
+        StartCoroutine(FallbackEnsureLocalSpawn(scene.name));
+    }
+
+    private IEnumerator FallbackEnsureLocalSpawn(string sceneName)
+    {
+        yield return new WaitForSeconds(1.0f);
+
+        var context = MatchContext.Instance;
+        var conn = NakamaConnection.Instance != null ? NakamaConnection.Instance : FindObjectOfType<NakamaConnection>();
+        var spawner = PlayerSpawnManager.Instance != null ? PlayerSpawnManager.Instance : FindObjectOfType<PlayerSpawnManager>();
+        if (context == null || context.lastInit == null || conn == null || spawner == null)
+        {
+            _pendingFallbackBootstrap = false;
+            yield break;
+        }
+
+        var selfId = ResolveSelfId(conn, context.lastInit);
+        if (string.IsNullOrEmpty(selfId))
+        {
+            Debug.LogWarning("[SceneFlow] Fallback bootstrap aborted: selfId unresolved");
+            _pendingFallbackBootstrap = false;
+            yield break;
+        }
+
+        if (spawner.TryGet(selfId, out var existingLocal) && existingLocal != null)
+        {
+            Debug.Log("[SceneFlow] Fallback bootstrap skipped: local already exists user=" + selfId);
+            _pendingFallbackBootstrap = false;
+            yield break;
+        }
+
+        var init = context.lastInit;
+        MatchTransport.SpawnPoint selfSpawn = null;
+        if (init.spawns != null)
+        {
+            for (var i = 0; i < init.spawns.Length; i++)
+            {
+                var s = init.spawns[i];
+                if (s == null || string.IsNullOrEmpty(s.userId)) continue;
+                if (s.userId == selfId)
+                {
+                    selfSpawn = s;
+                    break;
+                }
+            }
+        }
+
+        // Local-only recovery: avoid clearing/remaking the whole world and remotes.
+        // Primary bootstrap already generated the map and remote proxies.
+        var bootstrap = FindObjectOfType<GameBootstrap>();
+        if (bootstrap != null)
+        {
+            if (spawner.localPlayerPrefab == null && bootstrap.localPlayerPrefab != null)
+            {
+                spawner.localPlayerPrefab = bootstrap.localPlayerPrefab;
+            }
+            if (spawner.remoteProxyPrefab == null && bootstrap.proxyPlayerPrefab != null)
+            {
+                spawner.remoteProxyPrefab = bootstrap.proxyPlayerPrefab;
+            }
+        }
+
+        spawner.Despawn(selfId);
+        if (selfSpawn != null)
+        {
+            spawner.SpawnLocal(selfId, selfSpawn.position, 0f, selfSpawn.modelIndex);
+        }
+        else if (init.spawns != null && init.spawns.Length > 0 && init.spawns[0] != null)
+        {
+            var s = init.spawns[0];
+            spawner.SpawnLocal(selfId, s.position, 0f, s.modelIndex);
+        }
+        else
+        {
+            spawner.SpawnLocal(selfId, Vector3.zero, 0f, -1);
+        }
+
+        var host = HostAuthority.Instance != null ? HostAuthority.Instance : FindObjectOfType<HostAuthority>();
+        if (host != null) host.EnableGameplayAfterBootstrap();
+
+        var hasLocal = spawner.TryGet(selfId, out var localAfter) && localAfter != null;
+        Debug.Log("[SceneFlow] Fallback bootstrap completed user=" + selfId + " hasLocal=" + hasLocal);
+        _pendingFallbackBootstrap = false;
+    }
+
+    private static string ResolveSelfId(NakamaConnection conn, MatchTransport.InitMsg init)
+    {
+        if (conn != null && !string.IsNullOrEmpty(conn.SelfUserId)) return conn.SelfUserId;
+        if (conn != null && conn.Match != null && conn.Match.Self != null && !string.IsNullOrEmpty(conn.Match.Self.UserId)) return conn.Match.Self.UserId;
+        if (conn != null && conn.IsCurrentPlayerMatchCreator && init != null && !string.IsNullOrEmpty(init.mediumUserId)) return init.mediumUserId;
+        return string.Empty;
     }
 
     /// <summary>

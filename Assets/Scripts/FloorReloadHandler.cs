@@ -110,9 +110,6 @@ public class FloorReloadHandler : MonoBehaviour
             return;
         }
 
-        // Clear existing players
-        playerSpawner.ClearAll();
-
         var context = MatchContext.Instance;
         if (context == null || context.lastInit == null)
         {
@@ -121,7 +118,22 @@ public class FloorReloadHandler : MonoBehaviour
         }
 
         var init = context.lastInit;
-        var selfId = conn.SelfUserId;
+        var selfId = ResolveLocalUserId(init);
+        if (string.IsNullOrEmpty(selfId))
+        {
+            if (enableDebugLogs) Debug.LogWarning("[FloorReload] Self user id unresolved. Skipping respawn pass.");
+            return;
+        }
+
+        if (playerSpawner.TryGet(selfId, out var existingLocal) && existingLocal != null)
+        {
+            if (enableDebugLogs) Debug.Log("[FloorReload] Local already exists, skipping duplicate respawn.");
+            _hasRespawnedThisLoad = true;
+            return;
+        }
+
+        // Clear existing players only after we have valid local identity.
+        playerSpawner.ClearAll();
 
         if (enableDebugLogs)
         {
@@ -139,7 +151,7 @@ public class FloorReloadHandler : MonoBehaviour
         }
 
         // Spawn local player
-        if (!string.IsNullOrEmpty(selfId) && TryGetSpawn(init.spawns, selfId, out var localSpawn))
+        if (TryGetSpawn(init.spawns, selfId, out var localSpawn))
         {
             playerSpawner.SpawnLocal(selfId, localSpawn, 0f);
             
@@ -232,6 +244,20 @@ public class FloorReloadHandler : MonoBehaviour
         
         if (conn == null)
             conn = NakamaConnection.Instance != null ? NakamaConnection.Instance : FindObjectOfType<NakamaConnection>();
+    }
+
+    private string ResolveLocalUserId(MatchTransport.InitMsg init)
+    {
+        if (conn != null && !string.IsNullOrEmpty(conn.SelfUserId)) return conn.SelfUserId;
+        if (conn != null && conn.Match != null && conn.Match.Self != null && !string.IsNullOrEmpty(conn.Match.Self.UserId))
+        {
+            return conn.Match.Self.UserId;
+        }
+        if (conn != null && conn.IsCurrentPlayerMatchCreator && init != null && !string.IsNullOrEmpty(init.mediumUserId))
+        {
+            return init.mediumUserId;
+        }
+        return string.Empty;
     }
 
     /// <summary>
