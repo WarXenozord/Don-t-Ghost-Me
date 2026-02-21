@@ -70,7 +70,11 @@ ShaderVariantCollection:
         passType: 0
       - keywords: SAMPLING_EDGE_LUMINANCE TARGET_LUMINANCE
         passType: 0
+      - keywords: SAMPLING_PIXELATION
+        passType: 0
       - keywords: SAMPLING_PIXELATION TARGET_LUMINANCE
+        passType: 0
+      - keywords: SAMPLING_RGB_SHIFT
         passType: 0
       - keywords: SAMPLING_RGB_SHIFT TARGET_LUMINANCE
         passType: 0
@@ -79,6 +83,8 @@ ShaderVariantCollection:
       - keywords: TARGET_LUMINANCE TONE_SEPIA
         passType: 0
       - keywords: TONE_GRAYSCALE
+        passType: 0
+      - keywords: TONE_SEPIA
         passType: 0
       - keywords: TRANSITION_CUTOFF
         passType: 0
@@ -91,7 +97,27 @@ ShaderVariantCollection:
   - first: {fileID: 4800000, guid: 935b7be1c88464d2eb87204fdfab5a38, type: 3}
     second:
       variants:
+      - keywords: COLOR_FILTER
+        passType: 0
+      - keywords: EDGE_SHINY
+        passType: 0
+      - keywords: SAMPLING_BLUR_FAST
+        passType: 0
+      - keywords: SAMPLING_EDGE_ALPHA
+        passType: 0
+      - keywords: SAMPLING_EDGE_LUMINANCE
+        passType: 0
+      - keywords: SAMPLING_RGB_SHIFT
+        passType: 0
       - keywords: SAMPLING_RGB_SHIFT TRANSITION_DISSOLVE
+        passType: 0
+      - keywords: TRANSITION_DISSOLVE
+        passType: 0
+      - keywords: TRANSITION_FADE
+        passType: 0
+      - keywords: TRANSITION_MASK
+        passType: 0
+      - keywords: TRANSITION_SHINY
         passType: 0
   - first: {fileID: 4800000, guid: e65241fa80a374114b3f55ed746c04d9, type: 3}
     second:
