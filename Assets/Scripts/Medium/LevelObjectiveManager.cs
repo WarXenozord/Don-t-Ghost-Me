@@ -124,21 +124,22 @@ public class LevelObjectiveManager : MonoBehaviour
 
     // ?? Ritual ?????????????????????????????????????????????????????????????
 
-    public void OnRitualComplete()
+   public void OnRitualComplete()
     {
         if (_ritualComplete) return;
         _ritualComplete = true;
 
-        UpdateUI();
+        Debug.Log("[LevelObjective] Ritual complete! Advancing to next floor...");
 
         if (completionPanel != null)
             completionPanel.SetActive(true);
 
-        // Transition to next scene
-        Invoke(nameof(LoadNextScene), delayBeforeTransition);
-
-        Debug.Log("[LevelObjective] Ritual complete! Loading next floor...");
-        BroadcastObjectiveState(string.Empty);
+        // NEW: Trigger floor transition
+        var floorTransition = FloorTransitionManager.Instance;
+        if (floorTransition != null)
+        {
+            floorTransition.TriggerFloorTransition();
+        }
     }
 
     private void LoadNextScene()

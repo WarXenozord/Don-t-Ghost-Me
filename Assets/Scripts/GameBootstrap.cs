@@ -3,6 +3,9 @@ using UnityEngine;
 public class GameBootstrap : MonoBehaviour
 {
     [Header("Refs")]
+    public FloorProgressionManager progressionManager;
+    public FloorTransitionManager transitionManager;
+    public PlayerDeathTracker deathTracker;
     public NakamaConnection conn;
     public HostAuthority hostAuthority;
     public ProceduralBuildingGenerator buildingGenerator;
@@ -25,6 +28,7 @@ public class GameBootstrap : MonoBehaviour
         if (!spawner) spawner = PlayerSpawnManager.Instance != null ? PlayerSpawnManager.Instance : FindObjectOfType<PlayerSpawnManager>();
         if (!enemySpawner) enemySpawner = EnemySpawnManager.Instance != null ? EnemySpawnManager.Instance : FindObjectOfType<EnemySpawnManager>();
         if (!ghostSpawner) ghostSpawner = GhostSpawner.Instance != null ? GhostSpawner.Instance : FindObjectOfType<GhostSpawner>();
+        
         if (!spawner)
         {
             var go = new GameObject("PlayerSpawnManager");
@@ -39,6 +43,24 @@ public class GameBootstrap : MonoBehaviour
         {
             var go = new GameObject("GhostSpawner");
             ghostSpawner = go.AddComponent<GhostSpawner>();
+        }
+        if (!progressionManager) progressionManager = FloorProgressionManager.Instance != null ? FloorProgressionManager.Instance : FindObjectOfType<FloorProgressionManager>();
+        if (!transitionManager) transitionManager = FloorTransitionManager.Instance != null ? FloorTransitionManager.Instance : FindObjectOfType<FloorTransitionManager>();
+        if (!deathTracker) deathTracker = PlayerDeathTracker.Instance != null ? PlayerDeathTracker.Instance : FindObjectOfType<PlayerDeathTracker>();
+        if (!progressionManager)
+        {
+            var go = new GameObject("FloorProgressionManager");
+            progressionManager = go.AddComponent<FloorProgressionManager>();
+        }
+        if (!transitionManager)
+        {
+            var go = new GameObject("FloorTransitionManager");
+            transitionManager = go.AddComponent<FloorTransitionManager>();
+        }
+        if (!deathTracker)
+        {
+            var go = new GameObject("PlayerDeathTracker");
+            deathTracker = go.AddComponent<PlayerDeathTracker>();
         }
     }
 
@@ -57,8 +79,44 @@ public class GameBootstrap : MonoBehaviour
         }
 
         var init = context.lastInit;
+        if (progressionManager != null)
+        {
+            if (!progressionManager.RunActive)
+            {
+                // Start new run
+                progressionManager.StartNewRun();
+                Debug.Log("[GameBootstrap] Started new run at Floor 1");
+            }
+            else
+            {
+                Debug.Log($"[GameBootstrap] Continuing run at Floor {progressionManager.CurrentFloor}");
+            }
 
-        if (buildingGenerator) buildingGenerator.GenerateBuildingFromSeed(init.seed);
+            // Generate building with current floor's difficulty
+            int roomCount = progressionManager.CurrentRoomCount;
+            int floorNumber = progressionManager.CurrentFloor;
+            
+            // Modify seed with floor number for variation
+            int floorSeed = init.seed + floorNumber;
+            
+            if (buildingGenerator)
+            {
+                // Set room count (you may need to add public setters to ProceduralBuildingGenerator)
+                SetBuildingGeneratorRoomCount(buildingGenerator, roomCount);
+                buildingGenerator.GenerateBuildingFromSeed(floorSeed);
+            }
+        // Set enemy count
+            if (hostAuthority)
+            {
+                int enemyCount = progressionManager.CurrentEnemyCount;
+                SetHostAuthorityEnemyCount(hostAuthority, enemyCount);
+            }
+        }
+        else
+        {
+            // Fallback: Use default generation
+            if (buildingGenerator) buildingGenerator.GenerateBuildingFromSeed(init.seed);
+        }
         if (!spawner) spawner = PlayerSpawnManager.Instance != null ? PlayerSpawnManager.Instance : FindObjectOfType<PlayerSpawnManager>();
 
         if (spawner != null)
@@ -136,5 +194,34 @@ public class GameBootstrap : MonoBehaviour
     {
         if (string.IsNullOrEmpty(id)) return "------";
         return id.Length <= 6 ? id : id.Substring(0, 6);
+    }
+     private void SetBuildingGeneratorRoomCount(ProceduralBuildingGenerator generator, int roomCount)
+    {
+        // Use reflection to set room count
+        var minRoomsField = generator.GetType().GetField("minRooms", 
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+        var maxRoomsField = generator.GetType().GetField("maxRooms", 
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+
+        if (minRoomsField != null)
+            minRoomsField.SetValue(generator, roomCount);
+        
+        if (maxRoomsField != null)
+            maxRoomsField.SetValue(generator, roomCount);
+
+        Debug.Log($"[GameBootstrap] Set generator to {roomCount} rooms");
+    }
+
+    private void SetHostAuthorityEnemyCount(HostAuthority host, int enemyCount)
+    {
+        // Use reflection to set enemy count
+        var startEnemyCountField = host.GetType().GetField("startEnemyCount", 
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+
+        if (startEnemyCountField != null)
+        {
+            startEnemyCountField.SetValue(host, enemyCount);
+            Debug.Log($"[GameBootstrap] Set enemy count to {enemyCount}");
+        }
     }
 }

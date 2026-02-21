@@ -1,0 +1,267 @@
+using UnityEngine;
+using UnityEngine.SceneManagement;
+using System.Collections.Generic;
+
+/// <summary>
+/// Tracks player deaths and triggers game over when all players are dead.
+/// A player is "dead" when they become a ghost.
+/// </summary>
+public class PlayerDeathTracker : MonoBehaviour
+{
+    public static PlayerDeathTracker Instance { get; private set; }
+
+    [Header("References")]
+    public NakamaConnection conn;
+    public PlayerSpawnManager playerSpawner;
+    public FloorProgressionManager progressionManager;
+
+    [Header("Game Over")]
+    public string gameOverScene = "GameOver";
+    public float gameOverDelay = 3f; // Delay before loading game over scene
+
+    [Header("Debug")]
+    public bool enableDebugLogs = true;
+
+    // Track which players are currently alive (mediums)
+    private readonly HashSet<string> _alivePlayers = new HashSet<string>();
+    private readonly HashSet<string> _deadPlayers = new HashSet<string>();
+    
+    private bool _gameOverTriggered = false;
+    private float _gameOverTimer = 0f;
+
+    void Awake()
+    {
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+
+        Instance = this;
+        DontDestroyOnLoad(gameObject);
+    }
+
+    void Update()
+    {
+        ResolveRefs();
+        CheckPlayerStates();
+
+        // Game over countdown
+        if (_gameOverTriggered)
+        {
+            _gameOverTimer -= Time.deltaTime;
+            if (_gameOverTimer <= 0f)
+            {
+                LoadGameOverScene();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Registers a player as alive (called when player spawns as medium)
+    /// </summary>
+    public void RegisterPlayerAlive(string userId)
+    {
+        if (string.IsNullOrEmpty(userId)) return;
+
+        _alivePlayers.Add(userId);
+        _deadPlayers.Remove(userId);
+
+        if (enableDebugLogs)
+            Debug.Log($"[DeathTracker] Player {userId} registered as ALIVE. Alive: {_alivePlayers.Count}, Dead: {_deadPlayers.Count}");
+    }
+
+    /// <summary>
+    /// Registers a player as dead (called when player becomes ghost)
+    /// </summary>
+    public void RegisterPlayerDead(string userId)
+    {
+        if (string.IsNullOrEmpty(userId)) return;
+
+        _alivePlayers.Remove(userId);
+        _deadPlayers.Add(userId);
+
+        if (enableDebugLogs)
+            Debug.Log($"[DeathTracker] Player {userId} registered as DEAD. Alive: {_alivePlayers.Count}, Dead: {_deadPlayers.Count}");
+
+        // Check if all dead
+        CheckForGameOver();
+    }
+
+    /// <summary>
+    /// Checks current player states and updates alive/dead tracking
+    /// </summary>
+    private void CheckPlayerStates()
+    {
+        if (playerSpawner == null) return;
+
+        // Get all current players in match
+        var currentPlayers = GetAllPlayerIds();
+
+        foreach (var userId in currentPlayers)
+        {
+            if (!playerSpawner.TryGet(userId, out var playerGo) || playerGo == null)
+                continue;
+
+            // Check if player is a ghost
+            var ghost = playerGo.GetComponentInChildren<GhostController>(true);
+            if (ghost != null)
+            {
+                // Player is a ghost (dead)
+                if (_alivePlayers.Contains(userId))
+                {
+                    RegisterPlayerDead(userId);
+                }
+            }
+            else
+            {
+                // Player is a medium (alive)
+                if (!_alivePlayers.Contains(userId))
+                {
+                    RegisterPlayerAlive(userId);
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Checks if all players are dead and triggers game over
+    /// </summary>
+    private void CheckForGameOver()
+    {
+        if (_gameOverTriggered) return;
+
+        // Get total players in match
+        var allPlayers = GetAllPlayerIds();
+        
+        if (allPlayers.Count == 0)
+        {
+            // No players yet, don't trigger game over
+            return;
+        }
+
+        // Check if everyone is dead
+        bool allDead = _alivePlayers.Count == 0 && _deadPlayers.Count > 0;
+
+        if (allDead)
+        {
+            TriggerGameOver();
+        }
+    }
+
+    /// <summary>
+    /// Triggers game over sequence
+    /// </summary>
+    private void TriggerGameOver()
+    {
+        if (_gameOverTriggered) return;
+
+        _gameOverTriggered = true;
+        _gameOverTimer = gameOverDelay;
+
+        Debug.Log($"[DeathTracker] GAME OVER! All {_deadPlayers.Count} players are dead. Loading game over scene in {gameOverDelay}s...");
+
+        // End the run
+        if (progressionManager != null)
+        {
+            progressionManager.EndRun();
+        }
+    }
+
+    /// <summary>
+    /// Loads the game over scene
+    /// </summary>
+    private void LoadGameOverScene()
+    {
+        Debug.Log($"[DeathTracker] Loading game over scene: {gameOverScene}");
+        
+        if (!string.IsNullOrEmpty(gameOverScene))
+        {
+            SceneManager.LoadScene(gameOverScene);
+        }
+        else
+        {
+            Debug.LogError("[DeathTracker] Game over scene name not set!");
+        }
+    }
+
+    /// <summary>
+    /// Resets the death tracker (call when starting new run)
+    /// </summary>
+    public void ResetTracker()
+    {
+        _alivePlayers.Clear();
+        _deadPlayers.Clear();
+        _gameOverTriggered = false;
+        _gameOverTimer = 0f;
+
+        Debug.Log("[DeathTracker] Tracker reset");
+    }
+
+    /// <summary>
+    /// Gets all player IDs currently in the match
+    /// </summary>
+    private HashSet<string> GetAllPlayerIds()
+    {
+        var players = new HashSet<string>();
+
+        if (conn == null || conn.Match == null) return players;
+
+        // Add all presences
+        if (conn.Match.Presences != null)
+        {
+            foreach (var presence in conn.Match.Presences)
+            {
+                if (presence != null && !string.IsNullOrEmpty(presence.UserId))
+                {
+                    players.Add(presence.UserId);
+                }
+            }
+        }
+
+        // Add self
+        if (!string.IsNullOrEmpty(conn.SelfUserId))
+        {
+            players.Add(conn.SelfUserId);
+        }
+
+        return players;
+    }
+
+    private void ResolveRefs()
+    {
+        if (conn == null)
+            conn = NakamaConnection.Instance != null ? NakamaConnection.Instance : FindObjectOfType<NakamaConnection>();
+        
+        if (playerSpawner == null)
+            playerSpawner = PlayerSpawnManager.Instance != null ? PlayerSpawnManager.Instance : FindObjectOfType<PlayerSpawnManager>();
+        
+        if (progressionManager == null)
+            progressionManager = FloorProgressionManager.Instance != null ? FloorProgressionManager.Instance : FindObjectOfType<FloorProgressionManager>();
+    }
+
+    /// <summary>
+    /// Gets current alive player count (for UI)
+    /// </summary>
+    public int GetAlivePlayerCount()
+    {
+        return _alivePlayers.Count;
+    }
+
+    /// <summary>
+    /// Gets current dead player count (for UI)
+    /// </summary>
+    public int GetDeadPlayerCount()
+    {
+        return _deadPlayers.Count;
+    }
+
+    /// <summary>
+    /// Debug: Force game over
+    /// </summary>
+    [ContextMenu("Force Game Over")]
+    public void DebugForceGameOver()
+    {
+        TriggerGameOver();
+    }
+}

@@ -6,6 +6,7 @@ using UnityEngine;
 /// </summary>
 public class RitualMark : MonoBehaviour, IInteractable
 {
+    private FloorTransitionManager _floorTransition;
     [Header("Interaction")]
     [SerializeField] private float energyCost = 50f; // completing ritual costs energy
 
@@ -151,9 +152,26 @@ private GameObject _spawnedLight;
     {
         Debug.Log("[RitualMark] Ritual complete!");
 
+        // Notify objective manager
         if (_manager != null)
             _manager.OnRitualComplete();
+        
+        // Trigger floor transition
+        if (_floorTransition == null)
+            _floorTransition = FloorTransitionManager.Instance != null 
+                ? FloorTransitionManager.Instance 
+                : FindObjectOfType<FloorTransitionManager>();
+        
+        if (_floorTransition != null)
+        {
+            _floorTransition.TriggerFloorTransition();
+        }
+        else
+        {
+            Debug.LogError("[RitualMark] FloorTransitionManager not found! Cannot advance to next floor.");
+        }
     }
+
 
     // ?? Highlight ??????????????????????????????????????????????????????????
 
