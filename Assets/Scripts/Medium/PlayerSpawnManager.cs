@@ -37,7 +37,11 @@ public class PlayerSpawnManager : MonoBehaviour
         }
 
         Instance = this;
-        DontDestroyOnLoad(gameObject);
+    }
+
+    void OnDestroy()
+    {
+        if (Instance == this) Instance = null;
     }
 
     private void AbsorbSceneConfig(PlayerSpawnManager other)

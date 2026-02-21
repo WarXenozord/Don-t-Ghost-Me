@@ -4,6 +4,7 @@ using UnityEngine;
 
 public class HostAuthority : MonoBehaviour
 {
+    public static HostAuthority Instance { get; private set; }
     public NakamaConnection conn;
     public MatchTransport transport;
     public PlayerSpawnManager spawner;
@@ -81,6 +82,14 @@ public class HostAuthority : MonoBehaviour
 
     void Awake()
     {
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+        Instance = this;
+        DontDestroyOnLoad(gameObject);
+
         ResolveRefs();
         if (!spawner) spawner = PlayerSpawnManager.Instance != null ? PlayerSpawnManager.Instance : FindObjectOfType<PlayerSpawnManager>();
         if (!enemySpawner) enemySpawner = EnemySpawnManager.Instance != null ? EnemySpawnManager.Instance : FindObjectOfType<EnemySpawnManager>();
@@ -89,6 +98,7 @@ public class HostAuthority : MonoBehaviour
 
     void OnDestroy()
     {
+        if (Instance == this) Instance = null;
         if (transport && _transportBound)
         {
             transport.OnInput -= HandleInputFromClient;

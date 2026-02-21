@@ -32,7 +32,6 @@ public class RitualCompletionHandler : MonoBehaviour
         }
 
         Instance = this;
-        DontDestroyOnLoad(gameObject);
 
         ResolveRefs();
         EnsureBound();
@@ -47,6 +46,7 @@ public class RitualCompletionHandler : MonoBehaviour
 
     void OnDestroy()
     {
+        if (Instance == this) Instance = null;
         SceneManager.sceneLoaded -= OnSceneLoaded;
         if (transport != null && _transportBound)
         {

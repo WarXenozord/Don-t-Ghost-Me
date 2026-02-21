@@ -29,7 +29,6 @@ public class GhostSpawner : MonoBehaviour
         }
 
         Instance = this;
-        DontDestroyOnLoad(gameObject);
         ResolveRefs();
         EnsureBound();
     }
@@ -42,6 +41,7 @@ public class GhostSpawner : MonoBehaviour
 
     void OnDestroy()
     {
+        if (Instance == this) Instance = null;
         if (transport != null && _bound)
         {
             transport.OnGhostSpawn -= OnGhostSpawnReceived;

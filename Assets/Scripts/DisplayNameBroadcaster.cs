@@ -34,7 +34,6 @@ public class DisplayNameBroadcaster : MonoBehaviour
         }
 
         Instance = this;
-        DontDestroyOnLoad(gameObject);
 
         ResolveRefs();
         EnsureBound();
@@ -87,6 +86,7 @@ public class DisplayNameBroadcaster : MonoBehaviour
 
     void OnDestroy()
     {
+        if (Instance == this) Instance = null;
         if (transport != null && _transportBound)
         {
             transport.OnDisplayName -= OnDisplayNameReceived;

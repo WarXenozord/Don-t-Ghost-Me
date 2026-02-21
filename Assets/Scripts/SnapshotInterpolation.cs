@@ -3,6 +3,7 @@ using UnityEngine;
 
 public class SnapshotInterpolation : MonoBehaviour
 {
+    public static SnapshotInterpolation Instance { get; private set; }
     public MatchTransport transport;
     public NakamaConnection conn;
     public PlayerSpawnManager spawner;
@@ -43,12 +44,21 @@ public class SnapshotInterpolation : MonoBehaviour
 
     void Awake()
     {
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+        Instance = this;
+        DontDestroyOnLoad(gameObject);
+
         ResolveRefs();
         EnsureBound();
     }
 
     void OnDestroy()
     {
+        if (Instance == this) Instance = null;
         if (transport != null && _bound)
         {
             transport.OnSnapshot -= OnSnapshot;

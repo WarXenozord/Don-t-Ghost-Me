@@ -44,7 +44,6 @@ public class EnemySpawnManager : MonoBehaviour
         }
 
         Instance = this;
-        DontDestroyOnLoad(gameObject);
         ResolveRefs();
         EnsureBound();
     }
@@ -58,6 +57,7 @@ public class EnemySpawnManager : MonoBehaviour
 
     void OnDestroy()
     {
+        if (Instance == this) Instance = null;
         if (transport != null && _bound)
         {
             transport.OnEnemySpawn -= OnEnemySpawnReceived;
