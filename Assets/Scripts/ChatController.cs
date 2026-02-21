@@ -23,6 +23,7 @@ public class ChatController : MonoBehaviour
     private const string TargetMediums = "Mediums";
     private const string TargetGhosts = "Ghosts";
     private const string TargetAllGhosts = "AllGhosts";
+    private UsernameManager _usernameManager;
 
     private bool _bound;
 
@@ -110,7 +111,8 @@ public class ChatController : MonoBehaviour
         var color = (msg.senderRole == RoleMedium && NormalizeTarget(msg.target) == TargetGhosts)
             ? "#FF4D4D"
             : "#FFFFFF";
-        var localLine = "<color=" + color + ">[" + msg.senderRole + "] " + ShortId(conn.SelfUserId) + ": " + msg.text + "</color>";
+       var senderName = _usernameManager != null ? _usernameManager.GetDisplayName(conn.SelfUserId) : ShortId(conn.SelfUserId);
+        var localLine = "<color=" + color + ">[" + msg.senderRole + "] " + senderName + ": " + msg.text + "</color>";
         OnChatLine?.Invoke(localLine);
         return true;
     }
@@ -159,7 +161,8 @@ public class ChatController : MonoBehaviour
         var safeText = NormalizeIncoming(msg.text);
         if (string.IsNullOrEmpty(safeText)) return;
 
-        var line = "[" + senderRole + "] " + ShortId(msg.senderUserId) + ": " + safeText;
+       var senderName = _usernameManager != null ? _usernameManager.GetDisplayName(msg.senderUserId) : ShortId(msg.senderUserId);
+        var line = "[" + senderRole + "] " + senderName + ": " + safeText;
         if (senderRole == RoleMedium && target == TargetGhosts)
         {
             line = "<color=#FF4D4D>" + line + "</color>";
@@ -254,6 +257,7 @@ public class ChatController : MonoBehaviour
         if (transport == null) transport = MatchTransport.Instance != null ? MatchTransport.Instance : FindObjectOfType<MatchTransport>();
         if (hostAuthority == null) hostAuthority = FindObjectOfType<HostAuthority>();
         if (playerSpawner == null) playerSpawner = PlayerSpawnManager.Instance != null ? PlayerSpawnManager.Instance : FindObjectOfType<PlayerSpawnManager>();
+        if (_usernameManager == null) _usernameManager = UsernameManager.Instance; 
     }
 
     private void EnsureBound()

@@ -821,6 +821,42 @@ MonoBehaviour:
   ghostMessageCost: 5
   maxMessageLength: 40
   mediumToGhostMaxLength: 10
+--- !u!114 &827982691
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 827982689}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 44133788baa324342aa1d9a77b2524bd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  transport: {fileID: 0}
+  conn: {fileID: 0}
+  usernameManager: {fileID: 0}
+  broadcastDelay: 0.5
+--- !u!114 &827982692
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 827982689}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9f9d0eb2746b4a24eaba36ad7b0bc14c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  usernameInput: {fileID: 0}
+  feedbackText: {fileID: 0}
+  saveButton: {fileID: 0}
+  backButton: {fileID: 0}
+  returnScene: MainMenu
+  successColor: {r: 0, g: 1, b: 0, a: 1}
+  errorColor: {r: 1, g: 0, b: 0, a: 1}
+  feedbackDisplayTime: 3
 --- !u!1 &1027122380
 GameObject:
   m_ObjectHideFlags: 0
@@ -1887,6 +1923,12 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 73163572864504066, guid: 3b4ec7472d45f3c4f9bd2ffe57d02ad3, type: 3}
       insertIndex: 1
       addedObject: {fileID: 827982690}
+    - targetCorrespondingSourceObject: {fileID: 73163572864504066, guid: 3b4ec7472d45f3c4f9bd2ffe57d02ad3, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 827982692}
+    - targetCorrespondingSourceObject: {fileID: 73163572864504066, guid: 3b4ec7472d45f3c4f9bd2ffe57d02ad3, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 827982691}
   m_SourcePrefab: {fileID: 100100000, guid: 3b4ec7472d45f3c4f9bd2ffe57d02ad3, type: 3}
 --- !u!1 &1971851828
 GameObject:
