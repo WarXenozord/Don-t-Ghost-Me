@@ -14,6 +14,7 @@ public class LobbyPlaceholderSpawner : MonoBehaviour
     public float fallbackSpacing = 2f;
 
     private readonly Dictionary<string, GameObject> _byUserId = new Dictionary<string, GameObject>();
+    private readonly Dictionary<string, int> _slotByUserId = new Dictionary<string, int>();
     private struct SlotPose
     {
         public Vector3 position;
@@ -33,18 +34,7 @@ public class LobbyPlaceholderSpawner : MonoBehaviour
             var userId = orderedUserIds[i];
             if (string.IsNullOrEmpty(userId)) continue;
             allowed.Add(userId);
-
-            if (!_byUserId.TryGetValue(userId, out var go) || go == null)
-            {
-                var pose = GetSlotPose(i);
-                go = Instantiate(lobbyPlaceholderPrefab, pose.position, pose.rotation, transform);
-                go.name = "LobbyPlaceholder_" + ShortId(userId);
-                ApplyDeterministicModel(go, userId);
-                _byUserId[userId] = go;
-            }
-
-            var target = GetSlotPose(i);
-            go.transform.SetPositionAndRotation(target.position, target.rotation);
+            SpawnOrMoveUser(userId, i);
         }
 
         var toRemove = new List<string>();
@@ -59,7 +49,38 @@ public class LobbyPlaceholderSpawner : MonoBehaviour
 
         for (var i = 0; i < toRemove.Count; i++)
         {
+            _slotByUserId.Remove(toRemove[i]);
             _byUserId.Remove(toRemove[i]);
+        }
+    }
+
+    public void SpawnOrMoveUser(string userId, int slotIndex)
+    {
+        if (string.IsNullOrEmpty(userId)) return;
+        if (lobbyPlaceholderPrefab == null) return;
+
+        if (!_byUserId.TryGetValue(userId, out var go) || go == null)
+        {
+            var pose = GetSlotPose(slotIndex);
+            go = Instantiate(lobbyPlaceholderPrefab, pose.position, pose.rotation, transform);
+            go.name = "LobbyPlaceholder_" + ShortId(userId);
+            ApplyDeterministicModel(go, userId);
+            _byUserId[userId] = go;
+        }
+
+        _slotByUserId[userId] = slotIndex;
+        var target = GetSlotPose(slotIndex);
+        go.transform.SetPositionAndRotation(target.position, target.rotation);
+    }
+
+    public void RemoveUser(string userId)
+    {
+        if (string.IsNullOrEmpty(userId)) return;
+        _slotByUserId.Remove(userId);
+        if (_byUserId.TryGetValue(userId, out var go))
+        {
+            if (go) Destroy(go);
+            _byUserId.Remove(userId);
         }
     }
 
@@ -70,6 +91,7 @@ public class LobbyPlaceholderSpawner : MonoBehaviour
             if (kv.Value) Destroy(kv.Value);
         }
         _byUserId.Clear();
+        _slotByUserId.Clear();
     }
 
     private int GetMaxSlots()

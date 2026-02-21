@@ -24,7 +24,8 @@ public class MatchTransport : MonoBehaviour
     public const long OPCODE_CHAIR_THROW = 35;
     public const long OPCODE_DISPLAY_NAME = 38;
     public const long OPCODE_CHAIR_STATE = 36;
-    public const long OPCODE_LOBBY_PLACEHOLDERS = 37;
+    public const long OPCODE_LOBBY_JOIN_REQUEST = 39;
+    public const long OPCODE_LOBBY_PLACEHOLDER_SPAWN = 40;
 
     public NakamaConnection conn;
 
@@ -45,7 +46,8 @@ public class MatchTransport : MonoBehaviour
     public event Action<ChairThrowMsg> OnChairThrow;
     public event Action<DisplayNameMsg> OnDisplayName;
     public event Action<ChairStateMsg> OnChairState;
-    public event Action<LobbyPlaceholdersMsg> OnLobbyPlaceholders;
+    public event Action<LobbyJoinRequestMsg> OnLobbyJoinRequest;
+    public event Action<LobbyPlaceholderSpawnMsg> OnLobbyPlaceholderSpawn;
     private bool _isBound;
     private NakamaConnection _boundConn;
 
@@ -245,11 +247,17 @@ public class MatchTransport : MonoBehaviour
             msg.senderUserId = state.UserPresence.UserId;
             OnChairState?.Invoke(msg);
         }
-        else if (state.OpCode == OPCODE_LOBBY_PLACEHOLDERS)
+        else if (state.OpCode == OPCODE_LOBBY_JOIN_REQUEST)
         {
-            var msg = JsonUtility.FromJson<LobbyPlaceholdersMsg>(json);
+            var msg = JsonUtility.FromJson<LobbyJoinRequestMsg>(json);
             msg.senderUserId = state.UserPresence.UserId;
-            OnLobbyPlaceholders?.Invoke(msg);
+            OnLobbyJoinRequest?.Invoke(msg);
+        }
+        else if (state.OpCode == OPCODE_LOBBY_PLACEHOLDER_SPAWN)
+        {
+            var msg = JsonUtility.FromJson<LobbyPlaceholderSpawnMsg>(json);
+            msg.senderUserId = state.UserPresence.UserId;
+            OnLobbyPlaceholderSpawn?.Invoke(msg);
         }
     }
 
@@ -412,11 +420,18 @@ public class MatchTransport : MonoBehaviour
         await conn.Socket.SendMatchStateAsync(conn.Match.Id, OPCODE_CHAIR_STATE, bytes);
     }
 
-    public async void BroadcastLobbyPlaceholders(LobbyPlaceholdersMsg msg)
+    public async void SendLobbyJoinRequest(LobbyJoinRequestMsg msg)
     {
         if (conn?.Socket == null || conn.Match == null) return;
         var bytes = Encoding.UTF8.GetBytes(JsonUtility.ToJson(msg));
-        await conn.Socket.SendMatchStateAsync(conn.Match.Id, OPCODE_LOBBY_PLACEHOLDERS, bytes);
+        await conn.Socket.SendMatchStateAsync(conn.Match.Id, OPCODE_LOBBY_JOIN_REQUEST, bytes);
+    }
+
+    public async void BroadcastLobbyPlaceholderSpawn(LobbyPlaceholderSpawnMsg msg)
+    {
+        if (conn?.Socket == null || conn.Match == null) return;
+        var bytes = Encoding.UTF8.GetBytes(JsonUtility.ToJson(msg));
+        await conn.Socket.SendMatchStateAsync(conn.Match.Id, OPCODE_LOBBY_PLACEHOLDER_SPAWN, bytes);
     }
 
     [Serializable]
@@ -620,9 +635,17 @@ public class MatchTransport : MonoBehaviour
     }
 
     [Serializable]
-    public class LobbyPlaceholdersMsg
+    public class LobbyJoinRequestMsg
     {
-        public string[] orderedUserIds;
+        public string userId;
+        [NonSerialized] public string senderUserId;
+    }
+
+    [Serializable]
+    public class LobbyPlaceholderSpawnMsg
+    {
+        public string userId;
+        public int slotIndex;
         [NonSerialized] public string senderUserId;
     }
 }

@@ -44,9 +44,11 @@ public class LobbyUI : MonoBehaviour
     private const string StartedMatchesKey = "started_match_ids";
 
     private readonly Dictionary<string, IUserPresence> players = new Dictionary<string, IUserPresence>();
+    private readonly Dictionary<string, int> _lobbySlotByUserId = new Dictionary<string, int>();
     private int _lastInitUiLogId = -1;
     private bool _loadingGameScene;
     private float _lobbyRosterRefreshAt;
+    private string _lastLobbyJoinRequestMatchId = string.Empty;
 
     private void Awake()
     {
@@ -67,12 +69,13 @@ public class LobbyUI : MonoBehaviour
         {
             transport.OnInit += OnInitReceived;
             transport.OnStart += OnStartReceived;
-            transport.OnLobbyPlaceholders += OnLobbyPlaceholdersReceived;
+            transport.OnLobbyJoinRequest += OnLobbyJoinRequestReceived;
+            transport.OnLobbyPlaceholderSpawn += OnLobbyPlaceholderSpawnReceived;
         }
 
         SetScreen(isInRoom: false);
         RefreshLobbyUi();
-        SyncLobbyPlaceholders();
+        if (lobbyPlaceholderSpawner) lobbyPlaceholderSpawner.ClearAll();
     }
 
     private void Start()
@@ -90,10 +93,7 @@ public class LobbyUI : MonoBehaviour
         {
             _lobbyRosterRefreshAt = Time.unscaledTime + 0.5f;
             RebuildPlayersFromCurrentMatch();
-            if (IsPlaceholderAuthority())
-            {
-                SyncLobbyPlaceholders();
-            }
+            if (conn.IsCurrentPlayerMatchCreator) EnsureAllKnownPlayersHaveLobbySpawn();
         }
         if (conn == null || conn.Match == null) return;
 
@@ -111,7 +111,8 @@ public class LobbyUI : MonoBehaviour
         {
             transport.OnInit -= OnInitReceived;
             transport.OnStart -= OnStartReceived;
-            transport.OnLobbyPlaceholders -= OnLobbyPlaceholdersReceived;
+            transport.OnLobbyJoinRequest -= OnLobbyJoinRequestReceived;
+            transport.OnLobbyPlaceholderSpawn -= OnLobbyPlaceholderSpawnReceived;
         }
     }
 
@@ -127,7 +128,7 @@ public class LobbyUI : MonoBehaviour
         PlayerPrefs.Save();
 
         RebuildPlayersFromCurrentMatch();
-        SyncLobbyPlaceholders();
+        EnsureHostSelfLobbySpawn();
         SetScreen(isInRoom: true);
         if (lobbyCameraMover) lobbyCameraMover.OnJoinedOrStartedMatch();
         RefreshLobbyUi("Hosting match " + ShortId(match.Id));
@@ -192,7 +193,7 @@ public class LobbyUI : MonoBehaviour
         conn.MatchCreatorUserId = match.Id == lastHostedMatchId ? conn.SelfUserId : string.Empty;
 
         RebuildPlayersFromCurrentMatch();
-        SyncLobbyPlaceholders();
+        RequestLobbySpawnFromHost();
         SetScreen(isInRoom: true);
         if (lobbyCameraMover) lobbyCameraMover.OnJoinedOrStartedMatch();
         RefreshLobbyUi("Joined match " + ShortId(match.Id));
@@ -210,6 +211,8 @@ public class LobbyUI : MonoBehaviour
         conn.Match = null;
         conn.MatchCreatorUserId = string.Empty;
         players.Clear();
+        _lobbySlotByUserId.Clear();
+        _lastLobbyJoinRequestMatchId = string.Empty;
         if (lobbyPlaceholderSpawner) lobbyPlaceholderSpawner.ClearAll();
         SetScreen(isInRoom: false);
         if (lobbyCameraMover) lobbyCameraMover.OnLeftMatch();
@@ -248,6 +251,11 @@ public class LobbyUI : MonoBehaviour
             {
                 if (join == null || string.IsNullOrEmpty(join.UserId)) continue;
                 players[join.UserId] = join;
+                if (conn.IsCurrentPlayerMatchCreator)
+                {
+                    var slot = EnsureSlotForUser(join.UserId);
+                    BroadcastLobbySpawn(join.UserId, slot);
+                }
             }
         }
 
@@ -257,16 +265,15 @@ public class LobbyUI : MonoBehaviour
             {
                 if (leave == null || string.IsNullOrEmpty(leave.UserId)) continue;
                 players.Remove(leave.UserId);
+                if (_lobbySlotByUserId.ContainsKey(leave.UserId)) _lobbySlotByUserId.Remove(leave.UserId);
+                if (lobbyPlaceholderSpawner) lobbyPlaceholderSpawner.RemoveUser(leave.UserId);
             }
         }
 
         // Rebuild from match snapshot to avoid any incremental desync in local dictionary.
         RebuildPlayersFromCurrentMatch();
         RefreshLobbyUi();
-        if (IsPlaceholderAuthority() || hadJoins)
-        {
-            SyncLobbyPlaceholders();
-        }
+        if (hadJoins && !conn.IsCurrentPlayerMatchCreator) RequestLobbySpawnFromHost();
     }
 
     private void OnInitReceived(MatchTransport.InitMsg msg)
@@ -337,32 +344,12 @@ public class LobbyUI : MonoBehaviour
         }
     }
 
-    private void SyncLobbyPlaceholders()
+    private void EnsureHostSelfLobbySpawn()
     {
-        if (!lobbyPlaceholderSpawner) return;
-        if (conn == null || conn.Match == null)
-        {
-            lobbyPlaceholderSpawner.ClearAll();
-            return;
-        }
-
-        if (IsPlaceholderAuthority())
-        {
-            var ordered = BuildDeterministicLobbyOrder();
-            lobbyPlaceholderSpawner.SyncPlayers(ordered);
-            if (transport != null)
-            {
-                transport.BroadcastLobbyPlaceholders(new MatchTransport.LobbyPlaceholdersMsg
-                {
-                    orderedUserIds = ordered.ToArray()
-                });
-            }
-        }
-        else
-        {
-            // Clients only mirror host placeholder state.
-            lobbyPlaceholderSpawner.ClearAll();
-        }
+        if (conn == null || conn.Match == null || !conn.IsCurrentPlayerMatchCreator) return;
+        if (string.IsNullOrEmpty(conn.SelfUserId)) return;
+        var slot = EnsureSlotForUser(conn.SelfUserId);
+        BroadcastLobbySpawn(conn.SelfUserId, slot);
     }
 
     private List<string> BuildDeterministicLobbyOrder()
@@ -382,45 +369,98 @@ public class LobbyUI : MonoBehaviour
         return all;
     }
 
-    private void OnLobbyPlaceholdersReceived(MatchTransport.LobbyPlaceholdersMsg msg)
+    private int EnsureSlotForUser(string userId)
     {
-        if (msg == null || lobbyPlaceholderSpawner == null) return;
-        if (conn == null || conn.Match == null) return;
-        if (IsPlaceholderAuthority()) return;
+        if (string.IsNullOrEmpty(userId)) return -1;
+        if (_lobbySlotByUserId.TryGetValue(userId, out var existing)) return existing;
 
-        // Only trust host as source of placeholder ordering.
-        if (!string.IsNullOrEmpty(conn.MatchCreatorUserId) &&
-            !string.IsNullOrEmpty(msg.senderUserId) &&
-            msg.senderUserId != conn.MatchCreatorUserId)
+        var used = new HashSet<int>(_lobbySlotByUserId.Values);
+        for (var i = 0; i < 4; i++)
         {
-            return;
+            if (!used.Contains(i))
+            {
+                _lobbySlotByUserId[userId] = i;
+                return i;
+            }
         }
 
-        if (msg.orderedUserIds == null)
-        {
-            lobbyPlaceholderSpawner.ClearAll();
-            return;
-        }
-
-        var ordered = new List<string>(msg.orderedUserIds.Length);
-        for (var i = 0; i < msg.orderedUserIds.Length; i++)
-        {
-            var id = msg.orderedUserIds[i];
-            if (string.IsNullOrEmpty(id)) continue;
-            ordered.Add(id);
-        }
-
-        lobbyPlaceholderSpawner.SyncPlayers(ordered);
+        var overflow = _lobbySlotByUserId.Count;
+        _lobbySlotByUserId[userId] = overflow;
+        return overflow;
     }
 
-    private bool IsPlaceholderAuthority()
+    private void BroadcastLobbySpawn(string userId, int slotIndex)
     {
-        if (conn == null || conn.Match == null) return false;
-        if (conn.IsCurrentPlayerMatchCreator) return true;
+        if (string.IsNullOrEmpty(userId) || slotIndex < 0) return;
+        if (transport == null || conn == null || conn.Match == null) return;
 
-        // Fallback for edge cases where creator flag is momentarily unset.
-        var lastHostedMatchId = PlayerPrefs.GetString(LastMatchIdKey, string.Empty);
-        return !string.IsNullOrEmpty(lastHostedMatchId) && conn.Match.Id == lastHostedMatchId;
+        var msg = new MatchTransport.LobbyPlaceholderSpawnMsg
+        {
+            userId = userId,
+            slotIndex = slotIndex
+        };
+        ApplyLobbySpawn(msg);
+        transport.BroadcastLobbyPlaceholderSpawn(msg);
+    }
+
+    private void ApplyLobbySpawn(MatchTransport.LobbyPlaceholderSpawnMsg msg)
+    {
+        if (msg == null || string.IsNullOrEmpty(msg.userId)) return;
+        _lobbySlotByUserId[msg.userId] = Mathf.Max(0, msg.slotIndex);
+        if (lobbyPlaceholderSpawner != null)
+        {
+            lobbyPlaceholderSpawner.SpawnOrMoveUser(msg.userId, Mathf.Max(0, msg.slotIndex));
+        }
+    }
+
+    private void EnsureAllKnownPlayersHaveLobbySpawn()
+    {
+        if (conn == null || conn.Match == null || !conn.IsCurrentPlayerMatchCreator) return;
+        var ordered = BuildDeterministicLobbyOrder();
+        for (var i = 0; i < ordered.Count; i++)
+        {
+            var userId = ordered[i];
+            if (string.IsNullOrEmpty(userId)) continue;
+            var slot = EnsureSlotForUser(userId);
+            BroadcastLobbySpawn(userId, slot);
+        }
+    }
+
+    private void RequestLobbySpawnFromHost()
+    {
+        if (conn == null || conn.Match == null || transport == null) return;
+        if (conn.IsCurrentPlayerMatchCreator) return;
+        if (string.IsNullOrEmpty(conn.SelfUserId)) return;
+
+        if (_lastLobbyJoinRequestMatchId == conn.Match.Id) return;
+        _lastLobbyJoinRequestMatchId = conn.Match.Id;
+
+        transport.SendLobbyJoinRequest(new MatchTransport.LobbyJoinRequestMsg
+        {
+            userId = conn.SelfUserId
+        });
+    }
+
+    private void OnLobbyJoinRequestReceived(MatchTransport.LobbyJoinRequestMsg msg)
+    {
+        if (msg == null || conn == null || conn.Match == null || !conn.IsCurrentPlayerMatchCreator) return;
+        var userId = !string.IsNullOrEmpty(msg.userId) ? msg.userId : msg.senderUserId;
+        if (string.IsNullOrEmpty(userId)) return;
+
+        if (!players.ContainsKey(userId))
+        {
+            RebuildPlayersFromCurrentMatch();
+        }
+
+        var slot = EnsureSlotForUser(userId);
+        BroadcastLobbySpawn(userId, slot);
+        EnsureAllKnownPlayersHaveLobbySpawn();
+    }
+
+    private void OnLobbyPlaceholderSpawnReceived(MatchTransport.LobbyPlaceholderSpawnMsg msg)
+    {
+        if (msg == null || conn == null || conn.Match == null) return;
+        ApplyLobbySpawn(msg);
     }
 
     private bool HasConnectedSocket()
