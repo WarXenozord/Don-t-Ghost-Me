@@ -221,13 +221,6 @@ public class FloorTransitionManager : MonoBehaviour
             yield break;
         }
 
-        var generator = FindObjectOfType<ProceduralBuildingGenerator>();
-        if (generator != null)
-        {
-            generator.GenerateBuildingFromSeed(_pendingSeed);
-            Debug.Log("[SceneFlow] Fallback map generation scene=" + sceneName + " seed=" + _pendingSeed);
-        }
-
         var init = context.lastInit;
         MatchTransport.SpawnPoint selfSpawn = null;
         if (init.spawns != null)
@@ -244,7 +237,22 @@ public class FloorTransitionManager : MonoBehaviour
             }
         }
 
-        spawner.ClearAll();
+        // Local-only recovery: avoid clearing/remaking the whole world and remotes.
+        // Primary bootstrap already generated the map and remote proxies.
+        var bootstrap = FindObjectOfType<GameBootstrap>();
+        if (bootstrap != null)
+        {
+            if (spawner.localPlayerPrefab == null && bootstrap.localPlayerPrefab != null)
+            {
+                spawner.localPlayerPrefab = bootstrap.localPlayerPrefab;
+            }
+            if (spawner.remoteProxyPrefab == null && bootstrap.proxyPlayerPrefab != null)
+            {
+                spawner.remoteProxyPrefab = bootstrap.proxyPlayerPrefab;
+            }
+        }
+
+        spawner.Despawn(selfId);
         if (selfSpawn != null)
         {
             spawner.SpawnLocal(selfId, selfSpawn.position, 0f, selfSpawn.modelIndex);
@@ -257,16 +265,6 @@ public class FloorTransitionManager : MonoBehaviour
         else
         {
             spawner.SpawnLocal(selfId, Vector3.zero, 0f, -1);
-        }
-
-        if (init.spawns != null)
-        {
-            for (var i = 0; i < init.spawns.Length; i++)
-            {
-                var s = init.spawns[i];
-                if (s == null || string.IsNullOrEmpty(s.userId) || s.userId == selfId) continue;
-                spawner.SpawnRemote(s.userId, s.position, 0f, s.modelIndex);
-            }
         }
 
         var host = HostAuthority.Instance != null ? HostAuthority.Instance : FindObjectOfType<HostAuthority>();
