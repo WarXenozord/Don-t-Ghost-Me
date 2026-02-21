@@ -109,7 +109,8 @@ private IEnumerator DelayedBootstrap()
         yield return new WaitForSeconds(0.25f);
     }
 
-    Debug.LogWarning("[GameBootstrap] Local player not spawned after retries.");
+    Debug.LogWarning("[GameBootstrap] Local player not spawned after retries. Applying recovery spawn.");
+    ForceRecoverLocalSpawn();
 }
     private void BootstrapFromMatchContext()
     {
@@ -292,5 +293,69 @@ private IEnumerator DelayedBootstrap()
             if (s.userId == userId) return true;
         }
         return false;
+    }
+
+    private void ForceRecoverLocalSpawn()
+    {
+        var context = MatchContext.Instance;
+        if (context == null || context.lastInit == null || spawner == null || conn == null) return;
+
+        var init = context.lastInit;
+        var selfId = ResolveLocalUserId(init);
+        if (string.IsNullOrEmpty(selfId)) return;
+
+        Vector3 spawnPos = Vector3.zero;
+        int modelIndex = -1;
+        if (TryGetSpawn(init.spawns, selfId, out var ownSpawn))
+        {
+            spawnPos = ownSpawn.position;
+            modelIndex = ownSpawn.modelIndex;
+        }
+        else if (init.spawns != null && init.spawns.Length > 0 && init.spawns[0] != null)
+        {
+            spawnPos = init.spawns[0].position;
+            modelIndex = init.spawns[0].modelIndex;
+        }
+
+        spawner.Despawn(selfId);
+
+        var spawned = spawner.SpawnLocal(selfId, spawnPos, 0f, modelIndex);
+        if (!spawned)
+        {
+            var fallbackPrefab = spawner.localPlayerPrefab != null ? spawner.localPlayerPrefab : spawner.remoteProxyPrefab;
+            if (fallbackPrefab != null)
+            {
+                var go = Instantiate(fallbackPrefab, spawnPos, Quaternion.identity);
+                go.name = "LocalRecovery_" + selfId;
+                spawner.RegisterSpawnedObject(selfId, go, true);
+            }
+        }
+
+        if (spawner.TryGet(selfId, out var localGo) && localGo != null)
+        {
+            var medium = localGo.GetComponentInChildren<MediumController>(true);
+            if (medium != null) medium.enabled = true;
+
+            var cameras = localGo.GetComponentsInChildren<Camera>(true);
+            if (cameras != null && cameras.Length > 0)
+            {
+                for (var i = 0; i < cameras.Length; i++) cameras[i].enabled = true;
+            }
+            else
+            {
+                var camGo = new GameObject("RecoveryCamera");
+                camGo.transform.SetParent(localGo.transform, false);
+                camGo.transform.localPosition = new Vector3(0f, 1.6f, -2.5f);
+                camGo.transform.LookAt(localGo.transform.position + Vector3.up * 1.2f);
+                camGo.AddComponent<Camera>();
+                camGo.AddComponent<AudioListener>();
+            }
+
+            var listeners = localGo.GetComponentsInChildren<AudioListener>(true);
+            for (var i = 0; i < listeners.Length; i++) listeners[i].enabled = true;
+
+            var minimap = FindObjectOfType<MinimapController>();
+            if (minimap != null) minimap.player = medium != null ? medium.transform : localGo.transform;
+        }
     }
 }
