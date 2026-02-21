@@ -112,10 +112,7 @@ private IEnumerator DelayedBootstrap()
 
             // Generate building with current floor's difficulty
             int roomCount = progressionManager.CurrentRoomCount;
-            int floorNumber = progressionManager.CurrentFloor;
-            
-            // Modify seed with floor number for variation
-            int floorSeed = init.seed + floorNumber;
+            int floorSeed = init.seed;
             
             if (buildingGenerator)
             {

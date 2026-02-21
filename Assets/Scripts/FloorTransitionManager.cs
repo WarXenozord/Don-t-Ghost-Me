@@ -74,6 +74,17 @@ public class FloorTransitionManager : MonoBehaviour
         StartCoroutine(TransitionToNextFloor());
     }
 
+    public void TriggerFloorTransitionSynced(int nextFloor, int nextRoomCount, int nextEnemyCount, int nextSeed)
+    {
+        if (_transitionInProgress)
+        {
+            if (enableDebugLogs) Debug.Log("[FloorTransition] Sync transition ignored: already in progress.");
+            return;
+        }
+
+        StartCoroutine(TransitionWithPayload(nextFloor, nextRoomCount, nextEnemyCount, nextSeed));
+    }
+
     private IEnumerator TransitionToNextFloor()
     {
         _transitionInProgress = true;
@@ -112,6 +123,42 @@ public class FloorTransitionManager : MonoBehaviour
 
         SceneManager.LoadScene(gameplayScene);
 
+        _transitionInProgress = false;
+    }
+
+    private IEnumerator TransitionWithPayload(int nextFloor, int nextRoomCount, int nextEnemyCount, int nextSeed)
+    {
+        _transitionInProgress = true;
+        ResolveRefs();
+
+        if (enableDebugLogs)
+        {
+            Debug.Log($"[FloorTransition] Synced transition payload floor={nextFloor}, rooms={nextRoomCount}, enemies={nextEnemyCount}, seed={nextSeed}");
+        }
+
+        if (loadingScreen != null) loadingScreen.SetActive(true);
+
+        yield return new WaitForSeconds(Mathf.Max(0f, transitionDelay));
+
+        if (_progressionManager != null)
+        {
+            _progressionManager.ApplyNetworkFloorState(nextFloor, nextRoomCount, nextEnemyCount);
+        }
+
+        var context = MatchContext.Instance;
+        if (context != null && context.lastInit != null)
+        {
+            context.lastInit.seed = nextSeed;
+            context.hasInit = true;
+            context.started = true;
+        }
+
+        var activeScene = SceneManager.GetActiveScene().name;
+        if (enableDebugLogs)
+        {
+            Debug.Log("[FloorTransition] Reloading active scene: " + activeScene);
+        }
+        SceneManager.LoadScene(activeScene);
         _transitionInProgress = false;
     }
 

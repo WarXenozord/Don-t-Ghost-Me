@@ -97,6 +97,23 @@ public class FloorProgressionManager : MonoBehaviour
         }
     }
 
+    public void ApplyNetworkFloorState(int floor, int roomCount, int enemyCount)
+    {
+        _currentFloor = Mathf.Max(1, floor);
+        _currentRoomCount = Mathf.Max(1, roomCount);
+        _currentEnemyCount = Mathf.Max(0, enemyCount);
+        _runActive = true;
+
+        if (_currentFloor > _highestFloor)
+        {
+            _highestFloor = _currentFloor;
+            _highestRoomCount = _currentRoomCount;
+            SaveHighscore();
+        }
+
+        Debug.Log($"[FloorProgression] Applied network floor state: floor={_currentFloor}, rooms={_currentRoomCount}, enemies={_currentEnemyCount}");
+    }
+
     /// <summary>
     /// Ends the current run (all players dead)
     /// </summary>

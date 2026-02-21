@@ -133,13 +133,7 @@ public class LevelObjectiveManager : MonoBehaviour
 
         if (completionPanel != null)
             completionPanel.SetActive(true);
-
-        // NEW: Trigger floor transition
-        var floorTransition = FloorTransitionManager.Instance;
-        if (floorTransition != null)
-        {
-            floorTransition.TriggerFloorTransition();
-        }
+        BroadcastObjectiveState(string.Empty);
     }
 
     private void LoadNextScene()
@@ -268,8 +262,6 @@ public class LevelObjectiveManager : MonoBehaviour
         _ritualComplete = true;
         UpdateUI();
         if (completionPanel != null) completionPanel.SetActive(true);
-        CancelInvoke(nameof(LoadNextScene));
-        Invoke(nameof(LoadNextScene), delayBeforeTransition);
         Debug.Log("[LevelObjective] Ritual complete synced from network.");
     }
 
