@@ -930,14 +930,13 @@ wall.isActive = false;
 
     private void InstantiateGeometry()
     {
-        Transform parent = transform;
+        //Transform parent = transform;
 
     buildingParentMap.Clear();
     var buildingParents = buildingParentMap;
     foreach (var b in buildings)
     {
         var go = new GameObject($"Building_{b.buildingIndex} ({b.roomsInSection} rooms)");
-        go.transform.parent   = parent;
         go.transform.position = b.position;
         buildingParents[b.buildingIndex] = go.transform;
     }
@@ -971,14 +970,14 @@ wall.isActive = false;
         if (!wall.isActive) continue;
         
         activeWalls.Add(wall);
-        var go = CreateWallCube(wall, parent);  // ← use CreateWallCube (below)
+        var go = CreateWallCube(wall);  // ← use CreateWallCube (below)
         wallGameObjects.Add(go);
     }
 
     
 foreach (var door in doors)
 {
-    var d = Instantiate(doorPrefab, door.position, Quaternion.identity, parent);
+    var d = Instantiate(doorPrefab, door.position, Quaternion.identity);
     
     // Rotate door to align with wall orientation
     // Assumes Blender door faces +Z (forward) by default, with width along X
@@ -1011,8 +1010,8 @@ foreach (var door in doors)
     foreach (var s in stairs)
     {
         var go = stairPrefab != null
-            ? Instantiate(stairPrefab, s.position, Quaternion.identity, parent)
-            : CreateDefaultStairs(s, parent);
+            ? Instantiate(stairPrefab, s.position, Quaternion.identity)
+            : CreateDefaultStairs(s);
         go.name = $"Stairs_{stairCount++}";
         go.transform.localScale = s.size;
     }
@@ -1027,12 +1026,12 @@ foreach (var door in doors)
 
     /// </summary>
 
-    private GameObject CreateWallCube(BuildingWall wall, Transform parent)
+    private GameObject CreateWallCube(BuildingWall wall)
 
     {
 
         var go = new GameObject($"Wall_{(wall.facingX ? "X" : "Z")}");
-        go.transform.SetParent(parent, worldPositionStays: false);
+        //go.transform.SetParent(parent, worldPositionStays: false);
         go.transform.position   = wall.position;
         go.transform.localScale = wall.size;
         go.layer= LayerMask.NameToLayer(wall.layer);
@@ -1162,10 +1161,10 @@ foreach (var door in doors)
         return mesh;
 
     }
-    private GameObject CreateDefaultStairs(BuildingStairs s, Transform parent)
+    private GameObject CreateDefaultStairs(BuildingStairs s)
     {
         var go = new GameObject("Stairs");
-        go.transform.parent   = parent;
+        //go.transform.parent   = parent;
         go.transform.position = s.position;
         go.AddComponent<MeshFilter>().mesh = CreateStairMesh();
         go.AddComponent<MeshRenderer>().material =
