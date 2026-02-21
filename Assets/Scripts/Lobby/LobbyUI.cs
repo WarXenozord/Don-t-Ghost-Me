@@ -92,8 +92,6 @@ public class LobbyUI : MonoBehaviour
         if (conn != null && conn.Match != null && Time.unscaledTime >= _lobbyRosterRefreshAt)
         {
             _lobbyRosterRefreshAt = Time.unscaledTime + 0.5f;
-            RebuildPlayersFromCurrentMatch();
-            RefreshLobbyUi();
             if (conn.IsCurrentPlayerMatchCreator) EnsureAllKnownPlayersHaveLobbySpawn();
         }
         if (conn == null || conn.Match == null) return;
@@ -271,8 +269,6 @@ public class LobbyUI : MonoBehaviour
             }
         }
 
-        // Rebuild from match snapshot to avoid any incremental desync in local dictionary.
-        RebuildPlayersFromCurrentMatch();
         RefreshLobbyUi();
         if (hadJoins && !conn.IsCurrentPlayerMatchCreator) RequestLobbySpawnFromHost();
     }
@@ -462,7 +458,6 @@ public class LobbyUI : MonoBehaviour
     {
         if (msg == null || conn == null || conn.Match == null) return;
         ApplyLobbySpawn(msg);
-        RebuildPlayersFromCurrentMatch();
         RefreshLobbyUi();
     }
 
