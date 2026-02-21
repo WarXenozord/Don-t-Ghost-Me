@@ -108,7 +108,10 @@ public class RitualCompletionHandler : MonoBehaviour
             nextSeed = nextSeed,
             nextFloor = nextFloor,
             nextRoomCount = nextRooms,
-            nextEnemyCount = nextEnemies
+            nextEnemyCount = nextEnemies,
+            mediumUserId = hostAuthority != null ? hostAuthority.CurrentMediumUserId : string.Empty,
+            spawns = (MatchContext.Instance != null && MatchContext.Instance.lastInit != null) ? MatchContext.Instance.lastInit.spawns : null,
+            goalPos = (MatchContext.Instance != null && MatchContext.Instance.lastInit != null) ? MatchContext.Instance.lastInit.goalPos : Vector3.zero
         };
 
         transport.BroadcastRitualComplete(msg);
@@ -189,6 +192,19 @@ public class RitualCompletionHandler : MonoBehaviour
 
         if (transitionManager != null)
         {
+            var context = MatchContext.Instance;
+            if (context != null)
+            {
+                if (context.lastInit == null) context.lastInit = new MatchTransport.InitMsg();
+                context.lastInit.initId = msg.initId;
+                context.lastInit.seed = msg.nextSeed;
+                if (msg.spawns != null && msg.spawns.Length > 0) context.lastInit.spawns = msg.spawns;
+                if (!string.IsNullOrEmpty(msg.mediumUserId)) context.lastInit.mediumUserId = msg.mediumUserId;
+                context.lastInit.goalPos = msg.goalPos;
+                context.hasInit = true;
+                context.started = true;
+            }
+
             if (enableDebugLogs)
                 Debug.Log("[RitualCompletion] Triggering synced floor transition");
             

@@ -463,6 +463,9 @@ public async void BroadcastRitualComplete(RitualCompleteMsg msg)
         public int nextFloor;
         public int nextRoomCount;
         public int nextEnemyCount;
+        public string mediumUserId;
+        public SpawnPoint[] spawns;
+        public Vector3 goalPos;
         [NonSerialized] public string senderUserId;
     }
     [Serializable]
