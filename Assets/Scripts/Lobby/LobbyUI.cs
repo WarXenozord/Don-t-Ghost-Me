@@ -93,6 +93,7 @@ public class LobbyUI : MonoBehaviour
         {
             _lobbyRosterRefreshAt = Time.unscaledTime + 0.5f;
             RebuildPlayersFromCurrentMatch();
+            RefreshLobbyUi();
             if (conn.IsCurrentPlayerMatchCreator) EnsureAllKnownPlayersHaveLobbySpawn();
         }
         if (conn == null || conn.Match == null) return;
@@ -461,6 +462,8 @@ public class LobbyUI : MonoBehaviour
     {
         if (msg == null || conn == null || conn.Match == null) return;
         ApplyLobbySpawn(msg);
+        RebuildPlayersFromCurrentMatch();
+        RefreshLobbyUi();
     }
 
     private bool HasConnectedSocket()
