@@ -139,6 +139,16 @@ public class RitualCompletionHandler : MonoBehaviour
             return;
         }
 
+        Debug.Log("[SceneFlow] Ritual msg received"
+            + " from=" + msg.senderUserId
+            + " initId=" + msg.initId
+            + " shouldTransition=" + msg.shouldTransition
+            + " nextSeed=" + msg.nextSeed
+            + " nextFloor=" + msg.nextFloor
+            + " nextRooms=" + msg.nextRoomCount
+            + " nextEnemies=" + msg.nextEnemyCount
+            + " spawns=" + (msg.spawns == null ? 0 : msg.spawns.Length));
+
         // Verify init ID matches
         if (hostAuthority != null && msg.initId != hostAuthority.ActiveInitId)
         {
@@ -190,6 +200,12 @@ public class RitualCompletionHandler : MonoBehaviour
                 Debug.Log("[RitualCompletion] Ritual complete but no alive medium. Transition skipped.");
             return;
         }
+
+        Debug.Log("[SceneFlow] Process ritual completion -> transition"
+            + " initId=" + msg.initId
+            + " seed=" + msg.nextSeed
+            + " floor=" + msg.nextFloor
+            + " spawns=" + (msg.spawns == null ? 0 : msg.spawns.Length));
 
         if (transitionManager != null)
         {

@@ -137,6 +137,13 @@ public class FloorTransitionManager : MonoBehaviour
         _transitionInProgress = true;
         ResolveRefs();
 
+        Debug.Log("[SceneFlow] TransitionWithPayload begin"
+            + " floor=" + nextFloor
+            + " rooms=" + nextRoomCount
+            + " enemies=" + nextEnemyCount
+            + " seed=" + nextSeed
+            + " activeScene=" + SceneManager.GetActiveScene().name);
+
         if (enableDebugLogs)
         {
             Debug.Log($"[FloorTransition] Synced transition payload floor={nextFloor}, rooms={nextRoomCount}, enemies={nextEnemyCount}, seed={nextSeed}");
@@ -149,6 +156,7 @@ public class FloorTransitionManager : MonoBehaviour
         if (_progressionManager != null)
         {
             _progressionManager.ApplyNetworkFloorState(nextFloor, nextRoomCount, nextEnemyCount);
+            Debug.Log("[SceneFlow] Applied progression state in transition");
         }
 
         var context = MatchContext.Instance;
@@ -157,6 +165,10 @@ public class FloorTransitionManager : MonoBehaviour
             context.lastInit.seed = nextSeed;
             context.hasInit = true;
             context.started = true;
+            Debug.Log("[SceneFlow] MatchContext updated before reload"
+                + " initId=" + context.lastInit.initId
+                + " seed=" + context.lastInit.seed
+                + " spawns=" + (context.lastInit.spawns == null ? 0 : context.lastInit.spawns.Length));
         }
 
         var activeScene = SceneManager.GetActiveScene().name;
@@ -164,6 +176,7 @@ public class FloorTransitionManager : MonoBehaviour
         {
             Debug.Log("[FloorTransition] Reloading active scene: " + activeScene);
         }
+        Debug.Log("[SceneFlow] Loading scene now: " + activeScene);
         SceneManager.LoadScene(activeScene);
         _transitionInProgress = false;
     }

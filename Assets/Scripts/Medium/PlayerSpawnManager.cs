@@ -65,6 +65,7 @@ public class PlayerSpawnManager : MonoBehaviour
 
     public bool SpawnLocal(string userId, Vector3 pos, float yaw, int modelIndex = -1)
     {
+        Debug.Log("[SceneFlow] PlayerSpawnManager.SpawnLocal called user=" + userId + " pos=" + pos);
         if (string.IsNullOrEmpty(userId)) return false;
         if (TryGet(userId, out var existing))
         {
@@ -73,6 +74,7 @@ public class PlayerSpawnManager : MonoBehaviour
             var looksLocalReady = _localUserId == userId && existingController != null && existingController.enabled && existingCamera != null && existingCamera.enabled;
             if (looksLocalReady)
             {
+                Debug.Log("[SceneFlow] SpawnLocal reusing existing local object user=" + userId + " go=" + existing.name);
                 spawnedLocal = true;
                 _localUserId = userId;
                 var minimapExisting = FindObjectOfType<MinimapController>();
@@ -84,18 +86,21 @@ public class PlayerSpawnManager : MonoBehaviour
             }
 
             // Existing object for this user is not a valid local player (often a stale remote/proxy).
+            Debug.LogWarning("[SceneFlow] SpawnLocal replacing stale existing object user=" + userId + " go=" + existing.name);
             Despawn(userId);
         }
 
         if (!localPlayerPrefab)
         {
             Debug.LogError("[Spawn] localPlayerPrefab is not assigned.");
+            Debug.LogError("[SceneFlow] SpawnLocal failed: localPlayerPrefab missing.");
             return false;
         }
         var safePos = ClampInsideMapBounds(pos);
         var rot = Quaternion.Euler(0f, yaw, 0f);
         var go = Instantiate(localPlayerPrefab, safePos, rot);
         go.name = "Local_" + ShortId(userId);
+        Debug.Log("[SceneFlow] SpawnLocal instantiated go=" + go.name + " at " + safePos);
         var randomizer = go.GetComponent<CharacterModelRandomizer>();
         if (randomizer != null)
         {
@@ -119,11 +124,16 @@ public class PlayerSpawnManager : MonoBehaviour
 
         var localController = go.GetComponentInChildren<MediumController>(true);
         if (localController) localController.enabled = true;
+        else Debug.LogWarning("[SceneFlow] SpawnLocal warning: MediumController not found on " + go.name);
 
         var cameras = go.GetComponentsInChildren<Camera>(true);
         for (var i = 0; i < cameras.Length; i++)
         {
             cameras[i].enabled = true;
+        }
+        if (cameras == null || cameras.Length == 0)
+        {
+            Debug.LogWarning("[SceneFlow] SpawnLocal warning: no Camera found on " + go.name);
         }
 
         var listeners = go.GetComponentsInChildren<AudioListener>(true);
@@ -137,6 +147,8 @@ public class PlayerSpawnManager : MonoBehaviour
         {
             minimap.player = localController != null ? localController.transform : go.transform;
         }
+
+        Debug.Log("[SceneFlow] SpawnLocal completed user=" + userId + " localUserId=" + _localUserId + " spawnedLocal=" + spawnedLocal);
 
         return true;
     }

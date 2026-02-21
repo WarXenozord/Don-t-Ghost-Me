@@ -1,5 +1,6 @@
 using UnityEngine;
 using System.Collections;
+using UnityEngine.SceneManagement;
 public class GameBootstrap : MonoBehaviour
 {
     [Header("Refs")]
@@ -19,6 +20,8 @@ public class GameBootstrap : MonoBehaviour
     public GameObject enemyPrefab;
     public GameObject localGhostPrefab;
     public GameObject remoteGhostPrefab;
+    [Header("Debug")]
+    public bool sceneFlowDebug = true;
 
     void Awake()
     {
@@ -66,6 +69,7 @@ public class GameBootstrap : MonoBehaviour
 
     void Start()
     {
+        if (sceneFlowDebug) Debug.Log("[SceneFlow] GameBootstrap.Start scene=" + SceneManager.GetActiveScene().name);
         StartCoroutine(DelayedBootstrap());
     }
 private IEnumerator DelayedBootstrap()
@@ -81,6 +85,14 @@ private IEnumerator DelayedBootstrap()
         var hasConn = !string.IsNullOrEmpty(resolvedSelfId);
         var hasInit = context != null && context.hasInit && context.lastInit != null;
         var hasSpawnForSelf = hasInit && context.lastInit.spawns != null && ContainsSpawnForUser(context.lastInit.spawns, resolvedSelfId);
+        if (sceneFlowDebug)
+        {
+            Debug.Log("[SceneFlow] WaitInit hasConn=" + hasConn
+                + " hasInit=" + hasInit
+                + " hasSpawnForSelf=" + hasSpawnForSelf
+                + " selfId=" + resolvedSelfId
+                + " elapsed=" + elapsed.ToString("F2"));
+        }
         if (hasConn && hasInit && (hasSpawnForSelf || context.lastInit.spawns == null || context.lastInit.spawns.Length == 0)) break;
         elapsed += Time.deltaTime;
         yield return null;
@@ -93,18 +105,22 @@ private IEnumerator DelayedBootstrap()
     {
         spawner.ClearAll();
         Debug.Log("[GameBootstrap] Cleared players for respawn");
+        if (sceneFlowDebug) Debug.Log("[SceneFlow] Spawner cleared before bootstrap.");
     }
 
     // Retry bootstrap until local player exists (avoids black screen race on floor reload).
     var attempts = 0;
     while (attempts < 5)
     {
+        if (sceneFlowDebug) Debug.Log("[SceneFlow] Bootstrap attempt " + (attempts + 1));
         BootstrapFromMatchContext();
         var resolvedSelfId = ResolveLocalUserId(MatchContext.Instance != null ? MatchContext.Instance.lastInit : null);
         if (spawner != null && !string.IsNullOrEmpty(resolvedSelfId) && spawner.TryGet(resolvedSelfId, out var localGo) && localGo != null)
         {
+            if (sceneFlowDebug) Debug.Log("[SceneFlow] Local spawned after attempt " + (attempts + 1) + " user=" + resolvedSelfId + " go=" + localGo.name);
             yield break;
         }
+        if (sceneFlowDebug) Debug.LogWarning("[SceneFlow] Local missing after attempt " + (attempts + 1) + " user=" + resolvedSelfId);
         attempts++;
         yield return new WaitForSeconds(0.25f);
     }
@@ -117,10 +133,19 @@ private IEnumerator DelayedBootstrap()
         if (!context.hasInit || context.lastInit == null)
         {
             Debug.LogWarning("[GameBootstrap] Missing init payload in MatchContext.");
+            if (sceneFlowDebug) Debug.LogWarning("[SceneFlow] Bootstrap blocked hasInit=" + context.hasInit + " lastInitNull=" + (context.lastInit == null));
             return;
         }
 
         var init = context.lastInit;
+        if (sceneFlowDebug)
+        {
+            Debug.Log("[SceneFlow] Bootstrap initId=" + init.initId
+                + " seed=" + init.seed
+                + " spawns=" + (init.spawns == null ? 0 : init.spawns.Length)
+                + " medium=" + init.mediumUserId
+                + " connSelf=" + (conn != null ? conn.SelfUserId : "null"));
+        }
         if (progressionManager != null)
         {
             if (!progressionManager.RunActive)
@@ -143,6 +168,7 @@ private IEnumerator DelayedBootstrap()
                 // Set room count (you may need to add public setters to ProceduralBuildingGenerator)
                 SetBuildingGeneratorRoomCount(buildingGenerator, roomCount);
                 buildingGenerator.GenerateBuildingFromSeed(floorSeed);
+                if (sceneFlowDebug) Debug.Log("[SceneFlow] Map generated seed=" + floorSeed + " roomCount=" + roomCount);
             }
         // Set enemy count
             if (hostAuthority)
@@ -162,6 +188,10 @@ private IEnumerator DelayedBootstrap()
         {
             if (localPlayerPrefab) spawner.localPlayerPrefab = localPlayerPrefab;
             if (proxyPlayerPrefab) spawner.remoteProxyPrefab = proxyPlayerPrefab;
+            if (sceneFlowDebug)
+            {
+                Debug.Log("[SceneFlow] Spawner prefabs local=" + (spawner.localPlayerPrefab != null) + " remote=" + (spawner.remoteProxyPrefab != null));
+            }
         }
         if (enemySpawner != null && !enemySpawner.enemyPrefab && enemyPrefab) enemySpawner.enemyPrefab = enemyPrefab;
         if (enemySpawner != null) enemySpawner.ClearAll();
@@ -176,11 +206,14 @@ private IEnumerator DelayedBootstrap()
         if (string.IsNullOrEmpty(selfId))
         {
             Debug.LogWarning("[GameBootstrap] Missing local user id.");
+            if (sceneFlowDebug) Debug.LogWarning("[SceneFlow] Resolved selfId is empty.");
             return;
         }
+        if (sceneFlowDebug) Debug.Log("[SceneFlow] Resolved selfId=" + selfId);
 
         if (TryGetSpawn(init.spawns, selfId, out var localSpawn))
         {
+            if (sceneFlowDebug) Debug.Log("[SceneFlow] SpawnLocal command user=" + selfId + " pos=" + localSpawn.position + " model=" + localSpawn.modelIndex);
             SpawnLocalPlayer(selfId, localSpawn.position, localSpawn.modelIndex);
         }
         else
@@ -190,12 +223,20 @@ private IEnumerator DelayedBootstrap()
             {
                 var fallback = init.spawns[0];
                 Debug.LogWarning("[GameBootstrap] Missing spawn for local user. Using fallback spawn.");
+                if (sceneFlowDebug) Debug.LogWarning("[SceneFlow] No matching spawn for self. Fallback user=" + selfId + " pos=" + fallback.position);
                 SpawnLocalPlayer(selfId, fallback.position, fallback.modelIndex);
             }
             else
             {
                 Debug.LogWarning("[GameBootstrap] Missing spawn for local user and no fallback spawns.");
+                if (sceneFlowDebug) Debug.LogWarning("[SceneFlow] No spawn entries available.");
             }
+        }
+
+        if (sceneFlowDebug && spawner != null)
+        {
+            var hasLocalAfterCmd = spawner.TryGet(selfId, out var localObjAfterCmd) && localObjAfterCmd != null;
+            Debug.Log("[SceneFlow] Post SpawnLocal check user=" + selfId + " exists=" + hasLocalAfterCmd);
         }
 
         SpawnRemoteProxies(init.spawns, selfId);

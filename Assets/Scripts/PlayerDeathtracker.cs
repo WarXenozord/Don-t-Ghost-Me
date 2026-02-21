@@ -28,6 +28,8 @@ public class PlayerDeathTracker : MonoBehaviour
     
     private bool _gameOverTriggered = false;
     private float _gameOverTimer = 0f;
+    private float _suppressChecksUntil;
+    private readonly Dictionary<string, float> _nextMissingBodyLogAt = new Dictionary<string, float>();
 
     void Awake()
     {
@@ -39,11 +41,19 @@ public class PlayerDeathTracker : MonoBehaviour
 
         Instance = this;
         DontDestroyOnLoad(gameObject);
+        SceneManager.sceneLoaded += OnSceneLoaded;
+    }
+
+    void OnDestroy()
+    {
+        if (Instance == this) Instance = null;
+        SceneManager.sceneLoaded -= OnSceneLoaded;
     }
 
     void Update()
     {
         ResolveRefs();
+        if (Time.unscaledTime < _suppressChecksUntil) return;
         CheckPlayerStates();
 
         // Game over countdown
@@ -198,6 +208,8 @@ public class PlayerDeathTracker : MonoBehaviour
         _deadPlayers.Clear();
         _gameOverTriggered = false;
         _gameOverTimer = 0f;
+        _suppressChecksUntil = Time.unscaledTime + 2f;
+        _nextMissingBodyLogAt.Clear();
 
         Debug.Log("[DeathTracker] Tracker reset");
     }
@@ -266,7 +278,10 @@ public class PlayerDeathTracker : MonoBehaviour
             if (string.IsNullOrEmpty(userId)) return false;
             if (!playerSpawner.TryGet(userId, out var go) || go == null)
             {
-                if (enableDebugLogs) Debug.Log($"[DeathTracker] Not all dead yet: missing body for {userId}");
+                if (enableDebugLogs && ShouldLogMissingBody(userId))
+                {
+                    Debug.Log($"[DeathTracker] Not all dead yet: missing body for {userId}");
+                }
                 return false;
             }
 
@@ -279,6 +294,22 @@ public class PlayerDeathTracker : MonoBehaviour
         }
 
         return true;
+    }
+
+    private bool ShouldLogMissingBody(string userId)
+    {
+        if (string.IsNullOrEmpty(userId)) return false;
+        var now = Time.unscaledTime;
+        if (_nextMissingBodyLogAt.TryGetValue(userId, out var nextAt) && now < nextAt) return false;
+        _nextMissingBodyLogAt[userId] = now + 2f;
+        return true;
+    }
+
+    private void OnSceneLoaded(Scene _, LoadSceneMode __)
+    {
+        // Give GameBootstrap/spawners time to build local+remote avatars.
+        _suppressChecksUntil = Time.unscaledTime + 3f;
+        _nextMissingBodyLogAt.Clear();
     }
 
     private void PrunePlayersNotInMatch(HashSet<string> currentPlayers)
