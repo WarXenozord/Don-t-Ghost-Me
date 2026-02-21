@@ -39,7 +39,7 @@ public class PlayerNameTag : MonoBehaviour
     public Color backgroundColor = new Color(0f, 0f, 0f, 0.5f);
 
     private UsernameManager _usernameManager;
-    private Transform _mainCameraTransform;
+    public Transform _mainCameraTransform;
     private bool _isLocalPlayer;
     private string _cachedDisplayName;
 

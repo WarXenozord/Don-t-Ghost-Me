@@ -139,7 +139,7 @@ GameObject:
   - component: {fileID: 2776133759108663281}
   m_Layer: 0
   m_Name: Camera
-  m_TagString: Untagged
+  m_TagString: MainCamera
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -544,6 +544,7 @@ MonoBehaviour:
   resourcesPath: CharacterModels
   modelParent: {fileID: 1688322380464866941}
   modelOffset: {x: 0, y: 0, z: 0}
+  randomizeOnAwake: 0
   _spawnedModel: {fileID: 0}
   _chosenIndex: -1
 --- !u!114 &7225594917151491043
