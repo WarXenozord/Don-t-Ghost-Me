@@ -232,7 +232,15 @@ public class LobbyUI : MonoBehaviour
     private void OnPresence(IMatchPresenceEvent e)
     {
         if (conn == null || conn.Match == null || e == null) return;
-        var hadJoins = e.Joins != null && e.Joins.Count > 0;
+        var hadJoins = false;
+        if (e.Joins != null)
+        {
+            foreach (var _ in e.Joins)
+            {
+                hadJoins = true;
+                break;
+            }
+        }
 
         if (e.Joins != null)
         {
