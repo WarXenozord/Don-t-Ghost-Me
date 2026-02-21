@@ -1927,8 +1927,8 @@ MonoBehaviour:
   m_ColorIntensity: 1
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_ColorGlow: 0
-  m_SamplingFilter: 5
-  m_SamplingIntensity: 0.5
+  m_SamplingFilter: 2
+  m_SamplingIntensity: 0.634
   m_SamplingWidth: 1
   m_SamplingScale: 1
   m_TransitionFilter: 0
@@ -2227,7 +2227,7 @@ MonoBehaviour:
   m_ColorIntensity: 1
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_ColorGlow: 0
-  m_SamplingFilter: 5
+  m_SamplingFilter: 0
   m_SamplingIntensity: 0.003
   m_SamplingWidth: 1
   m_SamplingScale: 1

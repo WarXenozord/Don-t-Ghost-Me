@@ -3,6 +3,13 @@ using UnityEngine;
 
 public class EnemySimpleAI : SoundAgroListener
 {
+    private class TrackedMedium
+    {
+        public string userId;
+        public Transform targetTransform;
+        public MediumController mediumController;
+    }
+
     public enum EnemyState
     {
         Patrol = 1,
@@ -61,16 +68,17 @@ public class EnemySimpleAI : SoundAgroListener
 
     private CharacterController _controller;
     private ProceduralBuildingGenerator _generator;
-    private readonly List<MediumController> _knownMediums = new List<MediumController>();
+    private readonly List<TrackedMedium> _knownMediums = new List<TrackedMedium>();
+    private readonly List<PlayerSpawnManager.SpawnedPlayerInfo> _spawnedPlayersBuffer = new List<PlayerSpawnManager.SpawnedPlayerInfo>();
     private readonly List<Vector3> _routeNodes = new List<Vector3>();
     private readonly List<Vector3> _roomCenterNodes = new List<Vector3>();
     private readonly Dictionary<int, int> _nodeVisits = new Dictionary<int, int>();
-    private readonly Dictionary<int, int> _touchCountByMedium = new Dictionary<int, int>();
-    private readonly HashSet<int> _activeTouchMediums = new HashSet<int>();
+    private readonly Dictionary<string, int> _touchCountByMedium = new Dictionary<string, int>();
+    private readonly HashSet<string> _activeTouchMediums = new HashSet<string>();
 
     private Vector3 _patrolTarget;
     private Vector3 _investigateTarget;
-    private MediumController _attackTarget;
+    private TrackedMedium _attackTarget;
     private float _nextPatrolResampleAt;
     private float _nextMediumRefreshAt;
 
@@ -203,7 +211,7 @@ public class EnemySimpleAI : SoundAgroListener
 
     private void TickAttack()
     {
-        if (_attackTarget == null)
+        if (_attackTarget == null || _attackTarget.targetTransform == null)
         {
             _attackRerouteToDoorActive = false;
             state = EnemyState.Patrol;
@@ -212,7 +220,7 @@ public class EnemySimpleAI : SoundAgroListener
             return;
         }
 
-        var targetPos = _attackTarget.transform.position;
+        var targetPos = _attackTarget.targetTransform.position;
         var distNow = Distance2D(transform.position, targetPos);
 
         if (_attackRerouteToDoorActive)
@@ -421,25 +429,61 @@ public class EnemySimpleAI : SoundAgroListener
         _nextMediumRefreshAt = Time.time + mediumRefreshInterval;
 
         _knownMediums.Clear();
-        var all = FindObjectsOfType<MediumController>(true);
-        for (var i = 0; i < all.Length; i++)
+        var playerSpawner = PlayerSpawnManager.Instance != null ? PlayerSpawnManager.Instance : FindObjectOfType<PlayerSpawnManager>();
+        if (playerSpawner != null)
         {
-            var m = all[i];
-            if (m == null || !m.gameObject.activeInHierarchy) continue;
-            _knownMediums.Add(m);
+            playerSpawner.FillSpawnedPlayers(_spawnedPlayersBuffer);
+            for (var i = 0; i < _spawnedPlayersBuffer.Count; i++)
+            {
+                var info = _spawnedPlayersBuffer[i];
+                var go = info.root;
+                if (go == null || !go.activeInHierarchy) continue;
+
+                // Ignore ghost players.
+                var ghost = go.GetComponentInChildren<GhostController>(true);
+                if (ghost != null) continue;
+
+                var medium = go.GetComponentInChildren<MediumController>(true);
+                var targetTransform = medium != null ? medium.transform : go.transform;
+                if (targetTransform == null) continue;
+
+                _knownMediums.Add(new TrackedMedium
+                {
+                    userId = info.userId,
+                    targetTransform = targetTransform,
+                    mediumController = medium
+                });
+            }
+        }
+
+        // Fallback: discover enabled hierarchy medium controllers directly.
+        if (_knownMediums.Count == 0)
+        {
+            var all = FindObjectsOfType<MediumController>(true);
+            for (var i = 0; i < all.Length; i++)
+            {
+                var m = all[i];
+                if (m == null || !m.gameObject.activeInHierarchy) continue;
+                _knownMediums.Add(new TrackedMedium
+                {
+                    userId = string.Empty,
+                    targetTransform = m.transform,
+                    mediumController = m
+                });
+            }
         }
     }
 
-    private MediumController FindVisibleMedium()
+    private TrackedMedium FindVisibleMedium()
     {
-        MediumController best = null;
+        TrackedMedium best = null;
         var bestDist = float.MaxValue;
         for (var i = 0; i < _knownMediums.Count; i++)
         {
             var m = _knownMediums[i];
             if (m == null || !CanSeeMedium(m)) continue;
 
-            var d = Distance2D(transform.position, m.transform.position);
+            var d = Distance2D(transform.position, m.targetTransform.position);
             if (d < bestDist)
             {
                 bestDist = d;
@@ -449,19 +493,19 @@ public class EnemySimpleAI : SoundAgroListener
         return best;
     }
 
-    private bool CanSeeMedium(MediumController medium)
+    private bool CanSeeMedium(TrackedMedium medium)
     {
-        if (medium == null) return false;
+        if (medium == null || medium.targetTransform == null) return false;
 
         if (requireSameRoomForVision && _generator != null)
         {
             var selfRoom = _generator.GetContainingRoomIndex(transform.position, preferredFloor: 0);
-            var targetRoom = _generator.GetContainingRoomIndex(medium.transform.position, preferredFloor: 0);
+            var targetRoom = _generator.GetContainingRoomIndex(medium.targetTransform.position, preferredFloor: 0);
             if (selfRoom >= 0 && targetRoom >= 0 && selfRoom != targetRoom) return false;
         }
 
         var origin = transform.position + Vector3.up * 1.4f;
-        var targetPos = medium.transform.position + Vector3.up * 1.2f;
+        var targetPos = medium.targetTransform.position + Vector3.up * 1.2f;
         var toTarget = targetPos - origin;
         var planar = new Vector3(toTarget.x, 0f, toTarget.z);
         var dist = planar.magnitude;
@@ -577,6 +621,14 @@ public class EnemySimpleAI : SoundAgroListener
         return Mathf.Sqrt(dx * dx + dz * dz);
     }
 
+    private static string BuildTrackedMediumKey(TrackedMedium medium)
+    {
+        if (medium == null) return string.Empty;
+        if (!string.IsNullOrEmpty(medium.userId)) return medium.userId;
+        if (medium.targetTransform != null) return "tf:" + medium.targetTransform.GetInstanceID();
+        return "unknown";
+    }
+
     private void HandleMediumContact()
     {
         if (!CanApplyGameplayEffects()) return;
@@ -585,10 +637,10 @@ public class EnemySimpleAI : SoundAgroListener
         for (var i = 0; i < _knownMediums.Count; i++)
         {
             var medium = _knownMediums[i];
-            if (medium == null) continue;
+            if (medium == null || medium.targetTransform == null) continue;
 
-            var mediumId = medium.GetInstanceID();
-            var dist = Distance2D(transform.position, medium.transform.position);
+            var mediumId = BuildTrackedMediumKey(medium);
+            var dist = Distance2D(transform.position, medium.targetTransform.position);
 
             if (dist <= contactDistance)
             {
@@ -603,17 +655,20 @@ public class EnemySimpleAI : SoundAgroListener
         }
     }
 
-    private void OnMediumTouched(MediumController medium, int mediumId)
+    private void OnMediumTouched(TrackedMedium medium, string mediumId)
     {
         _touchCountByMedium.TryGetValue(mediumId, out var count);
         count++;
         _touchCountByMedium[mediumId] = count;
-        medium.EnterHalfLife();
+        if (medium.mediumController != null)
+        {
+            medium.mediumController.EnterHalfLife();
+        }
 
         if (count == 1)
         {
             TriggerSyncedTouchFx(1);
-            TeleportAfterFirstTouch(medium.transform.position);
+            TeleportAfterFirstTouch(medium.targetTransform.position);
             return;
         }
 
@@ -621,13 +676,13 @@ public class EnemySimpleAI : SoundAgroListener
         {
             TriggerSyncedTouchFx(2);
             SpawnGhostOnSecondTouch(medium);
-            TeleportAfterFirstTouch(medium.transform.position);
+            TeleportAfterFirstTouch(medium.targetTransform.position);
         }
     }
 
-    private void SpawnGhostOnSecondTouch(MediumController medium)
+    private void SpawnGhostOnSecondTouch(TrackedMedium medium)
     {
-        if (!CanApplyGameplayEffects() || medium == null) return;
+        if (!CanApplyGameplayEffects() || medium == null || medium.targetTransform == null) return;
 
         if (_ghostSpawner == null)
         {
@@ -638,10 +693,15 @@ public class EnemySimpleAI : SoundAgroListener
         var playerSpawner = PlayerSpawnManager.Instance != null ? PlayerSpawnManager.Instance : FindObjectOfType<PlayerSpawnManager>();
         if (playerSpawner == null) return;
 
-        if (!playerSpawner.TryGetUserIdByObject(medium.gameObject, out var victimUserId)) return;
+        var victimUserId = medium.userId;
+        if (string.IsNullOrEmpty(victimUserId))
+        {
+            var candidateGo = medium.mediumController != null ? medium.mediumController.gameObject : medium.targetTransform.gameObject;
+            if (!playerSpawner.TryGetUserIdByObject(candidateGo, out victimUserId)) return;
+        }
 
-        var pos = medium.transform.position;
-        var yaw = medium.transform.eulerAngles.y;
+        var pos = medium.targetTransform.position;
+        var yaw = medium.targetTransform.eulerAngles.y;
         _ghostSpawner.HostKillMediumAndSpawnGhost(victimUserId, pos, yaw);
     }
 

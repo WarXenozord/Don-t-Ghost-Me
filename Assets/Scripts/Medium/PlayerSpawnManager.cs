@@ -3,6 +3,12 @@ using UnityEngine;
 
 public class PlayerSpawnManager : MonoBehaviour
 {
+    public struct SpawnedPlayerInfo
+    {
+        public string userId;
+        public GameObject root;
+    }
+
     public static PlayerSpawnManager Instance { get; private set; }
 
     [Header("Prefabs")]
@@ -242,6 +248,22 @@ public class PlayerSpawnManager : MonoBehaviour
         }
 
         return true;
+    }
+
+    public void FillSpawnedPlayers(List<SpawnedPlayerInfo> output)
+    {
+        if (output == null) return;
+        output.Clear();
+
+        foreach (var kv in _playersById)
+        {
+            if (string.IsNullOrEmpty(kv.Key) || kv.Value == null) continue;
+            output.Add(new SpawnedPlayerInfo
+            {
+                userId = kv.Key,
+                root = kv.Value
+            });
+        }
     }
 
     public void ApplyAuthoritativePose(string userId, Vector3 pos, float yaw)
