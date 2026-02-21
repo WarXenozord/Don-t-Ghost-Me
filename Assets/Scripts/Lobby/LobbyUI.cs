@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Text;
 using Nakama;
 using TMPro;
 using UnityEngine;
@@ -12,6 +13,7 @@ public class LobbyUI : MonoBehaviour
     public MatchTransport transport;
     public HostAuthority hostAuthority;
     public LobbyCameraMover lobbyCameraMover;
+    public LobbyPlaceholderSpawner lobbyPlaceholderSpawner;
 
     [Header("Screens")]
     public GameObject lobbywindow;
@@ -34,8 +36,12 @@ public class LobbyUI : MonoBehaviour
 
     [Header("Scene Flow")]
     public string gameSceneName = "GameScene";
+    [Header("Auto Refresh")]
+    public bool autoRefreshOnStart = true;
+    public float autoRefreshWaitTimeout = 10f;
 
     private const string LastMatchIdKey = "last_match_id";
+    private const string StartedMatchesKey = "started_match_ids";
 
     private readonly Dictionary<string, IUserPresence> players = new Dictionary<string, IUserPresence>();
     private int _lastInitUiLogId = -1;
@@ -47,6 +53,7 @@ public class LobbyUI : MonoBehaviour
         if (!transport) transport = FindObjectOfType<MatchTransport>();
         if (!hostAuthority) hostAuthority = FindObjectOfType<HostAuthority>();
         if (!lobbyCameraMover) lobbyCameraMover = FindObjectOfType<LobbyCameraMover>();
+        if (!lobbyPlaceholderSpawner) lobbyPlaceholderSpawner = FindObjectOfType<LobbyPlaceholderSpawner>();
 
         if (hostBtn) hostBtn.onClick.AddListener(HostLobby);
         if (refreshBtn) refreshBtn.onClick.AddListener(RefreshLobbies);
@@ -63,6 +70,15 @@ public class LobbyUI : MonoBehaviour
 
         SetScreen(isInRoom: false);
         RefreshLobbyUi();
+        SyncLobbyPlaceholders();
+    }
+
+    private void Start()
+    {
+        if (autoRefreshOnStart)
+        {
+            StartCoroutine(AutoRefreshWhenReady());
+        }
     }
 
     private void Update()
@@ -99,12 +115,18 @@ public class LobbyUI : MonoBehaviour
         PlayerPrefs.Save();
 
         RebuildPlayersFromCurrentMatch();
+        SyncLobbyPlaceholders();
         SetScreen(isInRoom: true);
         if (lobbyCameraMover) lobbyCameraMover.OnJoinedOrStartedMatch();
         RefreshLobbyUi("Hosting match " + ShortId(match.Id));
     }
 
     public async void RefreshLobbies()
+    {
+        await RefreshLobbiesInternal(silentStatus: false);
+    }
+
+    private async System.Threading.Tasks.Task RefreshLobbiesInternal(bool silentStatus)
     {
         if (conn == null || conn.Client == null || conn.Session == null)
         {
@@ -134,13 +156,17 @@ public class LobbyUI : MonoBehaviour
             foreach (var m in res.Matches)
             {
                 if (m == null || string.IsNullOrEmpty(m.MatchId)) continue;
+                if (IsStartedMatchId(m.MatchId)) continue;
                 found = true;
                 AddJoinRow(ShortId(m.MatchId) + "  |  " + m.Size + " players", m.MatchId);
             }
         }
 
         if (!found) AddInfoRow("No matches available.");
-        RefreshLobbyUi("Matches refreshed.");
+        if (!silentStatus)
+        {
+            RefreshLobbyUi("Matches refreshed.");
+        }
     }
 
     public async void JoinLobby(string matchId)
@@ -154,6 +180,7 @@ public class LobbyUI : MonoBehaviour
         conn.MatchCreatorUserId = match.Id == lastHostedMatchId ? conn.SelfUserId : string.Empty;
 
         RebuildPlayersFromCurrentMatch();
+        SyncLobbyPlaceholders();
         SetScreen(isInRoom: true);
         if (lobbyCameraMover) lobbyCameraMover.OnJoinedOrStartedMatch();
         RefreshLobbyUi("Joined match " + ShortId(match.Id));
@@ -171,6 +198,7 @@ public class LobbyUI : MonoBehaviour
         conn.Match = null;
         conn.MatchCreatorUserId = string.Empty;
         players.Clear();
+        if (lobbyPlaceholderSpawner) lobbyPlaceholderSpawner.ClearAll();
         SetScreen(isInRoom: false);
         if (lobbyCameraMover) lobbyCameraMover.OnLeftMatch();
         RefreshLobbyUi("Left match.");
@@ -212,6 +240,7 @@ public class LobbyUI : MonoBehaviour
         }
 
         RefreshLobbyUi();
+        SyncLobbyPlaceholders();
     }
 
     private void OnInitReceived(MatchTransport.InitMsg msg)
@@ -247,6 +276,10 @@ public class LobbyUI : MonoBehaviour
     {
         if (msg == null) return;
         MatchContext.Instance.started = true;
+        if (conn != null && conn.Match != null)
+        {
+            MarkMatchAsStarted(conn.Match.Id);
+        }
         RefreshLobbyUi("Game starting...");
         LoadGameSceneIfNeeded();
     }
@@ -278,9 +311,104 @@ public class LobbyUI : MonoBehaviour
         }
     }
 
+    private void SyncLobbyPlaceholders()
+    {
+        if (!lobbyPlaceholderSpawner) return;
+        if (conn == null || conn.Match == null)
+        {
+            lobbyPlaceholderSpawner.ClearAll();
+            return;
+        }
+
+        lobbyPlaceholderSpawner.SyncPlayers(BuildDeterministicLobbyOrder());
+    }
+
+    private List<string> BuildDeterministicLobbyOrder()
+    {
+        var all = new List<string>(players.Keys);
+        var creatorId = conn != null ? conn.MatchCreatorUserId : string.Empty;
+
+        all.Sort((a, b) =>
+        {
+            var aIsCreator = !string.IsNullOrEmpty(creatorId) && a == creatorId;
+            var bIsCreator = !string.IsNullOrEmpty(creatorId) && b == creatorId;
+            if (aIsCreator && !bIsCreator) return -1;
+            if (!aIsCreator && bIsCreator) return 1;
+            return string.CompareOrdinal(a, b);
+        });
+
+        return all;
+    }
+
     private bool HasConnectedSocket()
     {
         return conn != null && conn.Socket != null && conn.Socket.IsConnected;
+    }
+
+    private System.Collections.IEnumerator AutoRefreshWhenReady()
+    {
+        var waited = 0f;
+        while (waited < Mathf.Max(0.1f, autoRefreshWaitTimeout))
+        {
+            if (conn != null &&
+                conn.Client != null &&
+                conn.Session != null &&
+                conn.Socket != null &&
+                conn.Socket.IsConnected)
+            {
+                break;
+            }
+
+            waited += Time.unscaledDeltaTime;
+            yield return null;
+        }
+
+        var task = RefreshLobbiesInternal(silentStatus: true);
+        while (!task.IsCompleted)
+        {
+            yield return null;
+        }
+    }
+
+    private static HashSet<string> LoadStartedMatchIds()
+    {
+        var set = new HashSet<string>();
+        var raw = PlayerPrefs.GetString(StartedMatchesKey, string.Empty);
+        if (string.IsNullOrEmpty(raw)) return set;
+
+        var parts = raw.Split('|');
+        for (var i = 0; i < parts.Length; i++)
+        {
+            var id = parts[i];
+            if (string.IsNullOrEmpty(id)) continue;
+            set.Add(id);
+        }
+        return set;
+    }
+
+    private static bool IsStartedMatchId(string matchId)
+    {
+        if (string.IsNullOrEmpty(matchId)) return false;
+        var set = LoadStartedMatchIds();
+        return set.Contains(matchId);
+    }
+
+    private static void MarkMatchAsStarted(string matchId)
+    {
+        if (string.IsNullOrEmpty(matchId)) return;
+
+        var set = LoadStartedMatchIds();
+        if (!set.Add(matchId)) return;
+
+        var sb = new StringBuilder();
+        foreach (var id in set)
+        {
+            if (sb.Length > 0) sb.Append('|');
+            sb.Append(id);
+        }
+
+        PlayerPrefs.SetString(StartedMatchesKey, sb.ToString());
+        PlayerPrefs.Save();
     }
 
     private void SetScreen(bool isInRoom)

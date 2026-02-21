@@ -84,7 +84,7 @@ public class GameBootstrap : MonoBehaviour
 
         if (TryGetSpawn(init.spawns, selfId, out var localSpawn))
         {
-            SpawnLocalPlayer(selfId, localSpawn);
+            SpawnLocalPlayer(selfId, localSpawn.position, localSpawn.modelIndex);
         }
         else
         {
@@ -96,26 +96,26 @@ public class GameBootstrap : MonoBehaviour
         if (hostAuthority) hostAuthority.EnableGameplayAfterBootstrap();
     }
 
-    private static bool TryGetSpawn(MatchTransport.SpawnPoint[] spawns, string userId, out Vector3 pos)
+    private static bool TryGetSpawn(MatchTransport.SpawnPoint[] spawns, string userId, out MatchTransport.SpawnPoint foundSpawn)
     {
-        pos = Vector3.zero;
+        foundSpawn = null;
         if (spawns == null || string.IsNullOrEmpty(userId)) return false;
 
         foreach (var spawn in spawns)
         {
             if (spawn == null || string.IsNullOrEmpty(spawn.userId)) continue;
             if (spawn.userId != userId) continue;
-            pos = spawn.position;
+            foundSpawn = spawn;
             return true;
         }
 
         return false;
     }
 
-    private void SpawnLocalPlayer(string userId, Vector3 pos)
+    private void SpawnLocalPlayer(string userId, Vector3 pos, int modelIndex)
     {
         if (!spawner) return;
-        spawner.SpawnLocal(userId, pos, 0f);
+        spawner.SpawnLocal(userId, pos, 0f, modelIndex);
     }
 
     private void SpawnRemoteProxies(MatchTransport.SpawnPoint[] spawns, string selfId)
@@ -128,7 +128,7 @@ public class GameBootstrap : MonoBehaviour
             if (spawn.userId == selfId) continue;
 
             if (!spawner) continue;
-            spawner.SpawnRemote(spawn.userId, spawn.position, 0f);
+            spawner.SpawnRemote(spawn.userId, spawn.position, 0f, spawn.modelIndex);
         }
     }
 

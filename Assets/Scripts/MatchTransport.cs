@@ -441,6 +441,8 @@ public class MatchTransport : MonoBehaviour
     {
         public string userId;
         public Vector3 position;
+        public int slotIndex;
+        public int modelIndex;
     }
 
     [Serializable]

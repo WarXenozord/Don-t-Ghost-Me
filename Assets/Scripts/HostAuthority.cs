@@ -24,6 +24,14 @@ public class HostAuthority : MonoBehaviour
     [Header("Enemy Spawn (Host)")]
     [Min(0)] public int startEnemyCount = 0;
     [Min(0f)] public float enemyMinDistanceFromPlayers = 8f;
+    [Header("Lobby Slots (Deterministic)")]
+    public Vector3[] lobbySpawnSlots = new Vector3[]
+    {
+        new Vector3(-3f, 0.5f, 0f),
+        new Vector3(-1f, 0.5f, 0f),
+        new Vector3(1f, 0.5f, 0f),
+        new Vector3(3f, 0.5f, 0f)
+    };
 
     [Header("Debug")]
     public bool enableDebugLogs = true;
@@ -50,6 +58,7 @@ public class HostAuthority : MonoBehaviour
 
     private readonly HashSet<string> _readyUserIds = new HashSet<string>();
     private readonly Dictionary<string, Vector3> _spawnByUserId = new Dictionary<string, Vector3>();
+    private readonly Dictionary<string, int> _slotByUserId = new Dictionary<string, int>();
 
     // Authoritative state (host only)
     private readonly Dictionary<string, Vector3> _pos = new Dictionary<string, Vector3>();
@@ -244,12 +253,30 @@ public class HostAuthority : MonoBehaviour
     private MatchTransport.SpawnPoint[] BuildSpawnPointsPlaceholder()
     {
         var users = GetPresentUserIds();
-        var spawns = new MatchTransport.SpawnPoint[users.Count];
-        var i = 0;
-        foreach (var userId in users)
+        EnsureSlotAssignments(users);
+
+        var orderedUsers = new List<string>(users);
+        orderedUsers.Sort((a, b) =>
         {
-            var position = new Vector3(i * 2f, 0.5f, 0f);
-            spawns[i++] = new MatchTransport.SpawnPoint { userId = userId, position = position };
+            var slotA = _slotByUserId.TryGetValue(a, out var sa) ? sa : int.MaxValue;
+            var slotB = _slotByUserId.TryGetValue(b, out var sb) ? sb : int.MaxValue;
+            if (slotA != slotB) return slotA.CompareTo(slotB);
+            return string.CompareOrdinal(a, b);
+        });
+
+        var spawns = new MatchTransport.SpawnPoint[orderedUsers.Count];
+        for (var i = 0; i < orderedUsers.Count; i++)
+        {
+            var userId = orderedUsers[i];
+            var slot = _slotByUserId.TryGetValue(userId, out var s) ? s : i;
+            var position = GetSlotPosition(slot);
+            spawns[i] = new MatchTransport.SpawnPoint
+            {
+                userId = userId,
+                position = position,
+                slotIndex = slot,
+                modelIndex = -1
+            };
         }
         return spawns;
     }
@@ -294,6 +321,7 @@ public class HostAuthority : MonoBehaviour
         _lastSentAnimState = -1;
         _lastBroadcastHostAnimState = -1;
         _spawnByUserId.Clear();
+        _slotByUserId.Clear();
         _cachedInitSpawns = msg.spawns;
         _spawnPassComplete = false;
         _initialEnemiesSpawned = false;
@@ -310,6 +338,7 @@ public class HostAuthority : MonoBehaviour
                 var spawn = msg.spawns[i];
                 if (spawn == null || string.IsNullOrEmpty(spawn.userId)) continue;
                 _spawnByUserId[spawn.userId] = spawn.position;
+                _slotByUserId[spawn.userId] = Mathf.Max(0, spawn.slotIndex);
             }
         }
 
@@ -353,6 +382,7 @@ public class HostAuthority : MonoBehaviour
 
         _readyUserIds.Clear();
         _spawnByUserId.Clear();
+        _slotByUserId.Clear();
         _cachedInitSpawns = null;
         _spawnPassComplete = false;
         _pos.Clear();
@@ -374,6 +404,17 @@ public class HostAuthority : MonoBehaviour
 
     private void OnPresenceChanged(IMatchPresenceEvent e)
     {
+        if (e != null && e.Leaves != null)
+        {
+            foreach (var leave in e.Leaves)
+            {
+                if (leave == null || string.IsNullOrEmpty(leave.UserId)) continue;
+                _slotByUserId.Remove(leave.UserId);
+            }
+        }
+
+        EnsureSlotAssignments(GetPresentUserIds());
+
         if (e != null && e.Joins != null)
         {
             foreach (var join in e.Joins)
@@ -440,6 +481,47 @@ public class HostAuthority : MonoBehaviour
         }
 
         return new List<string>(unique);
+    }
+
+    private void EnsureSlotAssignments(List<string> presentUsers)
+    {
+        if (presentUsers == null) return;
+
+        for (var i = 0; i < presentUsers.Count; i++)
+        {
+            var userId = presentUsers[i];
+            if (string.IsNullOrEmpty(userId)) continue;
+            if (_slotByUserId.ContainsKey(userId)) continue;
+            _slotByUserId[userId] = GetNextFreeSlot();
+        }
+    }
+
+    private int GetNextFreeSlot()
+    {
+        var used = new HashSet<int>(_slotByUserId.Values);
+        var maxSlots = lobbySpawnSlots != null && lobbySpawnSlots.Length > 0 ? lobbySpawnSlots.Length : 4;
+
+        for (var i = 0; i < maxSlots; i++)
+        {
+            if (!used.Contains(i)) return i;
+        }
+
+        // Fallback for overflow players beyond configured slots.
+        return _slotByUserId.Count;
+    }
+
+    private Vector3 GetSlotPosition(int slotIndex)
+    {
+        if (lobbySpawnSlots != null && lobbySpawnSlots.Length > 0)
+        {
+            if (slotIndex >= 0 && slotIndex < lobbySpawnSlots.Length)
+            {
+                return lobbySpawnSlots[slotIndex];
+            }
+        }
+
+        // Overflow fallback keeps deterministic spacing.
+        return new Vector3(slotIndex * 2f, 0.5f, 0f);
     }
 
     private MatchTransport.InputMsg BuildLocalInput()
@@ -634,7 +716,7 @@ public class HostAuthority : MonoBehaviour
         if (spawner == null || string.IsNullOrEmpty(conn?.SelfUserId)) return;
 
         var safeSpawn = spawner.ClampInsideMapBounds(spawnPos);
-        spawner.SpawnLocal(conn.SelfUserId, safeSpawn, 0f);
+        spawner.SpawnLocal(conn.SelfUserId, safeSpawn, 0f, GetModelIndexForUser(conn.SelfUserId));
 
         _spawnByUserId[conn.SelfUserId] = safeSpawn;
         _pos[conn.SelfUserId] = safeSpawn;
@@ -654,7 +736,7 @@ public class HostAuthority : MonoBehaviour
             if (spawn.userId == selfId) continue;
 
             var safeSpawn = spawner ? spawner.ClampInsideMapBounds(spawn.position) : spawn.position;
-            if (spawner) spawner.SpawnRemote(spawn.userId, safeSpawn, 0f);
+            if (spawner) spawner.SpawnRemote(spawn.userId, safeSpawn, 0f, spawn.modelIndex);
             _spawnByUserId[spawn.userId] = safeSpawn;
 
             if (isHost)
@@ -730,6 +812,13 @@ public class HostAuthority : MonoBehaviour
             return known;
         }
 
+        if (!string.IsNullOrEmpty(userId) && _slotByUserId.TryGetValue(userId, out var slotIdx))
+        {
+            var slotPos = GetSlotPosition(slotIdx);
+            if (spawner != null) return spawner.ClampInsideMapBounds(slotPos);
+            return slotPos;
+        }
+
         var baseSpawn = new Vector3(0f, 0.5f, 0f);
         var hash = string.IsNullOrEmpty(userId) ? 0 : Mathf.Abs(userId.GetHashCode());
         var ring = (hash % 5) + 1;
@@ -743,6 +832,19 @@ public class HostAuthority : MonoBehaviour
         }
 
         return baseSpawn;
+    }
+
+    private int GetModelIndexForUser(string userId)
+    {
+        if (string.IsNullOrEmpty(userId) || _cachedInitSpawns == null) return -1;
+        for (var i = 0; i < _cachedInitSpawns.Length; i++)
+        {
+            var spawn = _cachedInitSpawns[i];
+            if (spawn == null || string.IsNullOrEmpty(spawn.userId)) continue;
+            if (spawn.userId != userId) continue;
+            return spawn.modelIndex;
+        }
+        return -1;
     }
 
     private void ResolveRefs()
