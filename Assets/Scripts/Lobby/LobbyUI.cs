@@ -90,7 +90,7 @@ public class LobbyUI : MonoBehaviour
         {
             _lobbyRosterRefreshAt = Time.unscaledTime + 0.5f;
             RebuildPlayersFromCurrentMatch();
-            if (conn.IsCurrentPlayerMatchCreator)
+            if (IsPlaceholderAuthority())
             {
                 SyncLobbyPlaceholders();
             }
@@ -232,6 +232,7 @@ public class LobbyUI : MonoBehaviour
     private void OnPresence(IMatchPresenceEvent e)
     {
         if (conn == null || conn.Match == null || e == null) return;
+        var hadJoins = e.Joins != null && e.Joins.Count > 0;
 
         if (e.Joins != null)
         {
@@ -251,8 +252,10 @@ public class LobbyUI : MonoBehaviour
             }
         }
 
+        // Rebuild from match snapshot to avoid any incremental desync in local dictionary.
+        RebuildPlayersFromCurrentMatch();
         RefreshLobbyUi();
-        if (conn.IsCurrentPlayerMatchCreator)
+        if (IsPlaceholderAuthority() || hadJoins)
         {
             SyncLobbyPlaceholders();
         }
@@ -335,7 +338,7 @@ public class LobbyUI : MonoBehaviour
             return;
         }
 
-        if (conn.IsCurrentPlayerMatchCreator)
+        if (IsPlaceholderAuthority())
         {
             var ordered = BuildDeterministicLobbyOrder();
             lobbyPlaceholderSpawner.SyncPlayers(ordered);
@@ -375,7 +378,7 @@ public class LobbyUI : MonoBehaviour
     {
         if (msg == null || lobbyPlaceholderSpawner == null) return;
         if (conn == null || conn.Match == null) return;
-        if (conn.IsCurrentPlayerMatchCreator) return;
+        if (IsPlaceholderAuthority()) return;
 
         // Only trust host as source of placeholder ordering.
         if (!string.IsNullOrEmpty(conn.MatchCreatorUserId) &&
@@ -400,6 +403,16 @@ public class LobbyUI : MonoBehaviour
         }
 
         lobbyPlaceholderSpawner.SyncPlayers(ordered);
+    }
+
+    private bool IsPlaceholderAuthority()
+    {
+        if (conn == null || conn.Match == null) return false;
+        if (conn.IsCurrentPlayerMatchCreator) return true;
+
+        // Fallback for edge cases where creator flag is momentarily unset.
+        var lastHostedMatchId = PlayerPrefs.GetString(LastMatchIdKey, string.Empty);
+        return !string.IsNullOrEmpty(lastHostedMatchId) && conn.Match.Id == lastHostedMatchId;
     }
 
     private bool HasConnectedSocket()
