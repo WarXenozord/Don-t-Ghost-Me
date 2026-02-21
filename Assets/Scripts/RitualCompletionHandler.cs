@@ -148,13 +148,18 @@ public class RitualCompletionHandler : MonoBehaviour
             Debug.Log($"[RitualCompletion] Received ritual completion from {msg.senderUserId}");
         }
 
-        // Host receives client ritual request and rebroadcasts authoritative transition payload.
-        if (conn != null && conn.IsCurrentPlayerMatchCreator && !msg.shouldTransition && msg.nextFloor <= 0)
+        // Non-authoritative ritual trigger request (usually from a non-host) should not
+        // mark this floor as completed on clients; wait for host payload.
+        if (!msg.shouldTransition && msg.nextFloor <= 0)
         {
-            BroadcastRitualCompletion();
+            if (conn != null && conn.IsCurrentPlayerMatchCreator)
+            {
+                BroadcastRitualCompletion();
+            }
             return;
         }
 
+        // Host receives client ritual request and rebroadcasts authoritative transition payload.
         ProcessRitualCompletion(msg);
     }
 

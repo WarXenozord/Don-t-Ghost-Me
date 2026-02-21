@@ -97,6 +97,7 @@ public class PlayerDeathTracker : MonoBehaviour
 
         // Get all current players in match
         var currentPlayers = GetAllPlayerIds();
+        PrunePlayersNotInMatch(currentPlayers);
 
         foreach (var userId in currentPlayers)
         {
@@ -105,10 +106,11 @@ public class PlayerDeathTracker : MonoBehaviour
 
             // Check if player is a ghost
             var ghost = playerGo.GetComponentInChildren<GhostController>(true);
-            if (ghost != null)
+            var isGhost = ghost != null;
+            if (isGhost)
             {
                 // Player is a ghost (dead)
-                if (_alivePlayers.Contains(userId))
+                if (!_deadPlayers.Contains(userId))
                 {
                     RegisterPlayerDead(userId);
                 }
@@ -122,6 +124,8 @@ public class PlayerDeathTracker : MonoBehaviour
                 }
             }
         }
+
+        CheckForGameOver();
     }
 
     /// <summary>
@@ -140,8 +144,8 @@ public class PlayerDeathTracker : MonoBehaviour
             return;
         }
 
-        // Check if everyone is dead
-        bool allDead = _alivePlayers.Count == 0 && _deadPlayers.Count > 0;
+        // Check if everyone currently in match is known dead.
+        bool allDead = _deadPlayers.Count == allPlayers.Count && allPlayers.Count > 0;
 
         if (allDead)
         {
@@ -226,6 +230,37 @@ public class PlayerDeathTracker : MonoBehaviour
         }
 
         return players;
+    }
+
+    private void PrunePlayersNotInMatch(HashSet<string> currentPlayers)
+    {
+        if (currentPlayers == null) return;
+
+        var removeAlive = new List<string>();
+        foreach (var userId in _alivePlayers)
+        {
+            if (!currentPlayers.Contains(userId))
+            {
+                removeAlive.Add(userId);
+            }
+        }
+        for (var i = 0; i < removeAlive.Count; i++)
+        {
+            _alivePlayers.Remove(removeAlive[i]);
+        }
+
+        var removeDead = new List<string>();
+        foreach (var userId in _deadPlayers)
+        {
+            if (!currentPlayers.Contains(userId))
+            {
+                removeDead.Add(userId);
+            }
+        }
+        for (var i = 0; i < removeDead.Count; i++)
+        {
+            _deadPlayers.Remove(removeDead[i]);
+        }
     }
 
     private void ResolveRefs()
