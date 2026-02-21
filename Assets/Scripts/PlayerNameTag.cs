@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 
 /// <summary>
 /// Displays player's display name as floating text above their character.
@@ -11,15 +12,13 @@ public class PlayerNameTag : MonoBehaviour
     [Tooltip("The userId this name tag represents")]
     public string userId;
 
-    [Tooltip("Canvas with name text (will be created if null)")]
-    public Canvas nameCanvas;
-
     [Tooltip("Text component showing the name (will be created if null)")]
-    public Text nameText;
+    public GameObject nameCanvas;
+    public TMP_Text nameText;
 
     [Header("Settings")]
     [Tooltip("Offset from player position (typically above head)")]
-    public Vector3 offset = new Vector3(0f, 2.5f, 0f);
+    public Vector3 offset = new Vector3(0f, 1f, 0f);
 
     [Tooltip("Name tag scale")]
     public float scale = 0.02f;
@@ -60,11 +59,6 @@ public class PlayerNameTag : MonoBehaviour
             return;
         }
 
-        // Create UI if not assigned
-        if (nameCanvas == null || nameText == null)
-        {
-            CreateNameTagUI();
-        }
 
         UpdateDisplayName();
     }
@@ -72,7 +66,6 @@ public class PlayerNameTag : MonoBehaviour
     void LateUpdate()
     {
         if (_isLocalPlayer && !showForLocalPlayer) return;
-        if (nameCanvas == null) return;
 
         // Update name if it changed
         if (_usernameManager != null)
@@ -90,12 +83,7 @@ public class PlayerNameTag : MonoBehaviour
             nameCanvas.transform.rotation = _mainCameraTransform.rotation;
         }
 
-        // Distance culling
-        if (maxDistance > 0f && _mainCameraTransform != null)
-        {
-            float dist = Vector3.Distance(transform.position, _mainCameraTransform.position);
-            nameCanvas.enabled = dist <= maxDistance;
-        }
+    
     }
 
     /// <summary>
@@ -123,60 +111,6 @@ public class PlayerNameTag : MonoBehaviour
     /// <summary>
     /// Creates the UI canvas and text if not already present
     /// </summary>
-    private void CreateNameTagUI()
-    {
-        // Create canvas GameObject
-        var canvasGO = new GameObject("NameTagCanvas");
-        canvasGO.transform.SetParent(transform, worldPositionStays: false);
-        canvasGO.transform.localPosition = offset;
-        canvasGO.transform.localRotation = Quaternion.identity;
-        canvasGO.transform.localScale = Vector3.one * scale;
-
-        // Setup Canvas component
-        nameCanvas = canvasGO.AddComponent<Canvas>();
-        nameCanvas.renderMode = RenderMode.WorldSpace;
-
-        var canvasScaler = canvasGO.AddComponent<CanvasScaler>();
-        canvasScaler.dynamicPixelsPerUnit = 10f;
-
-        // Canvas size
-        var rectTransform = canvasGO.GetComponent<RectTransform>();
-        rectTransform.sizeDelta = new Vector2(200f, 50f);
-
-        // Background panel (optional)
-        if (showBackground)
-        {
-            var bgGO = new GameObject("Background");
-            bgGO.transform.SetParent(canvasGO.transform, worldPositionStays: false);
-
-            var bgImage = bgGO.AddComponent<Image>();
-            bgImage.color = backgroundColor;
-
-            var bgRect = bgGO.GetComponent<RectTransform>();
-            bgRect.anchorMin = Vector2.zero;
-            bgRect.anchorMax = Vector2.one;
-            bgRect.sizeDelta = Vector2.zero; // Stretch to fill parent
-        }
-
-        // Text GameObject
-        var textGO = new GameObject("NameText");
-        textGO.transform.SetParent(canvasGO.transform, worldPositionStays: false);
-
-        nameText = textGO.AddComponent<Text>();
-        nameText.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
-        nameText.text = "Player";
-        nameText.fontSize = fontSize;
-        nameText.fontStyle = fontStyle;
-        nameText.color = nameColor;
-        nameText.alignment = TextAnchor.MiddleCenter;
-
-        var textRect = textGO.GetComponent<RectTransform>();
-        textRect.anchorMin = Vector2.zero;
-        textRect.anchorMax = Vector2.one;
-        textRect.sizeDelta = Vector2.zero; // Stretch to fill parent
-
-        Debug.Log($"[PlayerNameTag] Created name tag UI for {userId}");
-    }
 
     /// <summary>
     /// Call this to manually set the userId (for dynamically spawned players)
@@ -192,7 +126,7 @@ public class PlayerNameTag : MonoBehaviour
         // Hide for local if configured
         if (_isLocalPlayer && !showForLocalPlayer)
         {
-            if (nameCanvas != null) nameCanvas.enabled = false;
+            if (nameCanvas != null) nameCanvas.SetActive(false);
             return;
         }
 
@@ -206,7 +140,6 @@ public class PlayerNameTag : MonoBehaviour
         {
             nameText.color = nameColor;
             nameText.fontSize = fontSize;
-            nameText.fontStyle = fontStyle;
         }
     }
 }
