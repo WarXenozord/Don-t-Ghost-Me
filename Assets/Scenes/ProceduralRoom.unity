@@ -1047,6 +1047,25 @@ MonoBehaviour:
   conn: {fileID: 0}
   usernameManager: {fileID: 0}
   broadcastDelay: 0.5
+--- !u!114 &827982692
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 827982689}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ceb5d8b79cdddb3458d753c655d847a2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  transport: {fileID: 0}
+  conn: {fileID: 0}
+  hostAuthority: {fileID: 0}
+  transitionManager: {fileID: 0}
+  progressionManager: {fileID: 0}
+  deathTracker: {fileID: 0}
+  enableDebugLogs: 1
 --- !u!1 &1027122380
 GameObject:
   m_ObjectHideFlags: 0
@@ -1343,8 +1362,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -304.6194, y: 135.70001}
-  m_SizeDelta: {x: 231.7612, y: 30}
+  m_AnchoredPosition: {x: -301.50815, y: 129.53357}
+  m_SizeDelta: {x: 237.9837, y: 42.3329}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &1304738251
 CanvasRenderer:
@@ -1944,6 +1963,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 73163572864504066, guid: 3b4ec7472d45f3c4f9bd2ffe57d02ad3, type: 3}
       insertIndex: -1
       addedObject: {fileID: 827982691}
+    - targetCorrespondingSourceObject: {fileID: 73163572864504066, guid: 3b4ec7472d45f3c4f9bd2ffe57d02ad3, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 827982692}
   m_SourcePrefab: {fileID: 100100000, guid: 3b4ec7472d45f3c4f9bd2ffe57d02ad3, type: 3}
 --- !u!1 &1971851828
 GameObject:
