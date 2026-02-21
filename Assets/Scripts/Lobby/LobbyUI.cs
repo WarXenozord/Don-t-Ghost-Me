@@ -13,6 +13,7 @@ public class LobbyUI : MonoBehaviour
     public MatchTransport transport;
     public HostAuthority hostAuthority;
     public LobbyCameraMover lobbyCameraMover;
+    public LobbyPlaceholderSpawner lobbyPlaceholderSpawner;
 
     [Header("Screens")]
     public GameObject lobbywindow;
@@ -52,6 +53,7 @@ public class LobbyUI : MonoBehaviour
         if (!transport) transport = FindObjectOfType<MatchTransport>();
         if (!hostAuthority) hostAuthority = FindObjectOfType<HostAuthority>();
         if (!lobbyCameraMover) lobbyCameraMover = FindObjectOfType<LobbyCameraMover>();
+        if (!lobbyPlaceholderSpawner) lobbyPlaceholderSpawner = FindObjectOfType<LobbyPlaceholderSpawner>();
 
         if (hostBtn) hostBtn.onClick.AddListener(HostLobby);
         if (refreshBtn) refreshBtn.onClick.AddListener(RefreshLobbies);
@@ -68,6 +70,7 @@ public class LobbyUI : MonoBehaviour
 
         SetScreen(isInRoom: false);
         RefreshLobbyUi();
+        SyncLobbyPlaceholders();
     }
 
     private void Start()
@@ -112,6 +115,7 @@ public class LobbyUI : MonoBehaviour
         PlayerPrefs.Save();
 
         RebuildPlayersFromCurrentMatch();
+        SyncLobbyPlaceholders();
         SetScreen(isInRoom: true);
         if (lobbyCameraMover) lobbyCameraMover.OnJoinedOrStartedMatch();
         RefreshLobbyUi("Hosting match " + ShortId(match.Id));
@@ -176,6 +180,7 @@ public class LobbyUI : MonoBehaviour
         conn.MatchCreatorUserId = match.Id == lastHostedMatchId ? conn.SelfUserId : string.Empty;
 
         RebuildPlayersFromCurrentMatch();
+        SyncLobbyPlaceholders();
         SetScreen(isInRoom: true);
         if (lobbyCameraMover) lobbyCameraMover.OnJoinedOrStartedMatch();
         RefreshLobbyUi("Joined match " + ShortId(match.Id));
@@ -193,6 +198,7 @@ public class LobbyUI : MonoBehaviour
         conn.Match = null;
         conn.MatchCreatorUserId = string.Empty;
         players.Clear();
+        if (lobbyPlaceholderSpawner) lobbyPlaceholderSpawner.ClearAll();
         SetScreen(isInRoom: false);
         if (lobbyCameraMover) lobbyCameraMover.OnLeftMatch();
         RefreshLobbyUi("Left match.");
@@ -234,6 +240,7 @@ public class LobbyUI : MonoBehaviour
         }
 
         RefreshLobbyUi();
+        SyncLobbyPlaceholders();
     }
 
     private void OnInitReceived(MatchTransport.InitMsg msg)
@@ -302,6 +309,35 @@ public class LobbyUI : MonoBehaviour
         {
             players[conn.Match.Self.UserId] = conn.Match.Self;
         }
+    }
+
+    private void SyncLobbyPlaceholders()
+    {
+        if (!lobbyPlaceholderSpawner) return;
+        if (conn == null || conn.Match == null)
+        {
+            lobbyPlaceholderSpawner.ClearAll();
+            return;
+        }
+
+        lobbyPlaceholderSpawner.SyncPlayers(BuildDeterministicLobbyOrder());
+    }
+
+    private List<string> BuildDeterministicLobbyOrder()
+    {
+        var all = new List<string>(players.Keys);
+        var creatorId = conn != null ? conn.MatchCreatorUserId : string.Empty;
+
+        all.Sort((a, b) =>
+        {
+            var aIsCreator = !string.IsNullOrEmpty(creatorId) && a == creatorId;
+            var bIsCreator = !string.IsNullOrEmpty(creatorId) && b == creatorId;
+            if (aIsCreator && !bIsCreator) return -1;
+            if (!aIsCreator && bIsCreator) return 1;
+            return string.CompareOrdinal(a, b);
+        });
+
+        return all;
     }
 
     private bool HasConnectedSocket()

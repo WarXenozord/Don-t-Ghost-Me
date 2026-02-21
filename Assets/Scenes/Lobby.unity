@@ -811,6 +811,58 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 233810706}
   m_CullTransparentMesh: 1
+--- !u!1 &236183008
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 236183010}
+  - component: {fileID: 236183009}
+  m_Layer: 0
+  m_Name: LobbySpawner
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &236183009
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 236183008}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7a47cec53375fd64d9f53392c572f198, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  lobbyPlaceholderPrefab: {fileID: 7926306406141672409, guid: 20439e3ca7e0a95438b909cee1f18792, type: 3}
+  slotAnchors:
+  - {fileID: 2097177115}
+  - {fileID: 893225592}
+  - {fileID: 1321996329}
+  - {fileID: 221887923}
+  fallbackStart: {x: -3, y: 0, z: 0}
+  fallbackSpacing: 2
+--- !u!4 &236183010
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 236183008}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -70.904625, y: 14.829403, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &249100396
 GameObject:
   m_ObjectHideFlags: 0
@@ -968,6 +1020,11 @@ MonoBehaviour:
   hostRemoteMaxExtrapolation: 0.12
   startEnemyCount: 1
   enemyMinDistanceFromPlayers: 20
+  lobbySpawnSlots:
+  - {x: -3, y: 0.5, z: 0}
+  - {x: -1, y: 0.5, z: 0}
+  - {x: 1, y: 0.5, z: 0}
+  - {x: 3, y: 0.5, z: 0}
   enableDebugLogs: 1
   debugLogInterval: 1
 --- !u!114 &302446470
@@ -2032,7 +2089,8 @@ MonoBehaviour:
   conn: {fileID: 0}
   transport: {fileID: 0}
   hostAuthority: {fileID: 0}
-  lobbyCameraMover: {fileID: 0}
+  lobbyCameraMover: {fileID: 963194229}
+  lobbyPlaceholderSpawner: {fileID: 236183009}
   lobbywindow: {fileID: 1920071833}
   roomwindow: {fileID: 949264952}
   hostBtn: {fileID: 1984774205}
@@ -6631,3 +6689,4 @@ SceneRoots:
   - {fileID: 1018756568426586368}
   - {fileID: 8254505019526136951}
   - {fileID: 6940453992620175797}
+  - {fileID: 236183010}

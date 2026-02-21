@@ -23,6 +23,8 @@ public class CharacterModelRandomizer : MonoBehaviour
 
     [Tooltip("Local position offset for the model")]
     public Vector3 modelOffset = Vector3.zero;
+    [Tooltip("If true, auto-spawns a random model in Awake. Keep disabled for networked deterministic assignment.")]
+    public bool randomizeOnAwake = false;
 
     [Header("Runtime Info (Read-Only)")]
     [SerializeField] private GameObject _spawnedModel;
@@ -39,7 +41,10 @@ public class CharacterModelRandomizer : MonoBehaviour
                            "Animator should be on the root for proper animation.");
         }
 
-        SpawnRandomModel();
+        if (randomizeOnAwake)
+        {
+            SpawnRandomModel();
+        }
     }
 
     /// <summary>

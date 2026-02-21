@@ -33,7 +33,7 @@ public class PlayerSpawnManager : MonoBehaviour
         DontDestroyOnLoad(gameObject);
     }
 
-    public bool SpawnLocal(string userId, Vector3 pos, float yaw)
+    public bool SpawnLocal(string userId, Vector3 pos, float yaw, int modelIndex = -1)
     {
         if (string.IsNullOrEmpty(userId)) return false;
         if (TryGet(userId, out _))
@@ -54,15 +54,22 @@ public class PlayerSpawnManager : MonoBehaviour
             Debug.LogError("[Spawn] localPlayerPrefab is not assigned.");
             return false;
         }
-        var controler = FindObjectOfType<ProceduralBuildingGenerator>();
-        
-        var safePos = controler.SpawnPlayerInRandomRoom();
+        var safePos = ClampInsideMapBounds(pos);
         var rot = Quaternion.Euler(0f, yaw, 0f);
         var go = Instantiate(localPlayerPrefab, safePos, rot);
         go.name = "Local_" + ShortId(userId);
         var randomizer = go.GetComponent<CharacterModelRandomizer>();
         if (randomizer != null)
-            randomizer.SpawnModelFromUserId(userId); // Deterministic = consistent across clients!
+        {
+            if (modelIndex >= 0 && randomizer.GetModelCount() > 0)
+            {
+                randomizer.SpawnModelByIndex(modelIndex % randomizer.GetModelCount());
+            }
+            else
+            {
+                randomizer.SpawnModelFromUserId(userId); // Fallback deterministic behavior.
+            }
+        }
         _playersById[userId] = go;
 
         _localUserId = userId;
@@ -125,7 +132,7 @@ public class PlayerSpawnManager : MonoBehaviour
         return true;
     }
 
-    public bool SpawnRemote(string userId, Vector3 pos, float yaw)
+    public bool SpawnRemote(string userId, Vector3 pos, float yaw, int modelIndex = -1)
     {
         if (string.IsNullOrEmpty(userId)) return false;
         if (TryGet(userId, out _)) return true;
@@ -138,7 +145,16 @@ public class PlayerSpawnManager : MonoBehaviour
             go = Instantiate(remoteProxyPrefab, safePos, rot);
             var randomizer = go.GetComponent<CharacterModelRandomizer>();
             if (randomizer != null)
-                randomizer.SpawnModelFromUserId(userId); // Deterministic = consistent across clients!
+            {
+                if (modelIndex >= 0 && randomizer.GetModelCount() > 0)
+                {
+                    randomizer.SpawnModelByIndex(modelIndex % randomizer.GetModelCount());
+                }
+                else
+                {
+                    randomizer.SpawnModelFromUserId(userId); // Fallback deterministic behavior.
+                }
+            }
     
         }
         else
