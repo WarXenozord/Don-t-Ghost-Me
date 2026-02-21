@@ -22,8 +22,9 @@ public class MatchTransport : MonoBehaviour
     public const long OPCODE_CHAT = 33;
     public const long OPCODE_ANIM = 34;
     public const long OPCODE_CHAIR_THROW = 35;
-    public const long OPCODE_DISPLAY_NAME = 34;
+    public const long OPCODE_DISPLAY_NAME = 38;
     public const long OPCODE_CHAIR_STATE = 36;
+    public const long OPCODE_LOBBY_PLACEHOLDERS = 37;
 
     public NakamaConnection conn;
 
@@ -44,6 +45,7 @@ public class MatchTransport : MonoBehaviour
     public event Action<ChairThrowMsg> OnChairThrow;
     public event Action<DisplayNameMsg> OnDisplayName;
     public event Action<ChairStateMsg> OnChairState;
+    public event Action<LobbyPlaceholdersMsg> OnLobbyPlaceholders;
     private bool _isBound;
     private NakamaConnection _boundConn;
 
@@ -243,6 +245,12 @@ public class MatchTransport : MonoBehaviour
             msg.senderUserId = state.UserPresence.UserId;
             OnChairState?.Invoke(msg);
         }
+        else if (state.OpCode == OPCODE_LOBBY_PLACEHOLDERS)
+        {
+            var msg = JsonUtility.FromJson<LobbyPlaceholdersMsg>(json);
+            msg.senderUserId = state.UserPresence.UserId;
+            OnLobbyPlaceholders?.Invoke(msg);
+        }
     }
 
     public async void SendInput(InputMsg msg)
@@ -402,6 +410,13 @@ public class MatchTransport : MonoBehaviour
         if (conn?.Socket == null || conn.Match == null) return;
         var bytes = Encoding.UTF8.GetBytes(JsonUtility.ToJson(msg));
         await conn.Socket.SendMatchStateAsync(conn.Match.Id, OPCODE_CHAIR_STATE, bytes);
+    }
+
+    public async void BroadcastLobbyPlaceholders(LobbyPlaceholdersMsg msg)
+    {
+        if (conn?.Socket == null || conn.Match == null) return;
+        var bytes = Encoding.UTF8.GetBytes(JsonUtility.ToJson(msg));
+        await conn.Socket.SendMatchStateAsync(conn.Match.Id, OPCODE_LOBBY_PLACEHOLDERS, bytes);
     }
 
     [Serializable]
@@ -601,6 +616,13 @@ public class MatchTransport : MonoBehaviour
         public float angVelX;
         public float angVelY;
         public float angVelZ;
+        [NonSerialized] public string senderUserId;
+    }
+
+    [Serializable]
+    public class LobbyPlaceholdersMsg
+    {
+        public string[] orderedUserIds;
         [NonSerialized] public string senderUserId;
     }
 }

@@ -67,6 +67,7 @@ public class LobbyUI : MonoBehaviour
         {
             transport.OnInit += OnInitReceived;
             transport.OnStart += OnStartReceived;
+            transport.OnLobbyPlaceholders += OnLobbyPlaceholdersReceived;
         }
 
         SetScreen(isInRoom: false);
@@ -89,7 +90,10 @@ public class LobbyUI : MonoBehaviour
         {
             _lobbyRosterRefreshAt = Time.unscaledTime + 0.5f;
             RebuildPlayersFromCurrentMatch();
-            SyncLobbyPlaceholders();
+            if (conn.IsCurrentPlayerMatchCreator)
+            {
+                SyncLobbyPlaceholders();
+            }
         }
         if (conn == null || conn.Match == null) return;
 
@@ -107,6 +111,7 @@ public class LobbyUI : MonoBehaviour
         {
             transport.OnInit -= OnInitReceived;
             transport.OnStart -= OnStartReceived;
+            transport.OnLobbyPlaceholders -= OnLobbyPlaceholdersReceived;
         }
     }
 
@@ -247,7 +252,10 @@ public class LobbyUI : MonoBehaviour
         }
 
         RefreshLobbyUi();
-        SyncLobbyPlaceholders();
+        if (conn.IsCurrentPlayerMatchCreator)
+        {
+            SyncLobbyPlaceholders();
+        }
     }
 
     private void OnInitReceived(MatchTransport.InitMsg msg)
@@ -327,7 +335,23 @@ public class LobbyUI : MonoBehaviour
             return;
         }
 
-        lobbyPlaceholderSpawner.SyncPlayers(BuildDeterministicLobbyOrder());
+        if (conn.IsCurrentPlayerMatchCreator)
+        {
+            var ordered = BuildDeterministicLobbyOrder();
+            lobbyPlaceholderSpawner.SyncPlayers(ordered);
+            if (transport != null)
+            {
+                transport.BroadcastLobbyPlaceholders(new MatchTransport.LobbyPlaceholdersMsg
+                {
+                    orderedUserIds = ordered.ToArray()
+                });
+            }
+        }
+        else
+        {
+            // Clients only mirror host placeholder state.
+            lobbyPlaceholderSpawner.ClearAll();
+        }
     }
 
     private List<string> BuildDeterministicLobbyOrder()
@@ -345,6 +369,37 @@ public class LobbyUI : MonoBehaviour
         });
 
         return all;
+    }
+
+    private void OnLobbyPlaceholdersReceived(MatchTransport.LobbyPlaceholdersMsg msg)
+    {
+        if (msg == null || lobbyPlaceholderSpawner == null) return;
+        if (conn == null || conn.Match == null) return;
+        if (conn.IsCurrentPlayerMatchCreator) return;
+
+        // Only trust host as source of placeholder ordering.
+        if (!string.IsNullOrEmpty(conn.MatchCreatorUserId) &&
+            !string.IsNullOrEmpty(msg.senderUserId) &&
+            msg.senderUserId != conn.MatchCreatorUserId)
+        {
+            return;
+        }
+
+        if (msg.orderedUserIds == null)
+        {
+            lobbyPlaceholderSpawner.ClearAll();
+            return;
+        }
+
+        var ordered = new List<string>(msg.orderedUserIds.Length);
+        for (var i = 0; i < msg.orderedUserIds.Length; i++)
+        {
+            var id = msg.orderedUserIds[i];
+            if (string.IsNullOrEmpty(id)) continue;
+            ordered.Add(id);
+        }
+
+        lobbyPlaceholderSpawner.SyncPlayers(ordered);
     }
 
     private bool HasConnectedSocket()
