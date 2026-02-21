@@ -71,6 +71,7 @@ public class LobbyUI : MonoBehaviour
             transport.OnStart += OnStartReceived;
             transport.OnLobbyJoinRequest += OnLobbyJoinRequestReceived;
             transport.OnLobbyPlaceholderSpawn += OnLobbyPlaceholderSpawnReceived;
+            transport.OnDisplayName += OnDisplayNameReceived;
         }
 
         SetScreen(isInRoom: false);
@@ -112,6 +113,7 @@ public class LobbyUI : MonoBehaviour
             transport.OnStart -= OnStartReceived;
             transport.OnLobbyJoinRequest -= OnLobbyJoinRequestReceived;
             transport.OnLobbyPlaceholderSpawn -= OnLobbyPlaceholderSpawnReceived;
+            transport.OnDisplayName -= OnDisplayNameReceived;
         }
     }
 
@@ -128,6 +130,7 @@ public class LobbyUI : MonoBehaviour
 
         RebuildPlayersFromCurrentMatch();
         EnsureHostSelfLobbySpawn();
+        BroadcastLocalDisplayName();
         SetScreen(isInRoom: true);
         if (lobbyCameraMover) lobbyCameraMover.OnJoinedOrStartedMatch();
         RefreshLobbyUi("Hosting match " + ShortId(match.Id));
@@ -193,6 +196,7 @@ public class LobbyUI : MonoBehaviour
 
         RebuildPlayersFromCurrentMatch();
         RequestLobbySpawnFromHost();
+        BroadcastLocalDisplayName();
         SetScreen(isInRoom: true);
         if (lobbyCameraMover) lobbyCameraMover.OnJoinedOrStartedMatch();
         RefreshLobbyUi("Joined match " + ShortId(match.Id));
@@ -270,7 +274,11 @@ public class LobbyUI : MonoBehaviour
         }
 
         RefreshLobbyUi();
-        if (hadJoins && !conn.IsCurrentPlayerMatchCreator) RequestLobbySpawnFromHost();
+        if (hadJoins)
+        {
+            BroadcastLocalDisplayName();
+            if (!conn.IsCurrentPlayerMatchCreator) RequestLobbySpawnFromHost();
+        }
     }
 
     private void OnInitReceived(MatchTransport.InitMsg msg)
@@ -461,6 +469,30 @@ public class LobbyUI : MonoBehaviour
         RefreshLobbyUi();
     }
 
+    private void OnDisplayNameReceived(MatchTransport.DisplayNameMsg msg)
+    {
+        if (msg == null || string.IsNullOrEmpty(msg.senderUserId) || string.IsNullOrEmpty(msg.displayName)) return;
+        var usernameManager = UsernameManager.Instance != null ? UsernameManager.Instance : FindObjectOfType<UsernameManager>();
+        if (usernameManager == null) return;
+
+        usernameManager.RegisterUserDisplayName(msg.senderUserId, msg.displayName);
+        RefreshLobbyUi();
+    }
+
+    private void BroadcastLocalDisplayName()
+    {
+        if (transport == null || conn == null || conn.Match == null) return;
+        var usernameManager = UsernameManager.Instance != null ? UsernameManager.Instance : FindObjectOfType<UsernameManager>();
+        if (usernameManager == null) return;
+        var displayName = usernameManager.LocalDisplayName;
+        if (string.IsNullOrWhiteSpace(displayName)) return;
+
+        transport.BroadcastDisplayName(new MatchTransport.DisplayNameMsg
+        {
+            displayName = displayName.Trim()
+        });
+    }
+
     private bool HasConnectedSocket()
     {
         return conn != null && conn.Socket != null && conn.Socket.IsConnected;
@@ -558,9 +590,18 @@ public class LobbyUI : MonoBehaviour
         foreach (var kv in players)
         {
             var p = kv.Value;
-            var username = usernameManager != null
-                ? usernameManager.GetDisplayName(p.UserId)
-                : (string.IsNullOrEmpty(p.Username) ? "Guest" : p.Username);
+            var username = string.Empty;
+            if (usernameManager != null)
+            {
+                username = usernameManager.GetDisplayName(p.UserId);
+            }
+
+            var shortId = ShortId(p.UserId);
+            if (string.IsNullOrWhiteSpace(username) || username == shortId)
+            {
+                username = string.IsNullOrEmpty(p.Username) ? shortId : p.Username;
+            }
+
             sb.AppendLine(username + " (" + ShortId(p.UserId) + ")");
         }
         return sb.ToString();
