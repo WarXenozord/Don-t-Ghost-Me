@@ -77,6 +77,7 @@ public class PlayerSpawnManager : MonoBehaviour
             }
         }
         _playersById[userId] = go;
+        ConfigureNameTags(go, userId);
 
         _localUserId = userId;
         spawnedLocal = true;
@@ -172,6 +173,7 @@ public class PlayerSpawnManager : MonoBehaviour
 
         go.name = "Remote_" + ShortId(userId);
         _playersById[userId] = go;
+        ConfigureNameTags(go, userId);
 
         var controller = go.GetComponentInChildren<MediumController>(true);
         if (controller) controller.enabled = false;
@@ -235,6 +237,7 @@ public class PlayerSpawnManager : MonoBehaviour
         }
 
         _playersById[userId] = go;
+        ConfigureNameTags(go, userId);
 
         if (isLocal)
         {
@@ -248,6 +251,17 @@ public class PlayerSpawnManager : MonoBehaviour
         }
 
         return true;
+    }
+
+    private static void ConfigureNameTags(GameObject root, string userId)
+    {
+        if (root == null || string.IsNullOrEmpty(userId)) return;
+        var tags = root.GetComponentsInChildren<PlayerNameTag>(true);
+        for (var i = 0; i < tags.Length; i++)
+        {
+            if (tags[i] == null) continue;
+            tags[i].SetUserId(userId);
+        }
     }
 
     public void FillSpawnedPlayers(List<SpawnedPlayerInfo> output)

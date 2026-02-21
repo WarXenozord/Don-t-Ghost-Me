@@ -170,10 +170,12 @@ public class DisplayNameBroadcaster : MonoBehaviour
 
     private void EnsureBound()
     {
-        if (_transportBound || transport == null) return;
-        transport.OnDisplayName += OnDisplayNameReceived;
-        _transportBound = true;
-        Debug.Log("[DisplayNameBroadcaster] Bound to MatchTransport");
+        if (!_transportBound && transport != null)
+        {
+            transport.OnDisplayName += OnDisplayNameReceived;
+            _transportBound = true;
+            Debug.Log("[DisplayNameBroadcaster] Bound to MatchTransport");
+        }
 
         if (!_presenceBound && conn != null)
         {
