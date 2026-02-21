@@ -3415,6 +3415,7 @@ MonoBehaviour:
   backButton: {fileID: 1488171098}
   usernamePanel: {fileID: 887748888}
   mainButtonsPanel: {fileID: 1390847009}
+  menuStateController: {fileID: 1807725822}
   lobbySceneName: Lobby
   successColor: {r: 0, g: 1, b: 0, a: 1}
   errorColor: {r: 1, g: 0, b: 0, a: 1}
@@ -5195,6 +5196,37 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1490869014}
   m_CullTransparentMesh: 1
+--- !u!1 &1543319464
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1543319465}
+  m_Layer: 0
+  m_Name: Table Target
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1543319465
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1543319464}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0.7071068, y: -0, z: -0, w: 0.7071068}
+  m_LocalPosition: {x: 0, y: 1.712, z: 6.665}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1548517571
 GameObject:
   m_ObjectHideFlags: 0
@@ -5873,9 +5905,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   cameraController: {fileID: 1357257870}
-  playTarget: {fileID: 1286963077}
-  settingsTarget: {fileID: 1286963077}
-  creditsTarget: {fileID: 1286963077}
+  sideTarget: {fileID: 1286963077}
+  mainTarget: {fileID: 1543319465}
   mainButtonsPanel: {fileID: 1390847009}
   playPanel: {fileID: 887748888}
   settingsPanel: {fileID: 1996014106}
@@ -6526,6 +6557,7 @@ CanvasRenderer:
 SceneRoots:
   m_ObjectHideFlags: 0
   m_Roots:
+  - {fileID: 1543319465}
   - {fileID: 1357257869}
   - {fileID: 901233806}
   - {fileID: 645982416}
