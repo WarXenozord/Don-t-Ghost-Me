@@ -458,6 +458,11 @@ public async void BroadcastRitualComplete(RitualCompleteMsg msg)
     public class RitualCompleteMsg
     {
         public int initId;
+        public bool shouldTransition;
+        public int nextSeed;
+        public int nextFloor;
+        public int nextRoomCount;
+        public int nextEnemyCount;
         [NonSerialized] public string senderUserId;
     }
     [Serializable]

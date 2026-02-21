@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 /// <summary>
 /// Listens for ritual completion messages and triggers floor transition (host only).
@@ -13,6 +14,8 @@ public class RitualCompletionHandler : MonoBehaviour
     public NakamaConnection conn;
     public HostAuthority hostAuthority;
     public FloorTransitionManager transitionManager;
+    public FloorProgressionManager progressionManager;
+    public PlayerDeathTracker deathTracker;
 
     [Header("Debug")]
     public bool enableDebugLogs = true;
@@ -33,6 +36,7 @@ public class RitualCompletionHandler : MonoBehaviour
 
         ResolveRefs();
         EnsureBound();
+        SceneManager.sceneLoaded += OnSceneLoaded;
     }
 
     void Update()
@@ -43,6 +47,7 @@ public class RitualCompletionHandler : MonoBehaviour
 
     void OnDestroy()
     {
+        SceneManager.sceneLoaded -= OnSceneLoaded;
         if (transport != null && _transportBound)
         {
             transport.OnRitualComplete -= OnRitualCompleteReceived;
@@ -66,10 +71,44 @@ public class RitualCompletionHandler : MonoBehaviour
             hostAuthority = FindObjectOfType<HostAuthority>();
 
         int initId = hostAuthority != null ? hostAuthority.ActiveInitId : -1;
+        ResolveRefs();
+
+        var isHost = conn != null && conn.IsCurrentPlayerMatchCreator;
+        var canTransition = false;
+        var nextFloor = 0;
+        var nextRooms = 0;
+        var nextEnemies = 0;
+        var nextSeed = 0;
+
+        if (isHost)
+        {
+            canTransition = HasAliveMediums();
+            nextSeed = BuildNextSeed();
+
+            if (canTransition && progressionManager != null)
+            {
+                if (!progressionManager.RunActive) progressionManager.StartNewRun();
+                progressionManager.AdvanceToNextFloor();
+                nextFloor = progressionManager.CurrentFloor;
+                nextRooms = progressionManager.CurrentRoomCount;
+                nextEnemies = progressionManager.CurrentEnemyCount;
+            }
+            else if (progressionManager != null)
+            {
+                nextFloor = progressionManager.CurrentFloor;
+                nextRooms = progressionManager.CurrentRoomCount;
+                nextEnemies = progressionManager.CurrentEnemyCount;
+            }
+        }
 
         var msg = new MatchTransport.RitualCompleteMsg
         {
-            initId = initId
+            initId = initId,
+            shouldTransition = canTransition,
+            nextSeed = nextSeed,
+            nextFloor = nextFloor,
+            nextRoomCount = nextRooms,
+            nextEnemyCount = nextEnemies
         };
 
         transport.BroadcastRitualComplete(msg);
@@ -79,8 +118,10 @@ public class RitualCompletionHandler : MonoBehaviour
             Debug.Log("[RitualCompletion] Broadcast ritual completion");
         }
 
-        // Also process locally immediately (don't wait for network echo)
-        ProcessRitualCompletion();
+        if (isHost)
+        {
+            ProcessRitualCompletion(msg);
+        }
     }
 
     /// <summary>
@@ -107,14 +148,23 @@ public class RitualCompletionHandler : MonoBehaviour
             Debug.Log($"[RitualCompletion] Received ritual completion from {msg.senderUserId}");
         }
 
-        ProcessRitualCompletion();
+        // Host receives client ritual request and rebroadcasts authoritative transition payload.
+        if (conn != null && conn.IsCurrentPlayerMatchCreator && !msg.shouldTransition && msg.nextFloor <= 0)
+        {
+            BroadcastRitualCompletion();
+            return;
+        }
+
+        ProcessRitualCompletion(msg);
     }
 
     /// <summary>
     /// Processes the ritual completion and triggers floor transition (host only)
     /// </summary>
-    private void ProcessRitualCompletion()
+    private void ProcessRitualCompletion(MatchTransport.RitualCompleteMsg msg)
     {
+        if (msg == null) return;
+
         // Only process once per floor
         if (_ritualCompletedThisFloor)
         {
@@ -125,24 +175,23 @@ public class RitualCompletionHandler : MonoBehaviour
 
         _ritualCompletedThisFloor = true;
 
-        // Only host triggers the actual floor transition
-        if (conn != null && !conn.IsCurrentPlayerMatchCreator)
+        if (!msg.shouldTransition)
         {
             if (enableDebugLogs)
-                Debug.Log("[RitualCompletion] Non-host received ritual completion - waiting for host to trigger transition");
+                Debug.Log("[RitualCompletion] Ritual complete but no alive medium. Transition skipped.");
             return;
         }
-
-        // Host: Trigger floor transition
-        if (transitionManager == null)
-            transitionManager = FloorTransitionManager.Instance;
 
         if (transitionManager != null)
         {
             if (enableDebugLogs)
-                Debug.Log("[RitualCompletion] Host triggering floor transition");
+                Debug.Log("[RitualCompletion] Triggering synced floor transition");
             
-            transitionManager.TriggerFloorTransition();
+            transitionManager.TriggerFloorTransitionSynced(
+                msg.nextFloor,
+                msg.nextRoomCount,
+                msg.nextEnemyCount,
+                msg.nextSeed);
         }
         else
         {
@@ -160,6 +209,11 @@ public class RitualCompletionHandler : MonoBehaviour
             Debug.Log("[RitualCompletion] Reset for new floor");
     }
 
+    private void OnSceneLoaded(Scene _, LoadSceneMode __)
+    {
+        _ritualCompletedThisFloor = false;
+    }
+
     private void ResolveRefs()
     {
         if (transport == null)
@@ -173,6 +227,12 @@ public class RitualCompletionHandler : MonoBehaviour
         
         if (transitionManager == null)
             transitionManager = FloorTransitionManager.Instance != null ? FloorTransitionManager.Instance : FindObjectOfType<FloorTransitionManager>();
+        
+        if (progressionManager == null)
+            progressionManager = FloorProgressionManager.Instance != null ? FloorProgressionManager.Instance : FindObjectOfType<FloorProgressionManager>();
+        
+        if (deathTracker == null)
+            deathTracker = PlayerDeathTracker.Instance != null ? PlayerDeathTracker.Instance : FindObjectOfType<PlayerDeathTracker>();
     }
 
     private void EnsureBound()
@@ -182,5 +242,22 @@ public class RitualCompletionHandler : MonoBehaviour
         _transportBound = true;
         if (enableDebugLogs)
             Debug.Log("[RitualCompletion] Bound to MatchTransport");
+    }
+
+    private bool HasAliveMediums()
+    {
+        if (deathTracker == null) return true;
+        return deathTracker.GetAlivePlayerCount() > 0;
+    }
+
+    private int BuildNextSeed()
+    {
+        var context = MatchContext.Instance;
+        var baseSeed = (context != null && context.lastInit != null) ? context.lastInit.seed : Random.Range(1, int.MaxValue);
+        var floor = progressionManager != null ? progressionManager.CurrentFloor + 1 : 1;
+        unchecked
+        {
+            return Mathf.Abs(baseSeed * 1103515245 + 12345 + floor * 7919);
+        }
     }
 }
