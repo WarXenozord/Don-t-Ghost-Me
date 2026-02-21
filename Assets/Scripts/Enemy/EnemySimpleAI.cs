@@ -154,6 +154,7 @@ public class EnemySimpleAI : SoundAgroListener
 
     protected override void OnSoundAgroHeard(SoundAgroEvent evt, float perceivedIntensity)
     {
+        if (!CanApplyGameplayEffects()) return;
         _investigateTarget = evt.worldPosition;
         if (state != EnemyState.Attack) state = EnemyState.Investigate;
     }

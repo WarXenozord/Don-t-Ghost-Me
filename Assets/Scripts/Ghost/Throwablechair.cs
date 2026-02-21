@@ -32,6 +32,11 @@ public class Throwablechair : MonoBehaviour, IInteractable
     [SerializeField] private float returnSpeed = 1.5f;
     [SerializeField] private float returnSnapDistance = 0.05f;
 
+    [Header("Throw Sound/Agro")]
+    [SerializeField] private float throwSoundIntensity = 4f;
+    [SerializeField] private AudioSource throwAudioSource;
+    [SerializeField] private AudioClip throwClip;
+
     [Header("Highlight")]
     [SerializeField] private GameObject highlightVisual;
     [SerializeField] private float highlightPulseSpeed = 3f;
@@ -80,6 +85,8 @@ public class Throwablechair : MonoBehaviour, IInteractable
             Random.Range(-1f, 1f)) * torqueAmount;
 
         ThrowWithParams(baseDir, throwForce, throwUpward, torque, snapToOriginStart: false);
+        EmitThrowSoundEvent();
+        PlayThrowSfx();
         BroadcastThrow(baseDir, torque);
     }
 
@@ -333,9 +340,24 @@ public class Throwablechair : MonoBehaviour, IInteractable
             msg.upward,
             new Vector3(msg.torqueX, msg.torqueY, msg.torqueZ),
             snapToOriginStart: true);
+        chair.EmitThrowSoundEvent();
+        chair.PlayThrowSfx();
 
         chair._remoteDriven = true;
         chair._hadRemoteState = false;
+    }
+
+    private void EmitThrowSoundEvent()
+    {
+        SoundAgroEventBus.Emit(transform.position, Mathf.Max(0f, throwSoundIntensity), gameObject);
+    }
+
+    private void PlayThrowSfx()
+    {
+        if (throwClip == null) return;
+        var source = throwAudioSource != null ? throwAudioSource : GetComponent<AudioSource>();
+        if (source == null) return;
+        source.PlayOneShot(throwClip);
     }
 
     private static void ResolveTransport()
