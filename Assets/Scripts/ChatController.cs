@@ -107,11 +107,10 @@ public class ChatController : MonoBehaviour
 
         transport.SendChat(msg);
 
-        // Local echo: always show sender's own message in local log.
-        var color = (msg.senderRole == RoleMedium && NormalizeTarget(msg.target) == TargetGhosts)
-            ? "#FF4D4D"
-            : "#FFFFFF";
-       var senderName = _usernameManager != null ? _usernameManager.GetDisplayName(conn.SelfUserId) : ShortId(conn.SelfUserId);
+        // Local echo: sender always sees their own successfully-sent message.
+        var target = NormalizeTarget(msg.target);
+        var color = (msg.senderRole == RoleMedium && target == TargetGhosts) ? "#FF4D4D" : "#FFFFFF";
+        var senderName = _usernameManager != null ? _usernameManager.GetDisplayName(conn.SelfUserId) : ShortId(conn.SelfUserId);
         var localLine = "<color=" + color + ">[" + msg.senderRole + "] " + senderName + ": " + msg.text + "</color>";
         OnChatLine?.Invoke(localLine);
         return true;
@@ -151,9 +150,8 @@ public class ChatController : MonoBehaviour
         }
         else if (target == TargetGhosts || target == TargetAllGhosts)
         {
-            // Medium -> Ghosts is shown to both sides (red).
-            // Ghost -> Ghosts stays ghost-only.
-            shouldDisplay = senderRole == RoleMedium || localRole == RoleGhost;
+            // Ghost-only channel.
+            shouldDisplay = localRole == RoleGhost;
         }
 
         if (!shouldDisplay) return;
