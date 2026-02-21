@@ -188,7 +188,8 @@ public class CharacterModelRandomizer : MonoBehaviour
 
         // Hash userId to get consistent index across all clients
         int hash = string.IsNullOrEmpty(userId) ? 0 : userId.GetHashCode();
-        int index = Mathf.Abs(hash) % models.Length;
+        int positiveHash = hash & 0x7fffffff;
+        int index = positiveHash % models.Length;
 
         SpawnModelByIndex(index);
         Debug.Log($"[CharacterModelRandomizer] User {userId} ? Model {index} (deterministic)");

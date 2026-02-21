@@ -46,6 +46,7 @@ public class LobbyUI : MonoBehaviour
     private readonly Dictionary<string, IUserPresence> players = new Dictionary<string, IUserPresence>();
     private int _lastInitUiLogId = -1;
     private bool _loadingGameScene;
+    private float _lobbyRosterRefreshAt;
 
     private void Awake()
     {
@@ -84,6 +85,12 @@ public class LobbyUI : MonoBehaviour
     private void Update()
     {
         if (_loadingGameScene) return;
+        if (conn != null && conn.Match != null && Time.unscaledTime >= _lobbyRosterRefreshAt)
+        {
+            _lobbyRosterRefreshAt = Time.unscaledTime + 0.5f;
+            RebuildPlayersFromCurrentMatch();
+            SyncLobbyPlaceholders();
+        }
         if (conn == null || conn.Match == null) return;
 
         var context = MatchContext.Instance;

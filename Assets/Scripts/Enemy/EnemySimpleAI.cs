@@ -544,7 +544,9 @@ public class EnemySimpleAI : SoundAgroListener
     {
         if (_attackTarget != null)
         {
-            _attackNoGainStartDist = Distance2D(transform.position, _attackTarget.transform.position);
+            _attackNoGainStartDist = _attackTarget.targetTransform != null
+                ? Distance2D(transform.position, _attackTarget.targetTransform.position)
+                : 0f;
         }
         else
         {
