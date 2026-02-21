@@ -69,18 +69,6 @@ public class FloorReloadHandler : MonoBehaviour
         yield return new WaitForEndOfFrame();
         yield return new WaitForSeconds(0.1f);
 
-        // GameBootstrap already owns full scene setup/spawning on floor reload.
-        // Avoid duplicate clear/spawn passes that can remove local player.
-        var bootstrap = FindObjectOfType<GameBootstrap>();
-        if (bootstrap != null)
-        {
-            if (enableDebugLogs)
-            {
-                Debug.Log("[FloorReload] GameBootstrap detected, skipping FloorReloadHandler respawn pass.");
-            }
-            yield break;
-        }
-
         ResolveRefs();
 
         // Check if we're in a gameplay scene with an active match
@@ -133,15 +121,7 @@ public class FloorReloadHandler : MonoBehaviour
         }
 
         var init = context.lastInit;
-        var selfId = ResolveLocalUserId(init);
-        if (string.IsNullOrEmpty(selfId))
-        {
-            if (enableDebugLogs)
-            {
-                Debug.LogWarning("[FloorReload] Self user id unresolved; aborting respawn pass to avoid local/remote mismatch.");
-            }
-            return;
-        }
+        var selfId = conn.SelfUserId;
 
         if (enableDebugLogs)
         {
@@ -159,7 +139,7 @@ public class FloorReloadHandler : MonoBehaviour
         }
 
         // Spawn local player
-        if (TryGetSpawn(init.spawns, selfId, out var localSpawn))
+        if (!string.IsNullOrEmpty(selfId) && TryGetSpawn(init.spawns, selfId, out var localSpawn))
         {
             playerSpawner.SpawnLocal(selfId, localSpawn, 0f);
             
@@ -173,7 +153,7 @@ public class FloorReloadHandler : MonoBehaviour
             foreach (var spawn in init.spawns)
             {
                 if (spawn == null || string.IsNullOrEmpty(spawn.userId)) continue;
-                if (!string.IsNullOrEmpty(selfId) && spawn.userId == selfId) continue; // Skip self
+                if (spawn.userId == selfId) continue; // Skip self
 
                 playerSpawner.SpawnRemote(spawn.userId, spawn.position, 0f);
                 
@@ -252,22 +232,6 @@ public class FloorReloadHandler : MonoBehaviour
         
         if (conn == null)
             conn = NakamaConnection.Instance != null ? NakamaConnection.Instance : FindObjectOfType<NakamaConnection>();
-    }
-
-    private string ResolveLocalUserId(MatchTransport.InitMsg init)
-    {
-        if (conn != null && !string.IsNullOrEmpty(conn.SelfUserId)) return conn.SelfUserId;
-        if (conn != null && conn.Match != null && conn.Match.Self != null && !string.IsNullOrEmpty(conn.Match.Self.UserId))
-        {
-            return conn.Match.Self.UserId;
-        }
-        if (init != null && init.spawns != null && init.spawns.Length > 0)
-        {
-            // Last-resort fallback: prefer explicit self from match when unavailable;
-            // do not infer from first spawn here to avoid local/remote swap.
-            return string.Empty;
-        }
-        return string.Empty;
     }
 
     /// <summary>

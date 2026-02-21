@@ -21,6 +21,8 @@ public class PlayerSpawnManager : MonoBehaviour
     public float localYawSnapThreshold = 45f;
     public float boundsPadding = 0.35f;
     public bool clampSnapshotPoses = false;
+    [Header("Debug")]
+    public bool enableSpawnDebugLogs = true;
 
     public bool spawnedLocal { get; private set; }
 
@@ -65,6 +67,7 @@ public class PlayerSpawnManager : MonoBehaviour
 
     public bool SpawnLocal(string userId, Vector3 pos, float yaw, int modelIndex = -1)
     {
+        if (enableSpawnDebugLogs) Debug.Log("[Spawn] SpawnLocal request user=" + userId + " pos=" + pos);
         if (string.IsNullOrEmpty(userId)) return false;
         if (TryGet(userId, out var existing))
         {
@@ -73,6 +76,7 @@ public class PlayerSpawnManager : MonoBehaviour
             var looksLocalReady = _localUserId == userId && existingController != null && existingController.enabled && existingCamera != null && existingCamera.enabled;
             if (looksLocalReady)
             {
+                if (enableSpawnDebugLogs) Debug.Log("[Spawn] SpawnLocal reuse existing local for user=" + userId);
                 spawnedLocal = true;
                 _localUserId = userId;
                 var minimapExisting = FindObjectOfType<MinimapController>();
@@ -84,6 +88,7 @@ public class PlayerSpawnManager : MonoBehaviour
             }
 
             // Existing object for this user is not a valid local player (often a stale remote/proxy).
+            if (enableSpawnDebugLogs) Debug.LogWarning("[Spawn] SpawnLocal replacing stale existing object for user=" + userId);
             Despawn(userId);
         }
 
@@ -119,11 +124,16 @@ public class PlayerSpawnManager : MonoBehaviour
 
         var localController = go.GetComponentInChildren<MediumController>(true);
         if (localController) localController.enabled = true;
+        else if (enableSpawnDebugLogs) Debug.LogWarning("[Spawn] SpawnLocal no MediumController found for user=" + userId);
 
         var cameras = go.GetComponentsInChildren<Camera>(true);
         for (var i = 0; i < cameras.Length; i++)
         {
             cameras[i].enabled = true;
+        }
+        if (enableSpawnDebugLogs && (cameras == null || cameras.Length == 0))
+        {
+            Debug.LogWarning("[Spawn] SpawnLocal no Camera found for user=" + userId);
         }
 
         var listeners = go.GetComponentsInChildren<AudioListener>(true);
@@ -137,6 +147,8 @@ public class PlayerSpawnManager : MonoBehaviour
         {
             minimap.player = localController != null ? localController.transform : go.transform;
         }
+
+        if (enableSpawnDebugLogs) Debug.Log("[Spawn] SpawnLocal complete user=" + userId + " go=" + go.name);
 
         return true;
     }
