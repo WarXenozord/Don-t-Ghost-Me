@@ -31,6 +31,7 @@ public class PlayerSpawnManager : MonoBehaviour
     {
         if (Instance != null && Instance != this)
         {
+            Instance.AbsorbSceneConfig(this);
             Destroy(gameObject);
             return;
         }
@@ -39,20 +40,47 @@ public class PlayerSpawnManager : MonoBehaviour
         DontDestroyOnLoad(gameObject);
     }
 
+    private void AbsorbSceneConfig(PlayerSpawnManager other)
+    {
+        if (other == null) return;
+
+        if (!localPlayerPrefab && other.localPlayerPrefab)
+        {
+            localPlayerPrefab = other.localPlayerPrefab;
+        }
+        if (!remoteProxyPrefab && other.remoteProxyPrefab)
+        {
+            remoteProxyPrefab = other.remoteProxyPrefab;
+        }
+
+        // Keep the most permissive correction settings when scene config is available.
+        localTeleportThreshold = Mathf.Max(localTeleportThreshold, other.localTeleportThreshold);
+        localLerp = Mathf.Max(localLerp, other.localLerp);
+        boundsPadding = Mathf.Max(boundsPadding, other.boundsPadding);
+    }
+
     public bool SpawnLocal(string userId, Vector3 pos, float yaw, int modelIndex = -1)
     {
         if (string.IsNullOrEmpty(userId)) return false;
-        if (TryGet(userId, out _))
+        if (TryGet(userId, out var existing))
         {
-            spawnedLocal = true;
-            _localUserId = userId;
-            var minimapExisting = FindObjectOfType<MinimapController>();
-            if (minimapExisting != null && TryGet(userId, out var existingGo) && existingGo != null)
+            var existingController = existing != null ? existing.GetComponentInChildren<MediumController>(true) : null;
+            var existingCamera = existing != null ? existing.GetComponentInChildren<Camera>(true) : null;
+            var looksLocalReady = _localUserId == userId && existingController != null && existingController.enabled && existingCamera != null && existingCamera.enabled;
+            if (looksLocalReady)
             {
-                var existingController = existingGo.GetComponentInChildren<MediumController>(true);
-                minimapExisting.player = existingController != null ? existingController.transform : existingGo.transform;
+                spawnedLocal = true;
+                _localUserId = userId;
+                var minimapExisting = FindObjectOfType<MinimapController>();
+                if (minimapExisting != null)
+                {
+                    minimapExisting.player = existingController.transform;
+                }
+                return true;
             }
-            return true;
+
+            // Existing object for this user is not a valid local player (often a stale remote/proxy).
+            Despawn(userId);
         }
 
         if (!localPlayerPrefab)

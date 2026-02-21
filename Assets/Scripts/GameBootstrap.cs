@@ -160,8 +160,8 @@ private IEnumerator DelayedBootstrap()
 
         if (spawner != null)
         {
-            if (!spawner.localPlayerPrefab && localPlayerPrefab) spawner.localPlayerPrefab = localPlayerPrefab;
-            if (!spawner.remoteProxyPrefab && proxyPlayerPrefab) spawner.remoteProxyPrefab = proxyPlayerPrefab;
+            if (localPlayerPrefab) spawner.localPlayerPrefab = localPlayerPrefab;
+            if (proxyPlayerPrefab) spawner.remoteProxyPrefab = proxyPlayerPrefab;
         }
         if (enemySpawner != null && !enemySpawner.enemyPrefab && enemyPrefab) enemySpawner.enemyPrefab = enemyPrefab;
         if (enemySpawner != null) enemySpawner.ClearAll();
