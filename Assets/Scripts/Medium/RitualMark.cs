@@ -49,7 +49,7 @@ private GameObject _spawnedLight;
     private MaterialPropertyBlock _highlightBlock;
     private LevelObjectiveManager _manager;
    
-    
+    private RitualCompletionHandler _ritualHandler;
    
     
     private void Start()
@@ -152,23 +152,21 @@ private GameObject _spawnedLight;
     {
         Debug.Log("[RitualMark] Ritual complete!");
 
-        // Notify objective manager
         if (_manager != null)
             _manager.OnRitualComplete();
         
-        // Trigger floor transition
-        if (_floorTransition == null)
-            _floorTransition = FloorTransitionManager.Instance != null 
-                ? FloorTransitionManager.Instance 
-                : FindObjectOfType<FloorTransitionManager>();
+        // NEW: Broadcast ritual completion (network synced!)
+        if (_ritualHandler == null)
+            _ritualHandler = RitualCompletionHandler.Instance;
         
-        if (_floorTransition != null)
+        if (_ritualHandler != null)
         {
-            _floorTransition.TriggerFloorTransition();
+            Debug.Log("[RitualMark] Broadcasting ritual completion to all players...");
+            _ritualHandler.BroadcastRitualCompletion();
         }
         else
         {
-            Debug.LogError("[RitualMark] FloorTransitionManager not found! Cannot advance to next floor.");
+            Debug.LogError("[RitualMark] RitualCompletionHandler not found! Cannot trigger floor transition.");
         }
     }
 
