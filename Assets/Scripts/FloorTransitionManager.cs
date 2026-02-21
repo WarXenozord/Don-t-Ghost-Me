@@ -38,6 +38,7 @@ public class FloorTransitionManager : MonoBehaviour
         }
 
         Instance = this;
+        DontDestroyOnLoad(gameObject);
     }
 
     void OnDestroy()

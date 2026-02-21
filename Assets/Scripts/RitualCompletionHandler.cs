@@ -32,6 +32,7 @@ public class RitualCompletionHandler : MonoBehaviour
         }
 
         Instance = this;
+        DontDestroyOnLoad(gameObject);
 
         ResolveRefs();
         EnsureBound();
