@@ -70,22 +70,43 @@ public class GameBootstrap : MonoBehaviour
     }
 private IEnumerator DelayedBootstrap()
 {
-    yield return new WaitForSeconds(0.2f);
-    
-    // Clear old players before respawning
+    var timeout = 6f;
+    var elapsed = 0f;
+
+    while (elapsed < timeout)
+    {
+        if (conn == null) conn = NakamaConnection.Instance != null ? NakamaConnection.Instance : FindObjectOfType<NakamaConnection>();
+        var context = MatchContext.Instance;
+        var hasConn = conn != null && !string.IsNullOrEmpty(conn.SelfUserId);
+        var hasInit = context != null && context.hasInit && context.lastInit != null;
+        if (hasConn && hasInit) break;
+        elapsed += Time.deltaTime;
+        yield return null;
+    }
+
     if (spawner == null)
-        spawner = PlayerSpawnManager.Instance != null 
-            ? PlayerSpawnManager.Instance 
-            : FindObjectOfType<PlayerSpawnManager>();
-    
+        spawner = PlayerSpawnManager.Instance != null ? PlayerSpawnManager.Instance : FindObjectOfType<PlayerSpawnManager>();
+
     if (spawner != null)
     {
         spawner.ClearAll();
         Debug.Log("[GameBootstrap] Cleared players for respawn");
     }
-    
-    // Run normal bootstrap (your existing code)
-    BootstrapFromMatchContext();
+
+    // Retry bootstrap until local player exists (avoids black screen race on floor reload).
+    var attempts = 0;
+    while (attempts < 5)
+    {
+        BootstrapFromMatchContext();
+        if (conn != null && spawner != null && !string.IsNullOrEmpty(conn.SelfUserId) && spawner.TryGet(conn.SelfUserId, out var localGo) && localGo != null)
+        {
+            yield break;
+        }
+        attempts++;
+        yield return new WaitForSeconds(0.25f);
+    }
+
+    Debug.LogWarning("[GameBootstrap] Local player not spawned after retries.");
 }
     private void BootstrapFromMatchContext()
     {
