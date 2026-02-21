@@ -135,8 +135,7 @@ public class PlayerDeathTracker : MonoBehaviour
     {
         if (_gameOverTriggered) return;
 
-        // Get total players in match
-        var allPlayers = GetAllPlayerIds();
+        var allPlayers = GetExpectedPlayerIds();
         
         if (allPlayers.Count == 0)
         {
@@ -144,8 +143,9 @@ public class PlayerDeathTracker : MonoBehaviour
             return;
         }
 
-        // Check if everyone currently in match is known dead.
-        bool allDead = _deadPlayers.Count == allPlayers.Count && allPlayers.Count > 0;
+        // Authoritative condition: every expected player currently has a ghost body.
+        // This avoids false positives when one side has stale alive/dead counters.
+        bool allDead = AreAllExpectedPlayersGhost(allPlayers);
 
         if (allDead)
         {
@@ -230,6 +230,55 @@ public class PlayerDeathTracker : MonoBehaviour
         }
 
         return players;
+    }
+
+    private HashSet<string> GetExpectedPlayerIds()
+    {
+        var expected = new HashSet<string>();
+        var context = MatchContext.Instance;
+        var spawns = context != null && context.lastInit != null ? context.lastInit.spawns : null;
+
+        if (spawns != null && spawns.Length > 0)
+        {
+            for (var i = 0; i < spawns.Length; i++)
+            {
+                var s = spawns[i];
+                if (s == null || string.IsNullOrEmpty(s.userId)) continue;
+                expected.Add(s.userId);
+            }
+        }
+
+        if (expected.Count == 0)
+        {
+            return GetAllPlayerIds();
+        }
+
+        return expected;
+    }
+
+    private bool AreAllExpectedPlayersGhost(HashSet<string> expectedPlayers)
+    {
+        if (expectedPlayers == null || expectedPlayers.Count == 0) return false;
+        if (playerSpawner == null) return false;
+
+        foreach (var userId in expectedPlayers)
+        {
+            if (string.IsNullOrEmpty(userId)) return false;
+            if (!playerSpawner.TryGet(userId, out var go) || go == null)
+            {
+                if (enableDebugLogs) Debug.Log($"[DeathTracker] Not all dead yet: missing body for {userId}");
+                return false;
+            }
+
+            var ghost = go.GetComponentInChildren<GhostController>(true);
+            if (ghost == null)
+            {
+                if (enableDebugLogs) Debug.Log($"[DeathTracker] Not all dead yet: {userId} is still medium");
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private void PrunePlayersNotInMatch(HashSet<string> currentPlayers)
