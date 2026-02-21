@@ -1066,7 +1066,7 @@ MonoBehaviour:
   yawLerpGain: 25
   maxSamplesPerPlayer: 12
   correctLocalWithSnapshots: 0
-  enableDebugLogs: 0
+  enableDebugLogs: 1
   debugLogInterval: 1
   verboseMotionDebug: 1
 --- !u!1 &351290260
