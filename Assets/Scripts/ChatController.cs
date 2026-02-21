@@ -108,8 +108,8 @@ public class ChatController : MonoBehaviour
         transport.SendChat(msg);
 
         // Local echo: sender always sees their own successfully-sent message.
-        var target = NormalizeTarget(msg.target);
-        var color = (msg.senderRole == RoleMedium && target == TargetGhosts) ? "#FF4D4D" : "#FFFFFF";
+        var normalizedTarget = NormalizeTarget(msg.target);
+        var color = (msg.senderRole == RoleMedium && normalizedTarget == TargetGhosts) ? "#FF4D4D" : "#FFFFFF";
         var senderName = _usernameManager != null ? _usernameManager.GetDisplayName(conn.SelfUserId) : ShortId(conn.SelfUserId);
         var localLine = "<color=" + color + ">[" + msg.senderRole + "] " + senderName + ": " + msg.text + "</color>";
         OnChatLine?.Invoke(localLine);
