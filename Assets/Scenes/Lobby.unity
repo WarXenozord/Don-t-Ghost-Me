@@ -5167,6 +5167,7 @@ MonoBehaviour:
   transitionDelay: 2
   loadingScreen: {fileID: 0}
   enableDebugLogs: 1
+  _progressionManager: {fileID: 0}
 --- !u!4 &1742745196
 Transform:
   m_ObjectHideFlags: 0
@@ -5194,10 +5195,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ceb5d8b79cdddb3458d753c655d847a2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  transport: {fileID: 0}
-  conn: {fileID: 0}
-  hostAuthority: {fileID: 0}
+  transport: {fileID: 302446468}
+  conn: {fileID: 302446470}
+  hostAuthority: {fileID: 302446469}
   transitionManager: {fileID: 1742745195}
+  progressionManager: {fileID: 506864045}
+  deathTracker: {fileID: 1136825153}
   enableDebugLogs: 1
 --- !u!1 &1762990384
 GameObject:

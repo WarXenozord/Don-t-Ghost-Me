@@ -77,9 +77,11 @@ private IEnumerator DelayedBootstrap()
     {
         if (conn == null) conn = NakamaConnection.Instance != null ? NakamaConnection.Instance : FindObjectOfType<NakamaConnection>();
         var context = MatchContext.Instance;
-        var hasConn = conn != null && !string.IsNullOrEmpty(conn.SelfUserId);
+        var resolvedSelfId = ResolveLocalUserId(context != null ? context.lastInit : null);
+        var hasConn = !string.IsNullOrEmpty(resolvedSelfId);
         var hasInit = context != null && context.hasInit && context.lastInit != null;
-        if (hasConn && hasInit) break;
+        var hasSpawnForSelf = hasInit && context.lastInit.spawns != null && ContainsSpawnForUser(context.lastInit.spawns, resolvedSelfId);
+        if (hasConn && hasInit && (hasSpawnForSelf || context.lastInit.spawns == null || context.lastInit.spawns.Length == 0)) break;
         elapsed += Time.deltaTime;
         yield return null;
     }
@@ -98,7 +100,8 @@ private IEnumerator DelayedBootstrap()
     while (attempts < 5)
     {
         BootstrapFromMatchContext();
-        if (conn != null && spawner != null && !string.IsNullOrEmpty(conn.SelfUserId) && spawner.TryGet(conn.SelfUserId, out var localGo) && localGo != null)
+        var resolvedSelfId = ResolveLocalUserId(MatchContext.Instance != null ? MatchContext.Instance.lastInit : null);
+        if (spawner != null && !string.IsNullOrEmpty(resolvedSelfId) && spawner.TryGet(resolvedSelfId, out var localGo) && localGo != null)
         {
             yield break;
         }
@@ -169,7 +172,7 @@ private IEnumerator DelayedBootstrap()
             ghostSpawner.ClearAll();
         }
 
-        var selfId = conn != null ? conn.SelfUserId : string.Empty;
+        var selfId = ResolveLocalUserId(init);
         if (string.IsNullOrEmpty(selfId))
         {
             Debug.LogWarning("[GameBootstrap] Missing local user id.");
@@ -182,7 +185,17 @@ private IEnumerator DelayedBootstrap()
         }
         else
         {
-            Debug.LogWarning("[GameBootstrap] Missing spawn for local user.");
+            // Fallback to avoid black screen if selfId mapping races/desyncs.
+            if (init.spawns != null && init.spawns.Length > 0 && init.spawns[0] != null)
+            {
+                var fallback = init.spawns[0];
+                Debug.LogWarning("[GameBootstrap] Missing spawn for local user. Using fallback spawn.");
+                SpawnLocalPlayer(selfId, fallback.position, fallback.modelIndex);
+            }
+            else
+            {
+                Debug.LogWarning("[GameBootstrap] Missing spawn for local user and no fallback spawns.");
+            }
         }
 
         SpawnRemoteProxies(init.spawns, selfId);
@@ -259,5 +272,25 @@ private IEnumerator DelayedBootstrap()
             startEnemyCountField.SetValue(host, enemyCount);
             Debug.Log($"[GameBootstrap] Set enemy count to {enemyCount}");
         }
+    }
+
+    private string ResolveLocalUserId(MatchTransport.InitMsg init)
+    {
+        if (conn != null && !string.IsNullOrEmpty(conn.SelfUserId)) return conn.SelfUserId;
+        if (conn != null && conn.Match != null && conn.Match.Self != null && !string.IsNullOrEmpty(conn.Match.Self.UserId)) return conn.Match.Self.UserId;
+        if (init != null && !string.IsNullOrEmpty(init.mediumUserId) && conn != null && conn.IsCurrentPlayerMatchCreator) return init.mediumUserId;
+        return string.Empty;
+    }
+
+    private static bool ContainsSpawnForUser(MatchTransport.SpawnPoint[] spawns, string userId)
+    {
+        if (spawns == null || string.IsNullOrEmpty(userId)) return false;
+        for (var i = 0; i < spawns.Length; i++)
+        {
+            var s = spawns[i];
+            if (s == null || string.IsNullOrEmpty(s.userId)) continue;
+            if (s.userId == userId) return true;
+        }
+        return false;
     }
 }
