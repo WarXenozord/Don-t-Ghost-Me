@@ -19,9 +19,11 @@ public class DisplayNameBroadcaster : MonoBehaviour
     public float broadcastDelay = 0.5f;
 
     private bool _transportBound;
+    private bool _presenceBound;
     private bool _hasBroadcastThisMatch;
     private string _currentMatchId;
     private float _broadcastTimer;
+    private float _nextPresenceRebroadcastAt;
 
     void Awake()
     {
@@ -89,6 +91,11 @@ public class DisplayNameBroadcaster : MonoBehaviour
         {
             transport.OnDisplayName -= OnDisplayNameReceived;
             _transportBound = false;
+        }
+        if (conn != null && _presenceBound)
+        {
+            conn.MatchPresenceReceived -= OnMatchPresence;
+            _presenceBound = false;
         }
     }
 
@@ -167,5 +174,28 @@ public class DisplayNameBroadcaster : MonoBehaviour
         transport.OnDisplayName += OnDisplayNameReceived;
         _transportBound = true;
         Debug.Log("[DisplayNameBroadcaster] Bound to MatchTransport");
+
+        if (!_presenceBound && conn != null)
+        {
+            conn.MatchPresenceReceived += OnMatchPresence;
+            _presenceBound = true;
+        }
+    }
+
+    private void OnMatchPresence(Nakama.IMatchPresenceEvent e)
+    {
+        if (conn == null || conn.Match == null) return;
+        if (e == null || e.Joins == null) return;
+        if (Time.unscaledTime < _nextPresenceRebroadcastAt) return;
+
+        foreach (var join in e.Joins)
+        {
+            if (join == null || string.IsNullOrEmpty(join.UserId)) continue;
+            if (join.UserId == conn.SelfUserId) continue;
+
+            _nextPresenceRebroadcastAt = Time.unscaledTime + 0.25f;
+            BroadcastLocalDisplayName();
+            break;
+        }
     }
 }

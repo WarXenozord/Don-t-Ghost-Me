@@ -555,11 +555,14 @@ public class LobbyUI : MonoBehaviour
     {
         if (players.Count == 0) return "No players";
 
+        var usernameManager = UsernameManager.Instance != null ? UsernameManager.Instance : FindObjectOfType<UsernameManager>();
         var sb = new System.Text.StringBuilder();
         foreach (var kv in players)
         {
             var p = kv.Value;
-            var username = string.IsNullOrEmpty(p.Username) ? "Guest" : p.Username;
+            var username = usernameManager != null
+                ? usernameManager.GetDisplayName(p.UserId)
+                : (string.IsNullOrEmpty(p.Username) ? "Guest" : p.Username);
             sb.AppendLine(username + " (" + ShortId(p.UserId) + ")");
         }
         return sb.ToString();
