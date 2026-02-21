@@ -1,5 +1,5 @@
 using UnityEngine;
-
+using System.Collections;
 public class GameBootstrap : MonoBehaviour
 {
     [Header("Refs")]
@@ -66,9 +66,27 @@ public class GameBootstrap : MonoBehaviour
 
     void Start()
     {
-        BootstrapFromMatchContext();
+        StartCoroutine(DelayedBootstrap());
     }
-
+private IEnumerator DelayedBootstrap()
+{
+    yield return new WaitForSeconds(0.2f);
+    
+    // Clear old players before respawning
+    if (spawner == null)
+        spawner = PlayerSpawnManager.Instance != null 
+            ? PlayerSpawnManager.Instance 
+            : FindObjectOfType<PlayerSpawnManager>();
+    
+    if (spawner != null)
+    {
+        spawner.ClearAll();
+        Debug.Log("[GameBootstrap] Cleared players for respawn");
+    }
+    
+    // Run normal bootstrap (your existing code)
+    BootstrapFromMatchContext();
+}
     private void BootstrapFromMatchContext()
     {
         var context = MatchContext.Instance;

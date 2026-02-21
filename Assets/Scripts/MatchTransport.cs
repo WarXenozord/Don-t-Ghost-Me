@@ -26,8 +26,11 @@ public class MatchTransport : MonoBehaviour
     public const long OPCODE_CHAIR_STATE = 36;
     public const long OPCODE_LOBBY_JOIN_REQUEST = 39;
     public const long OPCODE_LOBBY_PLACEHOLDER_SPAWN = 40;
+    public const long OPCODE_RITUAL_COMPLETE = 41;
 
     public NakamaConnection conn;
+
+    public event Action<RitualCompleteMsg> OnRitualComplete;
 
     public event Action<InputMsg> OnInput;
     public event Action<SnapshotMsg> OnSnapshot;
@@ -259,6 +262,16 @@ public class MatchTransport : MonoBehaviour
             msg.senderUserId = state.UserPresence.UserId;
             OnLobbyPlaceholderSpawn?.Invoke(msg);
         }
+        else if (state.OpCode == OPCODE_RITUAL_COMPLETE)
+        {
+            var msg = JsonUtility.FromJson<RitualCompleteMsg>(json);
+            msg.senderUserId = state.UserPresence.UserId;
+            OnRitualComplete?.Invoke(msg);
+            if (enableDebugLogs)
+            {
+                Debug.Log("[MatchTransport] RECV_RITUAL_COMPLETE from=" + msg.senderUserId);
+            }
+        }
     }
 
     public async void SendInput(InputMsg msg)
@@ -326,8 +339,16 @@ public class MatchTransport : MonoBehaviour
         var bytes = Encoding.UTF8.GetBytes(JsonUtility.ToJson(msg));
         await conn.Socket.SendMatchStateAsync(conn.Match.Id, OPCODE_ENEMY_TELEPORT, bytes);
     }
-
-    public async void BroadcastEnemyFx(EnemyFxMsg msg)
+public async void BroadcastRitualComplete(RitualCompleteMsg msg)
+    {
+        if (conn?.Socket == null || conn.Match == null) return;
+        var bytes = Encoding.UTF8.GetBytes(JsonUtility.ToJson(msg));
+        await conn.Socket.SendMatchStateAsync(conn.Match.Id, OPCODE_RITUAL_COMPLETE, bytes);
+        if (enableDebugLogs)
+        {
+            Debug.Log("[MatchTransport] SEND_RITUAL_COMPLETE");
+        }
+    }    public async void BroadcastEnemyFx(EnemyFxMsg msg)
     {
         if (conn?.Socket == null || conn.Match == null) return;
         var bytes = Encoding.UTF8.GetBytes(JsonUtility.ToJson(msg));
@@ -433,7 +454,12 @@ public class MatchTransport : MonoBehaviour
         var bytes = Encoding.UTF8.GetBytes(JsonUtility.ToJson(msg));
         await conn.Socket.SendMatchStateAsync(conn.Match.Id, OPCODE_LOBBY_PLACEHOLDER_SPAWN, bytes);
     }
-
+[Serializable]
+    public class RitualCompleteMsg
+    {
+        public int initId;
+        [NonSerialized] public string senderUserId;
+    }
     [Serializable]
     public class InputMsg
     {
