@@ -19,8 +19,6 @@ public class GameBootstrap : MonoBehaviour
     public GameObject enemyPrefab;
     public GameObject localGhostPrefab;
     public GameObject remoteGhostPrefab;
-    [Header("Debug")]
-    public bool enableSpawnDebugLogs = true;
 
     void Awake()
     {
@@ -101,17 +99,11 @@ private IEnumerator DelayedBootstrap()
     var attempts = 0;
     while (attempts < 5)
     {
-        if (enableSpawnDebugLogs) Debug.Log("[GameBootstrap] Bootstrap attempt " + (attempts + 1));
         BootstrapFromMatchContext();
         var resolvedSelfId = ResolveLocalUserId(MatchContext.Instance != null ? MatchContext.Instance.lastInit : null);
         if (spawner != null && !string.IsNullOrEmpty(resolvedSelfId) && spawner.TryGet(resolvedSelfId, out var localGo) && localGo != null)
         {
-            if (enableSpawnDebugLogs) Debug.Log("[GameBootstrap] Local player present after attempt " + (attempts + 1) + " user=" + resolvedSelfId);
             yield break;
-        }
-        else if (enableSpawnDebugLogs)
-        {
-            Debug.LogWarning("[GameBootstrap] Local player missing after attempt " + (attempts + 1) + " user=" + resolvedSelfId);
         }
         attempts++;
         yield return new WaitForSeconds(0.25f);
@@ -129,11 +121,6 @@ private IEnumerator DelayedBootstrap()
         }
 
         var init = context.lastInit;
-        if (enableSpawnDebugLogs)
-        {
-            var spawnCount = init.spawns == null ? 0 : init.spawns.Length;
-            Debug.Log("[GameBootstrap] BootstrapFromMatchContext initId=" + init.initId + " seed=" + init.seed + " spawnCount=" + spawnCount);
-        }
         if (progressionManager != null)
         {
             if (!progressionManager.RunActive)
@@ -191,20 +178,10 @@ private IEnumerator DelayedBootstrap()
             Debug.LogWarning("[GameBootstrap] Missing local user id.");
             return;
         }
-        if (enableSpawnDebugLogs) Debug.Log("[GameBootstrap] Resolved local user id: " + selfId);
 
         if (TryGetSpawn(init.spawns, selfId, out var localSpawn))
         {
-            if (enableSpawnDebugLogs) Debug.Log("[GameBootstrap] Issuing SpawnLocal for " + selfId + " at " + localSpawn.position);
             SpawnLocalPlayer(selfId, localSpawn.position, localSpawn.modelIndex);
-            if (spawner != null && spawner.TryGet(selfId, out var spawnedLocal) && spawnedLocal != null)
-            {
-                if (enableSpawnDebugLogs) Debug.Log("[GameBootstrap] SpawnLocal success for " + selfId);
-            }
-            else if (enableSpawnDebugLogs)
-            {
-                Debug.LogWarning("[GameBootstrap] SpawnLocal called but local object still missing for " + selfId);
-            }
         }
         else
         {
@@ -218,15 +195,6 @@ private IEnumerator DelayedBootstrap()
             else
             {
                 Debug.LogWarning("[GameBootstrap] Missing spawn for local user and no fallback spawns.");
-            }
-            if (enableSpawnDebugLogs && init.spawns != null)
-            {
-                for (var i = 0; i < init.spawns.Length; i++)
-                {
-                    var s = init.spawns[i];
-                    if (s == null) continue;
-                    Debug.Log("[GameBootstrap] Spawn entry[" + i + "] user=" + s.userId + " pos=" + s.position);
-                }
             }
         }
 
