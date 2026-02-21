@@ -1,25 +1,27 @@
 using UnityEngine;
-using UnityEngine.UI;
 using UnityEngine.SceneManagement;
+using UnityEngine.UI;
+using TMPro;
 
-/// <summary>
-/// UI for changing player display name in menu scene.
-/// </summary>
 public class UsernameMenuUI : MonoBehaviour
 {
     [Header("UI References")]
-    public InputField usernameInput;
-    public Text feedbackText;
-    public Button saveButton;
+    public TMP_InputField usernameInput;
+    public TMP_Text feedbackText;
+    public Button startButton;
     public Button backButton;
 
-    [Header("Scene Navigation")]
-    public string returnScene = "MainMenu"; // Scene to go back to
+    [Header("Menu Panels")]
+    public GameObject usernamePanel;
+    public GameObject mainButtonsPanel;
+    public MenuStateController menuStateController;
+    [Header("Scene")]
+    public string lobbySceneName = "Lobby";
 
     [Header("Style")]
     public Color successColor = Color.green;
     public Color errorColor = Color.red;
-    public float feedbackDisplayTime = 3f;
+    public float feedbackDisplayTime = 2f;
 
     private UsernameManager _usernameManager;
     private float _feedbackTimer;
@@ -27,56 +29,46 @@ public class UsernameMenuUI : MonoBehaviour
     void Start()
     {
         _usernameManager = UsernameManager.Instance;
+
         if (_usernameManager == null)
         {
-            // Create if doesn't exist
             var go = new GameObject("UsernameManager");
             _usernameManager = go.AddComponent<UsernameManager>();
         }
 
-        // Setup UI
         if (usernameInput != null)
         {
             usernameInput.text = _usernameManager.LocalDisplayName;
-            usernameInput.characterLimit = 16; // Max username length
+            usernameInput.characterLimit = 16;
         }
 
-        if (saveButton != null)
-        {
-            saveButton.onClick.AddListener(OnSaveClicked);
-        }
+        if (startButton != null)
+            startButton.onClick.AddListener(OnStartClicked);
 
         if (backButton != null)
-        {
             backButton.onClick.AddListener(OnBackClicked);
-        }
 
         if (feedbackText != null)
-        {
             feedbackText.gameObject.SetActive(false);
-        }
     }
 
     void Update()
     {
-        // Hide feedback after delay
         if (_feedbackTimer > 0f)
         {
             _feedbackTimer -= Time.deltaTime;
             if (_feedbackTimer <= 0f && feedbackText != null)
-            {
                 feedbackText.gameObject.SetActive(false);
-            }
         }
 
-        // Save on Enter key
-        if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))
+        if (Input.GetKeyDown(KeyCode.Return) || 
+            Input.GetKeyDown(KeyCode.KeypadEnter))
         {
-            OnSaveClicked();
+            OnStartClicked();
         }
     }
 
-    private void OnSaveClicked()
+    private void OnStartClicked()
     {
         if (usernameInput == null || _usernameManager == null) return;
 
@@ -86,27 +78,33 @@ public class UsernameMenuUI : MonoBehaviour
         {
             ShowFeedback("Username saved!", successColor);
 
-            // Broadcast new name if in a match
+            // Optional: Broadcast if needed
             var broadcaster = DisplayNameBroadcaster.Instance;
             if (broadcaster != null)
-            {
                 broadcaster.BroadcastLocalDisplayName();
-            }
+
+            // Small delay before loading Lobby (optional)
+            Invoke(nameof(LoadLobby), 0.6f);
         }
         else
         {
-            // Get error message
             UsernameManager.IsValidUsername(newName, out string error);
             ShowFeedback(error, errorColor);
         }
     }
 
+    private void LoadLobby()
+    {
+        SceneManager.LoadScene(lobbySceneName);
+    }
+
     private void OnBackClicked()
     {
-        if (!string.IsNullOrEmpty(returnScene))
-        {
-            SceneManager.LoadScene(returnScene);
-        }
+        if (usernamePanel != null)
+            usernamePanel.SetActive(false);
+
+        if (mainButtonsPanel != null)
+           menuStateController.ReturnToMain();
     }
 
     private void ShowFeedback(string message, Color color)
@@ -117,13 +115,5 @@ public class UsernameMenuUI : MonoBehaviour
         feedbackText.color = color;
         feedbackText.gameObject.SetActive(true);
         _feedbackTimer = feedbackDisplayTime;
-    }
-
-    /// <summary>
-    /// Call this from another button/UI to open username menu
-    /// </summary>
-    public static void OpenUsernameMenu(string usernameScene = "UsernameMenu")
-    {
-        SceneManager.LoadScene(usernameScene);
     }
 }
