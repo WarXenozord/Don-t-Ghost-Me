@@ -561,6 +561,10 @@ public class MatchTransport : MonoBehaviour
         public float startPosY;
         public float startPosZ;
         public float startYaw;
+        public float startRotX;
+        public float startRotY;
+        public float startRotZ;
+        public float startRotW;
         public float dirX;
         public float dirY;
         public float dirZ;

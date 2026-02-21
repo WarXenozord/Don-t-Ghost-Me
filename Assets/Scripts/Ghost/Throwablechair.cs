@@ -276,6 +276,10 @@ public class Throwablechair : MonoBehaviour, IInteractable
             startPosY = _originPos.y,
             startPosZ = _originPos.z,
             startYaw = _originRot.eulerAngles.y,
+            startRotX = _originRot.x,
+            startRotY = _originRot.y,
+            startRotZ = _originRot.z,
+            startRotW = _originRot.w,
             dirX = direction.x,
             dirY = direction.y,
             dirZ = direction.z,
@@ -305,7 +309,21 @@ public class Throwablechair : MonoBehaviour, IInteractable
         if (!Registry.TryGetValue(msg.chairId, out var chair) || chair == null) return;
 
         chair._originPos = new Vector3(msg.startPosX, msg.startPosY, msg.startPosZ);
-        chair._originRot = Quaternion.Euler(0f, msg.startYaw, 0f);
+        var syncedOriginRot = new Quaternion(msg.startRotX, msg.startRotY, msg.startRotZ, msg.startRotW);
+        var rotMagSq =
+            syncedOriginRot.x * syncedOriginRot.x +
+            syncedOriginRot.y * syncedOriginRot.y +
+            syncedOriginRot.z * syncedOriginRot.z +
+            syncedOriginRot.w * syncedOriginRot.w;
+        if (rotMagSq > 0.0001f)
+        {
+            chair._originRot = syncedOriginRot.normalized;
+        }
+        else
+        {
+            // Backward compatibility for older packets that only carry yaw.
+            chair._originRot = Quaternion.Euler(0f, msg.startYaw, 0f);
+        }
         chair.SetHighlight(false);
         chair._authorityUserId = msg.senderUserId;
 
