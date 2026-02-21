@@ -428,7 +428,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 62.7, y: 1.7}
+  m_AnchoredPosition: {x: 62.7, y: 19.3}
   m_SizeDelta: {x: 160, y: 20.4627}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &435009014
@@ -485,8 +485,8 @@ MonoBehaviour:
   m_fontSizeMin: 18
   m_fontSizeMax: 72
   m_fontStyle: 0
-  m_HorizontalAlignment: 1
-  m_VerticalAlignment: 256
+  m_HorizontalAlignment: 2
+  m_VerticalAlignment: 512
   m_textAlignment: 65535
   m_characterSpacing: 0
   m_wordSpacing: 0
@@ -1047,25 +1047,6 @@ MonoBehaviour:
   conn: {fileID: 0}
   usernameManager: {fileID: 0}
   broadcastDelay: 0.5
---- !u!114 &827982692
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 827982689}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ceb5d8b79cdddb3458d753c655d847a2, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  transport: {fileID: 0}
-  conn: {fileID: 0}
-  hostAuthority: {fileID: 0}
-  transitionManager: {fileID: 0}
-  progressionManager: {fileID: 0}
-  deathTracker: {fileID: 0}
-  enableDebugLogs: 1
 --- !u!1 &1027122380
 GameObject:
   m_ObjectHideFlags: 0
@@ -1250,7 +1231,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Enter text...
+  m_text: Press ; to chat...
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -1724,6 +1705,7 @@ MonoBehaviour:
   localYawSnapThreshold: 45
   boundsPadding: 0.35
   clampSnapshotPoses: 0
+  enableSpawnDebugLogs: 1
 --- !u!4 &1594733322
 Transform:
   m_ObjectHideFlags: 0
@@ -1963,9 +1945,6 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 73163572864504066, guid: 3b4ec7472d45f3c4f9bd2ffe57d02ad3, type: 3}
       insertIndex: -1
       addedObject: {fileID: 827982691}
-    - targetCorrespondingSourceObject: {fileID: 73163572864504066, guid: 3b4ec7472d45f3c4f9bd2ffe57d02ad3, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 827982692}
   m_SourcePrefab: {fileID: 100100000, guid: 3b4ec7472d45f3c4f9bd2ffe57d02ad3, type: 3}
 --- !u!1 &1971851828
 GameObject:
