@@ -447,8 +447,8 @@ MonoBehaviour:
   maxHealth: 100
   currentHealth: 0
   energyBar: {fileID: 3847393356819025840, guid: 99ddf888cf805834ead53fcdefccce83, type: 3}
-  drainRadius: 10
-  maxDrainPerMedium: 15
+  drainRadius: 5
+  maxDrainPerMedium: 30
   lowEnergyKillThreshold: 5
   lowEnergyKillRadius: 4
   lowEnergyKillCooldown: 1.5
