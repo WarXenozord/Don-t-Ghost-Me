@@ -57,6 +57,16 @@ private Camera playerCam;
 [SerializeField] private float exhaustionSpeedMultiplier = 0.5f;
 private HalfLifeEffect _halfLifeEffect;
 private bool _hasBeenHit = false;
+
+[Header("Footsteps")]
+[SerializeField] private AudioSource footstepSource;
+[SerializeField] private AudioClip footstepClip;
+[SerializeField] private float walkStepInterval = 0.5f;
+[SerializeField] private float runStepInterval = 0.3f;
+
+private float _stepTimer;
+
+
 [Header("Animation State (Network Sync)")]
 [SerializeField] private bool _isWalking = false;
 [SerializeField] private bool _isRunning = false;
@@ -99,6 +109,12 @@ private float _exhaustionTimer;
         staminaBarFill= child.GetChild(0).GetComponent<Image>();
         _currentStamina = maxStamina;
         UpdateStaminaBar();
+        if (breathingSource != null)
+{
+    breathingSource.loop = true;
+    breathingSource.volume = 0f;
+    breathingSource.Play();
+}
     }
 
     // Update is called once per frame
@@ -153,9 +169,30 @@ private float _exhaustionTimer;
         UpdateFOV();
         UpdateBreathing();
 
-
+        HandleFootsteps();
     }
-    private void UpdateFOV()
+    
+    private void HandleFootsteps()
+{
+    bool isMoving = PlayerMovementInput.magnitude > 0.1f;
+    bool grounded = Controller.isGrounded;
+
+    if (isMoving && grounded)
+    {
+        if (!footstepSource.isPlaying)
+            footstepSource.Play();
+
+        // Running = faster steps
+        footstepSource.pitch = Sprinting ? 1.5f : 1f;
+    }
+    else
+    {
+        if (footstepSource.isPlaying)
+            footstepSource.Stop();
+    }
+}
+    
+        private void UpdateFOV()
 {
     float targetFOV = Sprinting ? sprintFOV : normalFOV;
     playerCam.fieldOfView = Mathf.Lerp(

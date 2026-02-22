@@ -57,7 +57,9 @@ Vector3 end = Camera.main.ViewportToWorldPoint(
 );
 
         StartCoroutine(FlyUFO(start, end, flyDuration, startScale, endScale));
+
         musicSource.clip = ufoMusic;
+        
         musicSource.Play();
 
         // Fade in title + buttons while UFO is offscreen
