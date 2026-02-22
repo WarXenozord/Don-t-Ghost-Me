@@ -194,7 +194,14 @@ public class GhostEnergy : MonoBehaviour
 
         if (killed > 0)
         {
-            PlayLowEnergyKillSfx();
+            if (_ghostSpawner != null)
+            {
+                _ghostSpawner.RequestLowEnergyKillFx(transform.position);
+            }
+            else
+            {
+                PlayLowEnergyKillSfx();
+            }
         }
     }
 

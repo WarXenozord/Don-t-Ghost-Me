@@ -14,6 +14,9 @@ public class GhostSpawner : MonoBehaviour
     [Header("Prefabs")]
     public GameObject localGhostPrefab;
     public GameObject remoteGhostPrefab;
+    [Header("Global Ghost FX")]
+    public AudioSource globalGhostFxSource;
+    public AudioClip lowEnergyKillClip;
 
     [Header("Debug")]
     public bool enableDebugLogs = true;
@@ -47,6 +50,8 @@ public class GhostSpawner : MonoBehaviour
         {
             transport.OnGhostSpawn -= OnGhostSpawnReceived;
             transport.OnGhostKillRequest -= OnGhostKillRequestReceived;
+            transport.OnGhostFxRequest -= OnGhostFxRequestReceived;
+            transport.OnGhostFx -= OnGhostFxReceived;
             _bound = false;
         }
     }
@@ -71,6 +76,30 @@ public class GhostSpawner : MonoBehaviour
             yaw = yaw
         });
         return true;
+    }
+
+    public void RequestLowEnergyKillFx(Vector3 worldPos)
+    {
+        ResolveRefs();
+        if (transport == null || conn == null || conn.Match == null) return;
+
+        var msg = new MatchTransport.GhostFxMsg
+        {
+            fxId = 1,
+            x = worldPos.x,
+            y = worldPos.y,
+            z = worldPos.z
+        };
+
+        if (conn.IsCurrentPlayerMatchCreator)
+        {
+            ApplyGhostFx(msg);
+            transport.BroadcastGhostFx(msg);
+        }
+        else
+        {
+            transport.SendGhostFxRequest(msg);
+        }
     }
 
     public bool HostKillMediumAndSpawnGhost(string userId, Vector3 position, float yaw)
@@ -120,6 +149,22 @@ public class GhostSpawner : MonoBehaviour
         if (conn == null || !conn.IsCurrentPlayerMatchCreator) return;
 
         HostKillMediumAndSpawnGhost(msg.userId, new Vector3(msg.x, msg.y, msg.z), msg.yaw);
+    }
+
+    private void OnGhostFxRequestReceived(MatchTransport.GhostFxMsg msg)
+    {
+        if (msg == null) return;
+        if (conn == null || !conn.IsCurrentPlayerMatchCreator) return;
+
+        ApplyGhostFx(msg);
+        transport.BroadcastGhostFx(msg);
+    }
+
+    private void OnGhostFxReceived(MatchTransport.GhostFxMsg msg)
+    {
+        if (msg == null) return;
+        if (conn != null && !string.IsNullOrEmpty(msg.senderUserId) && msg.senderUserId == conn.SelfUserId) return;
+        ApplyGhostFx(msg);
     }
 
     private void ApplyGhostSpawn(MatchTransport.GhostSpawnMsg msg)
@@ -206,6 +251,7 @@ public class GhostSpawner : MonoBehaviour
         if (!transport) transport = MatchTransport.Instance != null ? MatchTransport.Instance : FindObjectOfType<MatchTransport>();
         if (!playerSpawner) playerSpawner = PlayerSpawnManager.Instance != null ? PlayerSpawnManager.Instance : FindObjectOfType<PlayerSpawnManager>();
         if (!deathTracker) deathTracker = PlayerDeathTracker.Instance != null ? PlayerDeathTracker.Instance : FindObjectOfType<PlayerDeathTracker>();
+        if (!globalGhostFxSource) globalGhostFxSource = GetComponent<AudioSource>();
     }
 
     private void EnsureBound()
@@ -213,7 +259,26 @@ public class GhostSpawner : MonoBehaviour
         if (!transport || _bound) return;
         transport.OnGhostSpawn += OnGhostSpawnReceived;
         transport.OnGhostKillRequest += OnGhostKillRequestReceived;
+        transport.OnGhostFxRequest += OnGhostFxRequestReceived;
+        transport.OnGhostFx += OnGhostFxReceived;
         _bound = true;
+    }
+
+    private void ApplyGhostFx(MatchTransport.GhostFxMsg msg)
+    {
+        AudioClip clip = null;
+        if (msg.fxId == 1) clip = lowEnergyKillClip;
+        if (clip == null) return;
+
+        var pos = new Vector3(msg.x, msg.y, msg.z);
+        if (globalGhostFxSource != null)
+        {
+            globalGhostFxSource.transform.position = pos;
+            globalGhostFxSource.PlayOneShot(clip);
+            return;
+        }
+
+        AudioSource.PlayClipAtPoint(clip, pos, 1f);
     }
 
     private static string ShortId(string id)

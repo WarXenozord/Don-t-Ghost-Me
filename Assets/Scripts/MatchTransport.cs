@@ -18,6 +18,8 @@ public class MatchTransport : MonoBehaviour
     public const long OPCODE_ENEMY_FX = 23;
     public const long OPCODE_GHOST_SPAWN = 30;
     public const long OPCODE_GHOST_KILL_REQUEST = 43;
+    public const long OPCODE_GHOST_FX_REQUEST = 44;
+    public const long OPCODE_GHOST_FX = 45;
     public const long OPCODE_LAMP_FLICKER = 31;
     public const long OPCODE_OBJECTIVE_STATE = 32;
     public const long OPCODE_CHAT = 33;
@@ -46,6 +48,8 @@ public class MatchTransport : MonoBehaviour
     public event Action<EnemyFxMsg> OnEnemyFx;
     public event Action<GhostSpawnMsg> OnGhostSpawn;
     public event Action<GhostKillRequestMsg> OnGhostKillRequest;
+    public event Action<GhostFxMsg> OnGhostFxRequest;
+    public event Action<GhostFxMsg> OnGhostFx;
     public event Action<LampFlickerMsg> OnLampFlicker;
     public event Action<ObjectiveStateMsg> OnObjectiveState;
     public event Action<ChatMsg> OnChat;
@@ -282,6 +286,18 @@ public class MatchTransport : MonoBehaviour
             msg.senderUserId = state.UserPresence.UserId;
             OnGhostKillRequest?.Invoke(msg);
         }
+        else if (state.OpCode == OPCODE_GHOST_FX_REQUEST)
+        {
+            var msg = JsonUtility.FromJson<GhostFxMsg>(json);
+            msg.senderUserId = state.UserPresence.UserId;
+            OnGhostFxRequest?.Invoke(msg);
+        }
+        else if (state.OpCode == OPCODE_GHOST_FX)
+        {
+            var msg = JsonUtility.FromJson<GhostFxMsg>(json);
+            msg.senderUserId = state.UserPresence.UserId;
+            OnGhostFx?.Invoke(msg);
+        }
         else if (state.OpCode == OPCODE_ALIVE_COUNT)
         {
             var msg = JsonUtility.FromJson<AliveCountMsg>(json);
@@ -400,6 +416,20 @@ public async void BroadcastRitualComplete(RitualCompleteMsg msg)
         if (conn?.Socket == null || conn.Match == null) return;
         var bytes = Encoding.UTF8.GetBytes(JsonUtility.ToJson(msg));
         await conn.Socket.SendMatchStateAsync(conn.Match.Id, OPCODE_GHOST_KILL_REQUEST, bytes);
+    }
+
+    public async void SendGhostFxRequest(GhostFxMsg msg)
+    {
+        if (conn?.Socket == null || conn.Match == null) return;
+        var bytes = Encoding.UTF8.GetBytes(JsonUtility.ToJson(msg));
+        await conn.Socket.SendMatchStateAsync(conn.Match.Id, OPCODE_GHOST_FX_REQUEST, bytes);
+    }
+
+    public async void BroadcastGhostFx(GhostFxMsg msg)
+    {
+        if (conn?.Socket == null || conn.Match == null) return;
+        var bytes = Encoding.UTF8.GetBytes(JsonUtility.ToJson(msg));
+        await conn.Socket.SendMatchStateAsync(conn.Match.Id, OPCODE_GHOST_FX, bytes);
     }
 
     public async void BroadcastLampFlicker(LampFlickerMsg msg)
@@ -622,6 +652,14 @@ public async void BroadcastRitualComplete(RitualCompleteMsg msg)
         public string userId;
         public float x, y, z;
         public float yaw;
+        [NonSerialized] public string senderUserId;
+    }
+
+    [Serializable]
+    public class GhostFxMsg
+    {
+        public int fxId;
+        public float x, y, z;
         [NonSerialized] public string senderUserId;
     }
 

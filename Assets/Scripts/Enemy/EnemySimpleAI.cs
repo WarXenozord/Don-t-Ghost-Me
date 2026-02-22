@@ -73,7 +73,9 @@ public class EnemySimpleAI : SoundAgroListener
     private readonly List<Vector3> _routeNodes = new List<Vector3>();
     private readonly List<Vector3> _roomCenterNodes = new List<Vector3>();
     private readonly Dictionary<int, int> _nodeVisits = new Dictionary<int, int>();
-    private readonly Dictionary<string, int> _touchCountByMedium = new Dictionary<string, int>();
+    // Shared across all enemy instances: second hit should kill regardless of which enemy hit first.
+    private static readonly Dictionary<string, int> SharedTouchCountByMedium = new Dictionary<string, int>();
+    private static int _sharedTouchInitId = int.MinValue;
     private readonly HashSet<string> _activeTouchMediums = new HashSet<string>();
 
     private Vector3 _patrolTarget;
@@ -679,9 +681,10 @@ public class EnemySimpleAI : SoundAgroListener
 
     private void OnMediumTouched(TrackedMedium medium, string mediumId)
     {
-        _touchCountByMedium.TryGetValue(mediumId, out var count);
+        RefreshSharedTouchCounterScope();
+        SharedTouchCountByMedium.TryGetValue(mediumId, out var count);
         count++;
-        _touchCountByMedium[mediumId] = count;
+        SharedTouchCountByMedium[mediumId] = count;
         if (medium.mediumController != null)
         {
             medium.mediumController.EnterHalfLife();
@@ -700,6 +703,16 @@ public class EnemySimpleAI : SoundAgroListener
             SpawnGhostOnSecondTouch(medium);
             TeleportAfterFirstTouch(medium.targetTransform.position);
         }
+    }
+
+    private static void RefreshSharedTouchCounterScope()
+    {
+        var context = MatchContext.Instance;
+        var initId = (context != null && context.lastInit != null) ? context.lastInit.initId : int.MinValue;
+        if (_sharedTouchInitId == initId) return;
+
+        SharedTouchCountByMedium.Clear();
+        _sharedTouchInitId = initId;
     }
 
     private void SpawnGhostOnSecondTouch(TrackedMedium medium)
