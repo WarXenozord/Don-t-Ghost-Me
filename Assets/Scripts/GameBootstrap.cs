@@ -118,6 +118,8 @@ private IEnumerator DelayedBootstrap()
         if (spawner != null && !string.IsNullOrEmpty(resolvedSelfId) && spawner.TryGet(resolvedSelfId, out var localGo) && localGo != null)
         {
             if (sceneFlowDebug) Debug.Log("[SceneFlow] Local spawned after attempt " + (attempts + 1) + " user=" + resolvedSelfId + " go=" + localGo.name);
+            var transition = FloorTransitionManager.Instance != null ? FloorTransitionManager.Instance : FindObjectOfType<FloorTransitionManager>();
+            if (transition != null) transition.NotifyLocalBootstrapCompleted(resolvedSelfId);
             yield break;
         }
         if (sceneFlowDebug) Debug.LogWarning("[SceneFlow] Local missing after attempt " + (attempts + 1) + " user=" + resolvedSelfId);
@@ -237,6 +239,11 @@ private IEnumerator DelayedBootstrap()
         {
             var hasLocalAfterCmd = spawner.TryGet(selfId, out var localObjAfterCmd) && localObjAfterCmd != null;
             Debug.Log("[SceneFlow] Post SpawnLocal check user=" + selfId + " exists=" + hasLocalAfterCmd);
+            if (hasLocalAfterCmd)
+            {
+                var transition = FloorTransitionManager.Instance != null ? FloorTransitionManager.Instance : FindObjectOfType<FloorTransitionManager>();
+                if (transition != null) transition.NotifyLocalBootstrapCompleted(selfId);
+            }
         }
 
         SpawnRemoteProxies(init.spawns, selfId);

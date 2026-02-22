@@ -176,6 +176,8 @@ public class FloorTransitionManager : MonoBehaviour
         }
         _pendingSeed = nextSeed;
         _pendingFallbackBootstrap = true;
+        if (_hostAuthority == null) _hostAuthority = HostAuthority.Instance != null ? HostAuthority.Instance : FindObjectOfType<HostAuthority>();
+        if (_hostAuthority != null) _hostAuthority.PrepareForFloorTransitionReload();
 
         var activeScene = SceneManager.GetActiveScene().name;
         if (enableDebugLogs)
@@ -185,6 +187,13 @@ public class FloorTransitionManager : MonoBehaviour
         Debug.Log("[SceneFlow] Loading scene now: " + activeScene);
         SceneManager.LoadScene(activeScene);
         _transitionInProgress = false;
+    }
+
+    public void NotifyLocalBootstrapCompleted(string userId)
+    {
+        if (!_pendingFallbackBootstrap) return;
+        _pendingFallbackBootstrap = false;
+        Debug.Log("[SceneFlow] Fallback cancelled: local bootstrap already completed for user=" + userId);
     }
 
     private void OnSceneLoaded(Scene scene, LoadSceneMode mode)

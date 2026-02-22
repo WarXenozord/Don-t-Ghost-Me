@@ -69,6 +69,13 @@ public class FloorReloadHandler : MonoBehaviour
         yield return new WaitForEndOfFrame();
         yield return new WaitForSeconds(0.1f);
 
+        // GameBootstrap owns regular scene bootstrap/spawn flow.
+        if (FindObjectOfType<GameBootstrap>() != null)
+        {
+            if (enableDebugLogs) Debug.Log("[FloorReload] GameBootstrap found. Skipping FloorReloadHandler respawn.");
+            yield break;
+        }
+
         ResolveRefs();
 
         // Check if we're in a gameplay scene with an active match
