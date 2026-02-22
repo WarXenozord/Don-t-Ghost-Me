@@ -1,5 +1,6 @@
 using System;
 using System.Text;
+using System.Threading.Tasks;
 using Nakama;
 using UnityEngine;
 
@@ -69,6 +70,7 @@ public class MatchTransport : MonoBehaviour
     private float _nextSendSnapshotLogAt;
     private float _nextRecvEnemySnapshotLogAt;
     private float _nextSendEnemySnapshotLogAt;
+    private float _nextSendErrorLogAt;
 
     void Awake()
     {
@@ -310,14 +312,14 @@ public class MatchTransport : MonoBehaviour
     {
         if (conn?.Socket == null || conn.Match == null) return;
         var bytes = Encoding.UTF8.GetBytes(JsonUtility.ToJson(msg));
-        await conn.Socket.SendMatchStateAsync(conn.Match.Id, OPCODE_INPUT, bytes);
+        await SendMatchStateSafe(OPCODE_INPUT, bytes, "SEND_INPUT");
     }
 
     public async void BroadcastSnapshot(SnapshotMsg msg)
     {
         if (conn?.Socket == null || conn.Match == null) return;
         var bytes = Encoding.UTF8.GetBytes(JsonUtility.ToJson(msg));
-        await conn.Socket.SendMatchStateAsync(conn.Match.Id, OPCODE_SNAPSHOT, bytes);
+        await SendMatchStateSafe(OPCODE_SNAPSHOT, bytes, "SEND_SNAPSHOT");
         if (enableDebugLogs && Time.unscaledTime >= _nextSendSnapshotLogAt)
         {
             _nextSendSnapshotLogAt = Time.unscaledTime + Mathf.Max(0.1f, debugLogInterval);
@@ -357,7 +359,7 @@ public class MatchTransport : MonoBehaviour
     {
         if (conn?.Socket == null || conn.Match == null) return;
         var bytes = Encoding.UTF8.GetBytes(JsonUtility.ToJson(msg));
-        await conn.Socket.SendMatchStateAsync(conn.Match.Id, OPCODE_ENEMY_SNAPSHOT, bytes);
+        await SendMatchStateSafe(OPCODE_ENEMY_SNAPSHOT, bytes, "SEND_ENEMY_SNAPSHOT");
         if (enableDebugLogs && Time.unscaledTime >= _nextSendEnemySnapshotLogAt)
         {
             _nextSendEnemySnapshotLogAt = Time.unscaledTime + Mathf.Max(0.1f, debugLogInterval);
@@ -515,6 +517,22 @@ public async void BroadcastRitualComplete(RitualCompleteMsg msg)
         if (conn?.Socket == null || conn.Match == null) return;
         var bytes = Encoding.UTF8.GetBytes(JsonUtility.ToJson(msg));
         await conn.Socket.SendMatchStateAsync(conn.Match.Id, OPCODE_LOBBY_PLACEHOLDER_SPAWN, bytes);
+    }
+
+    private async Task SendMatchStateSafe(long opCode, byte[] bytes, string label)
+    {
+        if (conn?.Socket == null || conn.Match == null || bytes == null) return;
+        try
+        {
+            await conn.Socket.SendMatchStateAsync(conn.Match.Id, opCode, bytes);
+        }
+        catch (Exception ex)
+        {
+            if (!enableDebugLogs) return;
+            if (Time.unscaledTime < _nextSendErrorLogAt) return;
+            _nextSendErrorLogAt = Time.unscaledTime + Mathf.Max(0.25f, debugLogInterval);
+            Debug.LogWarning("[MatchTransport] " + label + " failed: " + ex.Message);
+        }
     }
 [Serializable]
     public class RitualCompleteMsg

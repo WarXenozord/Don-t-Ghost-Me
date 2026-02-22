@@ -10,10 +10,12 @@ public class UsernameMenuUI : MonoBehaviour
     public TMP_Text feedbackText;
     public Button startButton;
     public Button backButton;
+    public Button openBookButton;
 
     [Header("Menu Panels")]
     public GameObject usernamePanel;
     public GameObject mainButtonsPanel;
+    public GameObject disableWhenBookOpen;
     public MenuStateController menuStateController;
     [Header("Scene")]
     public string lobbySceneName = "Lobby";
@@ -47,6 +49,8 @@ public class UsernameMenuUI : MonoBehaviour
 
         if (backButton != null)
             backButton.onClick.AddListener(OnBackClicked);
+        if (openBookButton != null)
+            openBookButton.onClick.AddListener(OnBookClicked);
 
         if (feedbackText != null)
             feedbackText.gameObject.SetActive(false);
@@ -103,8 +107,16 @@ public class UsernameMenuUI : MonoBehaviour
         if (usernamePanel != null)
             usernamePanel.SetActive(false);
 
+        SetBookOpenVisualState(false);
+
         if (mainButtonsPanel != null)
            menuStateController.ReturnToMain();
+    }
+
+    // Hook this on the "book" open button click.
+    public void OnBookClicked()
+    {
+        SetBookOpenVisualState(true);
     }
 
     private void ShowFeedback(string message, Color color)
@@ -115,5 +127,11 @@ public class UsernameMenuUI : MonoBehaviour
         feedbackText.color = color;
         feedbackText.gameObject.SetActive(true);
         _feedbackTimer = feedbackDisplayTime;
+    }
+
+    private void SetBookOpenVisualState(bool isBookOpen)
+    {
+        if (disableWhenBookOpen == null) return;
+        disableWhenBookOpen.SetActive(!isBookOpen);
     }
 }
