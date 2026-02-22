@@ -428,7 +428,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 62.7, y: 19.3}
+  m_AnchoredPosition: {x: 62.7, y: 9.2}
   m_SizeDelta: {x: 160, y: 20.4627}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &435009014
@@ -1756,6 +1756,7 @@ MonoBehaviour:
   conn: {fileID: 0}
   transport: {fileID: 0}
   playerSpawner: {fileID: 1594733321}
+  deathTracker: {fileID: 0}
   localGhostPrefab: {fileID: 5652273883015588081, guid: 471d28b91db188e4b9691095125224f5, type: 3}
   remoteGhostPrefab: {fileID: 5792367294580083491, guid: 79feb8ffd26a80741ae19c08908afd8c, type: 3}
   enableDebugLogs: 1
@@ -2539,8 +2540,8 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4278502174
-  m_fontColor: {r: 0.11731033, g: 0.7660377, b: 0.01589888, a: 1}
+    rgba: 4278211595
+  m_fontColor: {r: 0.044025116, g: 0.3301887, b: 0, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:

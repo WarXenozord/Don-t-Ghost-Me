@@ -19,7 +19,7 @@ public class FloorplanRenderer : MonoBehaviour
     [Tooltip("Door arc symbol. Arc should open toward +X in the source PNG.")]
     public GameObject doorSpritePrefab;
     [Tooltip("Player marker sprite.")]
-    private List<GameObject> enemyMarkers;
+    private List<GameObject> enemyMarkers = new List<GameObject>();
 
     [Header("Minimap Settings")]
     [Tooltip("World Y where all floorplan sprites are placed. Must be above your tallest building.")]
@@ -62,7 +62,7 @@ public class FloorplanRenderer : MonoBehaviour
         for (int i = 0; i < rooms.Count; i++)
             roomSprites[i] = new List<GameObject>();
 
-        // Per-floor parent objects — start hidden, revealed rooms within them start inactive
+        // Per-floor parent objects ï¿½ start hidden, revealed rooms within them start inactive
         foreach (int f in rooms.Select(r => r.floorIndex).Distinct().OrderBy(x => x))
         {
             var parent = new GameObject($"Minimap_Floor_{f}");
@@ -79,13 +79,13 @@ public class FloorplanRenderer : MonoBehaviour
         SetActiveFloor(0);
     }
     public void SetEnemyMarkers(GameObject marker){
+        if (enemyMarkers == null) enemyMarkers = new List<GameObject>();
+        if (marker == null) return;
         enemyMarkers.Add(marker);
-
-
     }
     /// <summary>
     /// Permanently reveals all minimap sprites that border roomIndex.
-    /// Safe to call multiple times — subsequent calls are no-ops.
+    /// Safe to call multiple times ï¿½ subsequent calls are no-ops.
     /// </summary>
     public void RevealRoom(int roomIndex)
     {
@@ -116,14 +116,18 @@ public class FloorplanRenderer : MonoBehaviour
                 go.SetActive(true);
         }
     }
-    foreach (var m in enemyMarkers){
-        m.SetActive(true);
-
+    if (enemyMarkers != null)
+    {
+        for (var i = 0; i < enemyMarkers.Count; i++)
+        {
+            var m = enemyMarkers[i];
+            if (m != null) m.SetActive(true);
+        }
     }
 
     // Also ensure floor parents are visible
     foreach (var kv in floorParents)
-        kv.Value.SetActive(true);
+        if (kv.Value != null) kv.Value.SetActive(true);
 
     Debug.Log("[FloorplanRenderer] All rooms revealed.");
 }
@@ -144,7 +148,7 @@ public class FloorplanRenderer : MonoBehaviour
         var mat = GetWallMaterial();
         if (mat == null)
         {
-            Debug.LogError("[FloorplanRenderer] GetWallMaterial() returned null — no walls will be created. " +
+            Debug.LogError("[FloorplanRenderer] GetWallMaterial() returned null ï¿½ no walls will be created. " +
                            "Assign wallShader or wallMaterialOverride in the inspector.");
             return;
         }
@@ -171,7 +175,7 @@ public class FloorplanRenderer : MonoBehaviour
             SetLayerRecursively(go, layer);
             created++;
 
-            // Start hidden — RevealRoom will enable it
+            // Start hidden ï¿½ RevealRoom will enable it
             if(_isHidden) go.SetActive(false);
 
             // Try roomA/roomB first (set by the refactored generator).
@@ -220,7 +224,7 @@ public class FloorplanRenderer : MonoBehaviour
             bool borders;
             if (wall.facingX)
             {
-                // Wall normal faces X — it sits on a left or right edge of the room
+                // Wall normal faces X ï¿½ it sits on a left or right edge of the room
                 bool onEdge = Mathf.Abs(wall.position.x - r.position.x) < tol ||
                               Mathf.Abs(wall.position.x - rXMax)        < tol;
                 bool zOverlap = wallZMax > r.position.z + tol &&
@@ -229,7 +233,7 @@ public class FloorplanRenderer : MonoBehaviour
             }
             else
             {
-                // Wall normal faces Z — it sits on a front or back edge of the room
+                // Wall normal faces Z ï¿½ it sits on a front or back edge of the room
                 bool onEdge = Mathf.Abs(wall.position.z - r.position.z) < tol ||
                               Mathf.Abs(wall.position.z - rZMax)        < tol;
                 bool xOverlap = wallXMax > r.position.x + tol &&
@@ -245,7 +249,7 @@ public class FloorplanRenderer : MonoBehaviour
         }
 
         if (!anyFound)
-            Debug.LogWarning($"[FloorplanRenderer] Wall at {wall.position} could not be assigned to any room — it won't be revealed.");
+            Debug.LogWarning($"[FloorplanRenderer] Wall at {wall.position} could not be assigned to any room ï¿½ it won't be revealed.");
     }
 
     private void SpawnDoorSprites(List<BuildingDoor> doors, float floorHeight, int layer)
@@ -293,7 +297,7 @@ public class FloorplanRenderer : MonoBehaviour
     /// so exterior walls appear when the interior room is revealed.</summary>
     private void RegisterSpriteToRoom(int roomIndex, GameObject go)
     {
-        if (roomIndex < 0) return; // exterior side — only registered to the interior room
+        if (roomIndex < 0) return; // exterior side ï¿½ only registered to the interior room
         if (!roomSprites.ContainsKey(roomIndex))
             roomSprites[roomIndex] = new List<GameObject>();
         // Avoid duplicates (a wall could theoretically be registered twice)
@@ -305,7 +309,7 @@ public class FloorplanRenderer : MonoBehaviour
     {
         if (_wallMaterial != null) return _wallMaterial;
 
-        // 1. Inspector override — highest priority
+        // 1. Inspector override ï¿½ highest priority
         if (wallMaterialOverride != null)
         {
             _wallMaterial = new Material(wallMaterialOverride) { color = wallColor };
@@ -333,7 +337,7 @@ public class FloorplanRenderer : MonoBehaviour
 
         // 4. Guaranteed fallback: steal the shader from a Unity primitive.
         //    CreatePrimitive always succeeds and its default material is always
-        //    included in the build — so this path can never fail.
+        //    included in the build ï¿½ so this path can never fail.
         var temp = GameObject.CreatePrimitive(PrimitiveType.Quad);
         _wallMaterial = new Material(temp.GetComponent<MeshRenderer>().sharedMaterial) { color = wallColor };
         DestroyImmediate(temp);

@@ -64,8 +64,7 @@ public class CharacterModelRandomizer : MonoBehaviour
         
         if (models == null || models.Length == 0)
         {
-            Debug.LogError("[CharacterModelRandomizer] No character models found! " +
-                         "Assign models in inspector or check Resources folder.");
+            Debug.LogWarning("[CharacterModelRandomizer] No character models found. Skipping spawn.");
             return;
         }
 
@@ -106,14 +105,13 @@ public class CharacterModelRandomizer : MonoBehaviour
             }
         }
         // Get Animator from new skin
-           Animator skinAnimator = _spawnedModel.GetComponent<Animator>();
-
-            //Assign avatar to main animator
+        var skinAnimator = _spawnedModel.GetComponent<Animator>();
+        if (_rootAnimator != null && skinAnimator != null && skinAnimator.avatar != null)
+        {
+            // Assign avatar to main animator
             _rootAnimator.avatar = skinAnimator.avatar;
-
-            // Force rebind
             _rootAnimator.Rebind();
-//_rootAnimator.Update(0f);
+        }
         Debug.Log($"[CharacterModelRandomizer] Spawned model {_chosenIndex}: {chosenPrefab.name}");
     }
 
@@ -132,7 +130,7 @@ public class CharacterModelRandomizer : MonoBehaviour
         
         if (models == null || models.Length == 0)
         {
-            Debug.LogError("[CharacterModelRandomizer] No models available!");
+            Debug.LogWarning("[CharacterModelRandomizer] No models available. Skipping spawn by index.");
             return;
         }
 
@@ -203,7 +201,7 @@ public class CharacterModelRandomizer : MonoBehaviour
         GameObject[] models = GetAvailableModels();
         if (models == null || models.Length == 0)
         {
-            Debug.LogError("[CharacterModelRandomizer] No models available!");
+            Debug.LogWarning("[CharacterModelRandomizer] No models available. Skipping deterministic spawn.");
             return;
         }
 

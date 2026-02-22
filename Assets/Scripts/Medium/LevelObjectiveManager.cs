@@ -42,11 +42,25 @@ public class LevelObjectiveManager : MonoBehaviour
     private readonly Dictionary<string, Candle> _candlesById = new Dictionary<string, Candle>();
     private bool _ritualComplete = false;
     private bool _debugSkipTriggered;
+    private float _nextRitualMarkLookupAt;
 
     // ?? Unity lifecycle ????????????????????????????????????????????????????
 
     public void SetMark(GameObject m){
+        if (m == null)
+        {
+            ritualMark = null;
+            Debug.LogWarning("[LevelObjective] SetMark called with null GameObject.");
+            return;
+        }
+
         ritualMark = m.GetComponent<RitualMark>();
+        if (ritualMark == null)
+        {
+            Debug.LogWarning("[LevelObjective] SetMark target has no RitualMark component.");
+            return;
+        }
+
         Debug.Log($"[LevelObjective] Sent RitualMark: {ritualMark.gameObject.name} " +
                           $"(InstanceID: {ritualMark.GetInstanceID()}) at {ritualMark.transform.position}");
     }
@@ -68,7 +82,8 @@ public class LevelObjectiveManager : MonoBehaviour
             }
             else
             {
-                Debug.LogError("[LevelObjective] No RitualMark found in scene!");
+                Debug.LogWarning("[LevelObjective] No RitualMark found in scene yet. Will retry.");
+                _nextRitualMarkLookupAt = Time.unscaledTime + 0.5f;
             }
         }
         else
@@ -98,6 +113,17 @@ public class LevelObjectiveManager : MonoBehaviour
 
     private void Update()
     {
+        if (ritualMark == null && Time.unscaledTime >= _nextRitualMarkLookupAt)
+        {
+            _nextRitualMarkLookupAt = Time.unscaledTime + 0.5f;
+            ritualMark = FindObjectOfType<RitualMark>();
+            if (ritualMark != null)
+            {
+                Debug.Log($"[LevelObjective] Late-found RitualMark: {ritualMark.gameObject.name} " +
+                          $"(InstanceID: {ritualMark.GetInstanceID()}) at {ritualMark.transform.position}");
+            }
+        }
+
         if (!enableDebugSkipHotkey || _debugSkipTriggered) return;
         if (!Input.GetKeyDown(debugSkipHotkey)) return;
 

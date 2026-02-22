@@ -120,9 +120,16 @@ public class EnemySimpleAI : SoundAgroListener
         }
 
         var floorRenderer = FindObjectOfType<FloorplanRenderer>();
-        if (floorRenderer != null && marker != null)
+        if (floorRenderer != null && marker != null && marker.activeInHierarchy)
         {
-            floorRenderer.SetEnemyMarkers(marker);
+            try
+            {
+                floorRenderer.SetEnemyMarkers(marker);
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogWarning("[EnemySimpleAI] Failed to register enemy marker at Start: " + ex.Message);
+            }
         }
 
         ResetMovementProgress();

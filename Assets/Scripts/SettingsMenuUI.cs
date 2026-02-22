@@ -50,18 +50,24 @@ public class SettingsMenuUI : MonoBehaviour
 
     public void SetMasterVolume(float value)
     {
+        if (mixer == null) return;
+        value = Mathf.Clamp(value, 0.0001f, 1f);
         mixer.SetFloat("MasterVolume", Mathf.Log10(value) * 20);
         PlayerPrefs.SetFloat("MasterVolume", value);
     }
 
     public void SetMusicVolume(float value)
     {
+        if (mixer == null) return;
+        value = Mathf.Clamp(value, 0.0001f, 1f);
         mixer.SetFloat("MusicVolume", Mathf.Log10(value) * 20);
         PlayerPrefs.SetFloat("MusicVolume", value);
     }
 
     public void SetSFXVolume(float value)
     {
+        if (mixer == null) return;
+        value = Mathf.Clamp(value, 0.0001f, 1f);
         mixer.SetFloat("SFXVolume", Mathf.Log10(value) * 20);
         PlayerPrefs.SetFloat("SFXVolume", value);
     }
@@ -79,14 +85,17 @@ public class SettingsMenuUI : MonoBehaviour
         float sfx = PlayerPrefs.GetFloat("SFXVolume", 1f);
         bool fullscreen = PlayerPrefs.GetInt("Fullscreen", 1) == 1;
 
-        masterSlider.value = master;
-        musicSlider.value = music;
-        sfxSlider.value = sfx;
-        fullscreenToggle.isOn = fullscreen;
+        if (masterSlider != null) masterSlider.value = master;
+        if (musicSlider != null) musicSlider.value = music;
+        if (sfxSlider != null) sfxSlider.value = sfx;
+        if (fullscreenToggle != null) fullscreenToggle.isOn = fullscreen;
 
-        SetMasterVolume(master);
-        SetMusicVolume(music);
-        SetSFXVolume(sfx);
+        if (mixer != null)
+        {
+            SetMasterVolume(master);
+            SetMusicVolume(music);
+            SetSFXVolume(sfx);
+        }
         SetFullscreen(fullscreen);
     }
 
