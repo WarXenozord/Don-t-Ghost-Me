@@ -87,6 +87,7 @@ public class ProceduralBuildingGenerator : MonoBehaviour
 {
     [Header("Seed")]
     [SerializeField] private int seed = 12345;
+    [SerializeField] private int seedSalt = 7919;
 
     [Header("Building Parameters")]
     [SerializeField] private int targetNumRooms = 20;
@@ -160,10 +161,16 @@ private Dictionary<RoomType, float> roomWeights;
     private Dictionary<(int, int), List<int>> sharedWallLookup;
 
     private System.Random random;
+    private int _baseSeed;
 
     // ?????????????????????????????????????????????????????????????????????????
     //  ENTRY POINT
     // ?????????????????????????????????????????????????????????????????????????
+
+    void Awake()
+    {
+        _baseSeed = seed;
+    }
 
     void Start() => GenerateBuilding();
     void InitializeRoomPools(){
@@ -207,6 +214,26 @@ sizePools = new Dictionary<RoomSize, List<RoomType>>();
 }
     public void GenerateBuilding()
     {
+        var floorTransition = FloorTransitionManager.Instance != null
+            ? FloorTransitionManager.Instance
+            : FindObjectOfType<FloorTransitionManager>();
+        if (floorTransition != null)
+        {
+            var floorParam = Mathf.Max(1, floorTransition.floorForSeedGeneration);
+            unchecked
+            {
+                var mixed = (_baseSeed * 1103515245) + 12345 + ((floorParam - 1) * seedSalt);
+                if (mixed == int.MinValue) mixed = 1;
+                seed = Mathf.Abs(mixed);
+                if (seed == 0) seed = 1;
+            }
+            Debug.Log($"[Generator] floorForSeed={floorParam} derivedSeed={seed}");
+        }
+        else
+        {
+            Debug.LogWarning("[Generator] FloorTransitionManager missing; using current seed.");
+        }
+
         InitializeRoomPools();
         ClearBuilding();
         Debug.Log($"Starting building generation with seed: {seed}");

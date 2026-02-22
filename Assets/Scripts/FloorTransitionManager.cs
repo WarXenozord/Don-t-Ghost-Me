@@ -25,11 +25,14 @@ public class FloorTransitionManager : MonoBehaviour
     public bool enableDebugLogs = true;
 
     public FloorProgressionManager _progressionManager;
+    [Header("Seed Sync")]
+    public int floorForSeedGeneration = 1;
     private HostAuthority _hostAuthority;
     private NakamaConnection _conn;
     private bool _transitionInProgress = false;
     private bool _pendingFallbackBootstrap;
     private int _pendingSeed;
+    private bool _isDestroying;
 
     void Awake()
     {
@@ -46,19 +49,27 @@ public class FloorTransitionManager : MonoBehaviour
 
     void OnDestroy()
     {
+        _isDestroying = true;
         if (Instance == this) Instance = null;
         SceneManager.sceneLoaded -= OnSceneLoaded;
+    }
+
+    void OnDisable()
+    {
+        if (_isDestroying || Instance != this) return;
+        if (!gameObject.activeSelf) return;
+        Debug.LogWarning("[FloorTransition] Component disabled unexpectedly. Re-enabling.");
+        enabled = true;
     }
 
     void Start()
     {
         ResolveRefs();
+        if (_progressionManager != null)
+            floorForSeedGeneration = Mathf.Max(1, _progressionManager.CurrentFloor);
 
         // Hide loading screen
-        if (loadingScreen != null)
-        {
-            loadingScreen.SetActive(false);
-        }
+        SetLoadingScreenActiveSafe(false);
     }
 
     /// <summary>
@@ -107,10 +118,7 @@ public class FloorTransitionManager : MonoBehaviour
         }
 
         // Show loading screen
-        if (loadingScreen != null)
-        {
-            loadingScreen.SetActive(true);
-        }
+        SetLoadingScreenActiveSafe(true);
 
         // Wait for transition delay
         yield return new WaitForSeconds(transitionDelay);
@@ -153,13 +161,14 @@ public class FloorTransitionManager : MonoBehaviour
             Debug.Log($"[FloorTransition] Synced transition payload floor={nextFloor}, rooms={nextRoomCount}, enemies={nextEnemyCount}, seed={nextSeed}");
         }
 
-        if (loadingScreen != null) loadingScreen.SetActive(true);
+        SetLoadingScreenActiveSafe(true);
 
         yield return new WaitForSeconds(Mathf.Max(0f, transitionDelay));
 
         if (_progressionManager != null)
         {
             _progressionManager.ApplyNetworkFloorState(nextFloor, nextRoomCount, nextEnemyCount);
+            floorForSeedGeneration = Mathf.Max(1, nextFloor);
             Debug.Log("[SceneFlow] Applied progression state in transition");
         }
 
@@ -344,8 +353,8 @@ public class FloorTransitionManager : MonoBehaviour
         var context = MatchContext.Instance;
         if (context.hasInit && context.lastInit != null)
         {
-            // Use seed + floor number for variation
-            int floorSeed = context.lastInit.seed + _progressionManager.CurrentFloor;
+            // Use the synchronized seed already computed by host transition payload.
+            int floorSeed = context.lastInit.seed;
             generator.GenerateBuildingFromSeed(floorSeed);
         }
         else
@@ -420,6 +429,8 @@ public class FloorTransitionManager : MonoBehaviour
     {
         if (_progressionManager == null)
             _progressionManager = FloorProgressionManager.Instance != null ? FloorProgressionManager.Instance : FindObjectOfType<FloorProgressionManager>();
+        if (_progressionManager != null)
+            floorForSeedGeneration = Mathf.Max(1, _progressionManager.CurrentFloor);
         
         if (_hostAuthority == null)
             _hostAuthority = FindObjectOfType<HostAuthority>();
@@ -434,15 +445,35 @@ public class FloorTransitionManager : MonoBehaviour
     public void OnSceneLoadedAfterTransition()
     {
         // Hide loading screen
-        if (loadingScreen != null)
-        {
-            loadingScreen.SetActive(false);
-        }
+        SetLoadingScreenActiveSafe(false);
 
         // Check if we're in a run
         if (_progressionManager != null && _progressionManager.RunActive)
         {
             RegenerateFloorWithNewDifficulty();
         }
+    }
+
+    private void SetLoadingScreenActiveSafe(bool active)
+    {
+        if (loadingScreen == null) return;
+
+        if (!active)
+        {
+            if (loadingScreen == gameObject)
+            {
+                Debug.LogWarning("[FloorTransition] loadingScreen references FloorTransitionManager GameObject. Skipping SetActive(false).");
+                return;
+            }
+
+            var loadingTransform = loadingScreen.transform;
+            if (loadingTransform != null && transform.IsChildOf(loadingTransform))
+            {
+                Debug.LogWarning("[FloorTransition] loadingScreen is parent of FloorTransitionManager. Skipping SetActive(false).");
+                return;
+            }
+        }
+
+        loadingScreen.SetActive(active);
     }
 }
