@@ -454,6 +454,9 @@ MonoBehaviour:
   lowEnergyKillCooldown: 1.5
   lowEnergyKillAudioSource: {fileID: 613729970767554745}
   lowEnergyKillClip: {fileID: 8300000, guid: d3cd274e3fd293a4cad203c9fabfc828, type: 3}
+  lowEnergyLoopThreshold: 20
+  lowEnergyLoopSource: {fileID: 613729970767554745}
+  lowEnergyLoopClip: {fileID: 8300000, guid: e5dc94ad71f4832439752d7e0da4533e, type: 3}
   regenPerSecond: 10
   regenDelay: 2
 --- !u!114 &4159529108978260038

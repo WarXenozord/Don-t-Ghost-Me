@@ -393,7 +393,7 @@ MonoBehaviour:
   logText: {fileID: 243157185}
   toMediumsIndicator: {fileID: 1472976500}
   toGhostsIndicator: {fileID: 2001037722}
-  maxLines: 9
+  maxLines: 5
   messageLifetimeSeconds: 10
 --- !u!1 &435009012
 GameObject:

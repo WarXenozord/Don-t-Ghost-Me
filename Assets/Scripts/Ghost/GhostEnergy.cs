@@ -20,6 +20,10 @@ public class GhostEnergy : MonoBehaviour
     public float lowEnergyKillCooldown = 1.5f;
     public AudioSource lowEnergyKillAudioSource;
     public AudioClip lowEnergyKillClip;
+    [Header("Low Energy Loop SFX (Local)")]
+    public float lowEnergyLoopThreshold = 20f;
+    public AudioSource lowEnergyLoopSource;
+    public AudioClip lowEnergyLoopClip;
 
     [Header("Regen Settings")]
     public float regenPerSecond = 10f;
@@ -28,6 +32,7 @@ public class GhostEnergy : MonoBehaviour
     private float timeSinceLastDrain = 0f;
     private float _nextLowEnergyKillAt;
     private bool _warnedHostAuthority;
+    private bool _lowEnergyLoopPlaying;
 
     private NakamaConnection _conn;
     private GhostSpawner _ghostSpawner;
@@ -53,6 +58,7 @@ public class GhostEnergy : MonoBehaviour
         }
 
         currentHealth = maxHealth;
+        ConfigureLowEnergyLoopSource();
         UpdateHealthBar();
     }
 
@@ -89,6 +95,8 @@ public class GhostEnergy : MonoBehaviour
         {
             TryLowEnergyBurstKill();
         }
+
+        UpdateLowEnergyLoopSfx();
     }
 
     private float DrainFromNearbyMediums()
@@ -232,5 +240,41 @@ public class GhostEnergy : MonoBehaviour
             energyBarFill.fillAmount = maxHealth > 0f ? currentHealth / maxHealth : 0f;
         }
         // If using a Slider: healthSlider.value = currentHealth / maxHealth;
+    }
+
+    private void ConfigureLowEnergyLoopSource()
+    {
+        if (lowEnergyLoopSource == null)
+        {
+            lowEnergyLoopSource = GetComponent<AudioSource>();
+        }
+
+        if (lowEnergyLoopSource == null || lowEnergyLoopClip == null) return;
+
+        lowEnergyLoopSource.clip = lowEnergyLoopClip;
+        lowEnergyLoopSource.loop = true;
+        lowEnergyLoopSource.playOnAwake = false;
+    }
+
+    private void UpdateLowEnergyLoopSfx()
+    {
+        if (lowEnergyLoopSource == null || lowEnergyLoopClip == null) return;
+
+        var shouldPlay = currentHealth < lowEnergyLoopThreshold;
+        if (shouldPlay && !_lowEnergyLoopPlaying)
+        {
+            if (lowEnergyLoopSource.clip != lowEnergyLoopClip)
+            {
+                lowEnergyLoopSource.clip = lowEnergyLoopClip;
+            }
+            lowEnergyLoopSource.loop = true;
+            lowEnergyLoopSource.Play();
+            _lowEnergyLoopPlaying = true;
+        }
+        else if (!shouldPlay && _lowEnergyLoopPlaying)
+        {
+            lowEnergyLoopSource.Stop();
+            _lowEnergyLoopPlaying = false;
+        }
     }
 }
