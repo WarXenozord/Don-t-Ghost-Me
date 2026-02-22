@@ -10,7 +10,7 @@ GameObject:
   m_Component:
   - component: {fileID: 510578768313460215}
   - component: {fileID: 5168428155573985214}
-  m_Layer: 8
+  m_Layer: 10
   m_Name: face
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -98,7 +98,7 @@ GameObject:
   - component: {fileID: 1151243061014826343}
   - component: {fileID: 5403183222194670432}
   - component: {fileID: 4048049176207895056}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: Ghost(Remote)
   m_TagString: Ghost
   m_Icon: {fileID: 0}
@@ -307,6 +307,14 @@ PrefabInstance:
     - target: {fileID: 919132149155446097, guid: 38b3c1b7a2a218e41b35dbc5852c7944, type: 3}
       propertyPath: m_Name
       value: Star Platinum
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 38b3c1b7a2a218e41b35dbc5852c7944, type: 3}
+      propertyPath: m_Layer
+      value: 10
+      objectReference: {fileID: 0}
+    - target: {fileID: 8164078558771037576, guid: 38b3c1b7a2a218e41b35dbc5852c7944, type: 3}
+      propertyPath: m_Layer
+      value: 10
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

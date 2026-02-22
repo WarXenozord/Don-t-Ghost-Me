@@ -57,6 +57,7 @@ MonoBehaviour:
   fontStyle: 1
   showBackground: 1
   backgroundColor: {r: 0, g: 0, b: 0, a: 0.5}
+  _mainCameraTransform: {fileID: 0}
 --- !u!1 &2348899634669402272
 GameObject:
   m_ObjectHideFlags: 0
