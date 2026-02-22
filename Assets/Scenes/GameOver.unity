@@ -850,7 +850,7 @@ MonoBehaviour:
           m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
           m_IntArgument: 0
           m_FloatArgument: 0
-          m_StringArgument: Lobby
+          m_StringArgument: StartMenu
           m_BoolArgument: 0
         m_CallState: 2
 --- !u!114 &602020423
@@ -2451,7 +2451,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Back to Lobby
+  m_text: Back to Start
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: f728cf3f734767d459f33bc5b7fac8a9, type: 2}
   m_sharedMaterial: {fileID: -8993090660047668903, guid: f728cf3f734767d459f33bc5b7fac8a9, type: 2}

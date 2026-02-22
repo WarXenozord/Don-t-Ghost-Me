@@ -19,6 +19,8 @@ public class MenuSequenceController : MonoBehaviour
     public CanvasGroup finalUFOGif;
     public float finalGifDelay = 1f;
 
+public AudioSource musicSource;
+public AudioClip ufoMusic;
     [Header("Settings")]
     public float flyDuration = 3f;
     public float secondFlyDuration = 2f;
@@ -55,7 +57,8 @@ Vector3 end = Camera.main.ViewportToWorldPoint(
 );
 
         StartCoroutine(FlyUFO(start, end, flyDuration, startScale, endScale));
-   
+        musicSource.clip = ufoMusic;
+        musicSource.Play();
 
         // Fade in title + buttons while UFO is offscreen
         
