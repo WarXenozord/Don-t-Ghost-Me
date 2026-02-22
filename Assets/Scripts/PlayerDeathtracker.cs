@@ -112,7 +112,15 @@ public class PlayerDeathTracker : MonoBehaviour
         foreach (var userId in currentPlayers)
         {
             if (!playerSpawner.TryGet(userId, out var playerGo) || playerGo == null)
+            {
+                // Missing body should still count as an alive player by default until
+                // a ghost body is explicitly observed/registered for this user.
+                if (!_deadPlayers.Contains(userId) && !_alivePlayers.Contains(userId))
+                {
+                    RegisterPlayerAlive(userId);
+                }
                 continue;
+            }
 
             // Check if player is a ghost
             var ghost = playerGo.GetComponentInChildren<GhostController>(true);
@@ -360,7 +368,18 @@ public class PlayerDeathTracker : MonoBehaviour
     /// </summary>
     public int GetAlivePlayerCount()
     {
-        return _alivePlayers.Count;
+        var expected = GetExpectedPlayerIds();
+        if (expected.Count == 0) return _alivePlayers.Count;
+
+        var alive = 0;
+        foreach (var userId in expected)
+        {
+            if (string.IsNullOrEmpty(userId)) continue;
+            if (_deadPlayers.Contains(userId)) continue;
+            alive++;
+        }
+
+        return alive;
     }
 
     /// <summary>
