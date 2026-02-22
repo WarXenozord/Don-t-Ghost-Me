@@ -393,7 +393,7 @@ MonoBehaviour:
   logText: {fileID: 243157185}
   toMediumsIndicator: {fileID: 1472976500}
   toGhostsIndicator: {fileID: 2001037722}
-  maxLines: 9
+  maxLines: 5
   messageLifetimeSeconds: 10
 --- !u!1 &435009012
 GameObject:
@@ -1969,7 +1969,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 293749387052256073, guid: 3b4ec7472d45f3c4f9bd2ffe57d02ad3, type: 3}
       propertyPath: enableDebugSkipHotkey
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 1023229969626592785, guid: 3b4ec7472d45f3c4f9bd2ffe57d02ad3, type: 3}
       propertyPath: mapPanel
@@ -2658,8 +2658,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 16
-  m_fontSizeBase: 16
+  m_fontSize: 14
+  m_fontSizeBase: 14
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18

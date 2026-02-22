@@ -31,6 +31,7 @@ public class UsernameManager : MonoBehaviour
         }
 
         Instance = this;
+        DontDestroyOnLoad(gameObject);
 
         LoadLocalUsername();
     }

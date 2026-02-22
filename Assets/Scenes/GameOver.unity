@@ -758,6 +758,7 @@ GameObject:
   - component: {fileID: 602020422}
   - component: {fileID: 602020425}
   - component: {fileID: 602020426}
+  - component: {fileID: 602020427}
   m_Layer: 5
   m_Name: Button
   m_TagString: Untagged
@@ -841,10 +842,10 @@ MonoBehaviour:
           m_StringArgument: 
           m_BoolArgument: 0
         m_CallState: 2
-      - m_Target: {fileID: 602020425}
-        m_TargetAssemblyTypeName: SceneLoader, Assembly-CSharp
-        m_MethodName: LoadScene
-        m_Mode: 5
+      - m_Target: {fileID: 602020427}
+        m_TargetAssemblyTypeName: FullReload, Assembly-CSharp
+        m_MethodName: RestartGame
+        m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
           m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
@@ -917,6 +918,22 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   clickClip: {fileID: 8300000, guid: 095d100329ca3914ea99d0fe2a44d136, type: 3}
   audioSource: {fileID: 1544246047}
+--- !u!114 &602020427
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 602020420}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 453a37c629eeb5a4aade1d2e55e57265, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  bootSceneBuildIndex: 0
+  clearPlayerPrefs: 1
+  destroyDontDestroyObjects: 1
+  socketCloseTimeoutSeconds: 1
 --- !u!1 &618275851
 GameObject:
   m_ObjectHideFlags: 0
