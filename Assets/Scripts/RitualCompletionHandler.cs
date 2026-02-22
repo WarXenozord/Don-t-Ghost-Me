@@ -22,6 +22,7 @@ public class RitualCompletionHandler : MonoBehaviour
 
     private bool _transportBound;
     private bool _ritualCompletedThisFloor;
+    private bool _isDestroying;
 
     void Awake()
     {
@@ -47,6 +48,7 @@ public class RitualCompletionHandler : MonoBehaviour
 
     void OnDestroy()
     {
+        _isDestroying = true;
         if (Instance == this) Instance = null;
         SceneManager.sceneLoaded -= OnSceneLoaded;
         if (transport != null && _transportBound)
@@ -54,6 +56,14 @@ public class RitualCompletionHandler : MonoBehaviour
             transport.OnRitualComplete -= OnRitualCompleteReceived;
             _transportBound = false;
         }
+    }
+
+    void OnDisable()
+    {
+        if (_isDestroying || Instance != this) return;
+        if (!gameObject.activeSelf) return;
+        Debug.LogWarning("[RitualCompletion] Component disabled unexpectedly. Re-enabling.");
+        enabled = true;
     }
 
     /// <summary>
@@ -83,22 +93,31 @@ public class RitualCompletionHandler : MonoBehaviour
 
         if (isHost)
         {
-            canTransition = HasAliveMediums();
-            nextSeed = BuildNextSeed();
+            if (progressionManager == null)
+                progressionManager = FloorProgressionManager.Instance != null ? FloorProgressionManager.Instance : FindObjectOfType<FloorProgressionManager>();
+            if (progressionManager == null)
+            {
+                Debug.LogError("[RitualCompletion] Cannot build next seed: FloorProgressionManager not found.");
+                return;
+            }
 
-            if (canTransition && progressionManager != null)
+            canTransition = HasAliveMediums();
+
+            if (canTransition)
             {
                 if (!progressionManager.RunActive) progressionManager.StartNewRun();
                 progressionManager.AdvanceToNextFloor();
                 nextFloor = progressionManager.CurrentFloor;
                 nextRooms = progressionManager.CurrentRoomCount;
                 nextEnemies = progressionManager.CurrentEnemyCount;
+                nextSeed = BuildNextSeedForFloor(nextFloor);
             }
-            else if (progressionManager != null)
+            else
             {
                 nextFloor = progressionManager.CurrentFloor;
                 nextRooms = progressionManager.CurrentRoomCount;
                 nextEnemies = progressionManager.CurrentEnemyCount;
+                nextSeed = BuildNextSeedForFloor(nextFloor);
             }
         }
 
@@ -288,14 +307,35 @@ public class RitualCompletionHandler : MonoBehaviour
         return deathTracker.GetAlivePlayerCount() > 0;
     }
 
-    private int BuildNextSeed()
+    private int BuildNextSeedForFloor(int floor)
     {
+        if (progressionManager == null)
+            progressionManager = FloorProgressionManager.Instance != null ? FloorProgressionManager.Instance : FindObjectOfType<FloorProgressionManager>();
+        if (progressionManager == null)
+        {
+            Debug.LogError("[RitualCompletion] BuildNextSeedForFloor failed: FloorProgressionManager missing.");
+            return 1;
+        }
+
         var context = MatchContext.Instance;
         var baseSeed = (context != null && context.lastInit != null) ? context.lastInit.seed : Random.Range(1, int.MaxValue);
-        var floor = progressionManager != null ? progressionManager.CurrentFloor + 1 : 1;
+        var nextFloor = Mathf.Max(1, floor);
+        var levelsPassed = Mathf.Max(0, nextFloor - 1);
         unchecked
         {
-            return Mathf.Abs(baseSeed * 1103515245 + 12345 + floor * 7919);
+            var mixed = (baseSeed * 1103515245) + 12345 + (levelsPassed * 7919);
+            if (mixed == int.MinValue) mixed = 1;
+            var nextSeed = Mathf.Abs(mixed);
+            if (nextSeed == 0) nextSeed = 1;
+            if (enableDebugLogs)
+            {
+                Debug.Log("[SceneFlow] BuildNextSeed"
+                    + " base=" + baseSeed
+                    + " nextFloor=" + nextFloor
+                    + " levelsPassed=" + levelsPassed
+                    + " nextSeed=" + nextSeed);
+            }
+            return nextSeed;
         }
     }
 }

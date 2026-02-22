@@ -1866,6 +1866,10 @@ PrefabInstance:
       propertyPath: requiredCandles
       value: 1
       objectReference: {fileID: 0}
+    - target: {fileID: 293749387052256073, guid: 3b4ec7472d45f3c4f9bd2ffe57d02ad3, type: 3}
+      propertyPath: enableDebugSkipHotkey
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 1023229969626592785, guid: 3b4ec7472d45f3c4f9bd2ffe57d02ad3, type: 3}
       propertyPath: mapPanel
       value: 

@@ -5165,7 +5165,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   gameplayScene: ProceduralRoom
   transitionDelay: 2
-  loadingScreen: {fileID: 0}
+  loadingScreen: {fileID: 1742745194}
   enableDebugLogs: 1
   _progressionManager: {fileID: 0}
 --- !u!4 &1742745196

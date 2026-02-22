@@ -31,6 +31,9 @@ public class LevelObjectiveManager : MonoBehaviour
     [Header("Network Sync")]
     [SerializeField] private MatchTransport transport;
     [SerializeField] private NakamaConnection conn;
+    [Header("Debug Skip")]
+    [SerializeField] private bool enableDebugSkipHotkey = false;
+    [SerializeField] private KeyCode debugSkipHotkey = KeyCode.H;
 
     // ?? Internal ???????????????????????????????????????????????????????????
 
@@ -38,6 +41,7 @@ public class LevelObjectiveManager : MonoBehaviour
     private readonly HashSet<string> _collectedCandleIds = new HashSet<string>();
     private readonly Dictionary<string, Candle> _candlesById = new Dictionary<string, Candle>();
     private bool _ritualComplete = false;
+    private bool _debugSkipTriggered;
 
     // ?? Unity lifecycle ????????????????????????????????????????????????????
 
@@ -90,6 +94,16 @@ public class LevelObjectiveManager : MonoBehaviour
             completionPanel.SetActive(false);
 
         UpdateUI();
+    }
+
+    private void Update()
+    {
+        if (!enableDebugSkipHotkey || _debugSkipTriggered) return;
+        if (!Input.GetKeyDown(debugSkipHotkey)) return;
+
+        _debugSkipTriggered = true;
+        Debug.Log("[LevelObjective] Debug skip hotkey pressed.");
+        ForceSkipToSceneLoad();
     }
 
     private void OnDestroy()
@@ -275,6 +289,26 @@ public class LevelObjectiveManager : MonoBehaviour
             collectedCount = _collectedCandleIds.Count,
             ritualComplete = _ritualComplete
         });
+    }
+
+    private void ForceSkipToSceneLoad()
+    {
+        if (!_ritualComplete)
+        {
+            OnRitualComplete();
+        }
+
+        var ritualHandler = RitualCompletionHandler.Instance != null
+            ? RitualCompletionHandler.Instance
+            : FindObjectOfType<RitualCompletionHandler>();
+        if (ritualHandler != null)
+        {
+            ritualHandler.BroadcastRitualCompletion();
+        }
+        else
+        {
+            Debug.LogWarning("[LevelObjective] Debug skip failed: RitualCompletionHandler not found.");
+        }
     }
 
     // ?? Debug ??????????????????????????????????????????????????????????????
