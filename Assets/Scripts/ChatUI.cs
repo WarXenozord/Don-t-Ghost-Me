@@ -19,6 +19,7 @@ public class ChatUI : MonoBehaviour
 
     [Header("Config")]
     public int maxLines = 30;
+    public float messageLifetimeSeconds = 10f;
 
     private enum TargetMode
     {
@@ -26,12 +27,19 @@ public class ChatUI : MonoBehaviour
         Ghosts
     }
 
-    private readonly Queue<string> _lines = new Queue<string>();
+    private struct ChatLineEntry
+    {
+        public string text;
+        public float expiresAt;
+    }
+
+    private readonly Queue<ChatLineEntry> _lines = new Queue<ChatLineEntry>();
     private TargetMode _selectedTarget = TargetMode.Ghosts;
     private bool _boundChat;
     private bool _boundInputFieldEvents;
     private bool _sanitizeSlashNextFrame;
     private string _lastResolvedRole = string.Empty;
+    private bool _logDirty;
 
     void Awake()
     {
@@ -66,6 +74,7 @@ public class ChatUI : MonoBehaviour
         RefreshRoleIfChanged();
         HandleSlashToggle();
         SanitizeSlashIfNeeded();
+        PruneExpiredLines();
 
         if (inputField == null) return;
         IsChatFocused = inputField.isFocused;
@@ -177,13 +186,17 @@ public class ChatUI : MonoBehaviour
     {
         if (string.IsNullOrEmpty(line) || logText == null) return;
 
-        _lines.Enqueue(line);
+        _lines.Enqueue(new ChatLineEntry
+        {
+            text = line,
+            expiresAt = Time.unscaledTime + Mathf.Max(0.1f, messageLifetimeSeconds)
+        });
         while (_lines.Count > Mathf.Max(1, maxLines))
         {
             _lines.Dequeue();
         }
-
-        logText.text = string.Join("\n", _lines);
+        _logDirty = true;
+        RebuildLogTextIfDirty();
     }
 
     private void RefreshRoleUI()
@@ -307,5 +320,44 @@ public class ChatUI : MonoBehaviour
         }
 
         return Mathf.Max(1, chatController.maxMessageLength);
+    }
+
+    private void PruneExpiredLines()
+    {
+        if (_lines.Count == 0) return;
+
+        var now = Time.unscaledTime;
+        var removed = false;
+        while (_lines.Count > 0 && _lines.Peek().expiresAt <= now)
+        {
+            _lines.Dequeue();
+            removed = true;
+        }
+
+        if (removed)
+        {
+            _logDirty = true;
+            RebuildLogTextIfDirty();
+        }
+    }
+
+    private void RebuildLogTextIfDirty()
+    {
+        if (!_logDirty || logText == null) return;
+        _logDirty = false;
+
+        if (_lines.Count == 0)
+        {
+            logText.text = string.Empty;
+            return;
+        }
+
+        var snapshot = _lines.ToArray();
+        var lines = new string[snapshot.Length];
+        for (var i = 0; i < snapshot.Length; i++)
+        {
+            lines[i] = snapshot[i].text;
+        }
+        logText.text = string.Join("\n", lines);
     }
 }
