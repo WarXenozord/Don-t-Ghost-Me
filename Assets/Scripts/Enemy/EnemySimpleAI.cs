@@ -110,9 +110,21 @@ public class EnemySimpleAI : SoundAgroListener
     void Start()
     {
         _patrolInitialized = false;
-        GameObject _marker = this.gameObject.GetComponent<Transform>().GetChild(0).gameObject;
-        FloorplanRenderer _floorRenderer = FindObjectOfType<FloorplanRenderer>();
-        _floorRenderer.SetEnemyMarkers(_marker);
+
+        // WebGL-safe startup guards: scene refs/children may not be ready in the same frame.
+        GameObject marker = null;
+        if (transform != null && transform.childCount > 0)
+        {
+            var child = transform.GetChild(0);
+            if (child != null) marker = child.gameObject;
+        }
+
+        var floorRenderer = FindObjectOfType<FloorplanRenderer>();
+        if (floorRenderer != null && marker != null)
+        {
+            floorRenderer.SetEnemyMarkers(marker);
+        }
+
         ResetMovementProgress();
     }
 
