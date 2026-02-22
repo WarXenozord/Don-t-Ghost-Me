@@ -104,9 +104,14 @@ public class PlayerSpawnManager : MonoBehaviour
         var randomizer = go.GetComponent<CharacterModelRandomizer>();
         if (randomizer != null)
         {
-            if (modelIndex >= 0 && randomizer.GetModelCount() > 0)
+            var modelCount = randomizer.GetModelCount();
+            if (modelCount <= 0)
             {
-                randomizer.SpawnModelByIndex(modelIndex % randomizer.GetModelCount());
+                Debug.LogWarning("[Spawn] CharacterModelRandomizer has no models on local prefab. Skipping model spawn.");
+            }
+            else if (modelIndex >= 0)
+            {
+                randomizer.SpawnModelByIndex(modelIndex % modelCount);
             }
             else
             {
@@ -197,9 +202,14 @@ public class PlayerSpawnManager : MonoBehaviour
             var randomizer = go.GetComponent<CharacterModelRandomizer>();
             if (randomizer != null)
             {
-                if (modelIndex >= 0 && randomizer.GetModelCount() > 0)
+                var modelCount = randomizer.GetModelCount();
+                if (modelCount <= 0)
                 {
-                    randomizer.SpawnModelByIndex(modelIndex % randomizer.GetModelCount());
+                    Debug.LogWarning("[Spawn] CharacterModelRandomizer has no models on remote prefab. Skipping model spawn.");
+                }
+                else if (modelIndex >= 0)
+                {
+                    randomizer.SpawnModelByIndex(modelIndex % modelCount);
                 }
                 else
                 {
