@@ -1,6 +1,8 @@
 using System.Collections.Generic;
 using Nakama;
 using UnityEngine;
+using UnityEngine.SceneManagement;
+using System.Collections;
 
 public class HostAuthority : MonoBehaviour
 {
@@ -76,6 +78,7 @@ public class HostAuthority : MonoBehaviour
     private bool _initialEnemiesSpawned;
     private int _lastSentAnimState = -1;
     private int _lastBroadcastHostAnimState = -1;
+    private bool _sceneResyncInProgress;
 
     public string CurrentMediumUserId => _mediumUserId;
     public int ActiveInitId => _activeInitId;
@@ -94,10 +97,12 @@ public class HostAuthority : MonoBehaviour
         if (!spawner) spawner = PlayerSpawnManager.Instance != null ? PlayerSpawnManager.Instance : FindObjectOfType<PlayerSpawnManager>();
         if (!enemySpawner) enemySpawner = EnemySpawnManager.Instance != null ? EnemySpawnManager.Instance : FindObjectOfType<EnemySpawnManager>();
         EnsureBindings();
+        SceneManager.sceneLoaded += OnSceneLoaded;
     }
 
     void OnDestroy()
     {
+        SceneManager.sceneLoaded -= OnSceneLoaded;
         if (Instance == this) Instance = null;
         if (transport && _transportBound)
         {
@@ -155,6 +160,12 @@ public class HostAuthority : MonoBehaviour
         }
 
         isHost = conn.IsCurrentPlayerMatchCreator;
+        if (isHost)
+        {
+            // Scene reload does not emit join events for already-present users.
+            // Keep a host-side guard that spawns any missing remotes from current presences.
+            EnsureRemoteProxiesForPresentUsers();
+        }
 
         if (!_gameplayStarted) return;
 
@@ -245,16 +256,21 @@ public class HostAuthority : MonoBehaviour
 
     private MatchTransport.InitMsg BuildInitMessage(int initId)
     {
-        var seed = Random.Range(1, int.MaxValue);
-        var goalPos = GetGoalPositionPlaceholder();
+        var context = MatchContext.Instance;
+        var preservedSeed = (context != null && context.lastInit != null && context.lastInit.seed > 0)
+            ? context.lastInit.seed
+            : Random.Range(1, int.MaxValue);
+        var preservedGoal = (context != null && context.lastInit != null)
+            ? context.lastInit.goalPos
+            : GetGoalPositionPlaceholder();
         var spawns = BuildSpawnPointsPlaceholder();
         var mediumUserId = DetermineMediumUserId();
         return new MatchTransport.InitMsg
         {
             initId = initId,
-            seed = seed,
+            seed = preservedSeed,
             spawns = spawns,
-            goalPos = goalPos,
+            goalPos = preservedGoal,
             mediumUserId = mediumUserId
         };
     }
@@ -812,6 +828,7 @@ public class HostAuthority : MonoBehaviour
         }
 
         SpawnProxiesForOthersAtAssignedSpawns(_cachedInitSpawns);
+        EnsureRemoteProxiesForPresentUsers();
 
         // Normalize cached spawn map through the same clamp used for instantiated players.
         if (spawner)
@@ -824,6 +841,86 @@ public class HostAuthority : MonoBehaviour
             }
         }
         _spawnPassComplete = true;
+    }
+
+    private void EnsureRemoteProxiesForPresentUsers()
+    {
+        if (!isHost && (conn == null || !conn.IsCurrentPlayerMatchCreator)) return;
+        if (!spawner) spawner = PlayerSpawnManager.Instance != null ? PlayerSpawnManager.Instance : FindObjectOfType<PlayerSpawnManager>();
+        if (spawner == null) return;
+
+        var selfId = conn != null ? conn.SelfUserId : string.Empty;
+        var presentUsers = GetPresentUserIds();
+        for (var i = 0; i < presentUsers.Count; i++)
+        {
+            var userId = presentUsers[i];
+            if (string.IsNullOrEmpty(userId) || userId == selfId) continue;
+            if (spawner.TryGet(userId, out _)) continue;
+
+            var spawn = ResolveSpawnForUser(userId);
+            var modelIndex = GetModelIndexForUser(userId);
+            spawner.SpawnRemote(userId, spawn, 0f, modelIndex);
+            _spawnByUserId[userId] = spawn;
+
+            if (conn != null && conn.IsCurrentPlayerMatchCreator)
+            {
+                _pos[userId] = spawn;
+                _yaw[userId] = 0f;
+                _hostVisualPos[userId] = spawn;
+                _hostVisualYaw[userId] = 0f;
+            }
+        }
+    }
+
+    private void OnSceneLoaded(Scene _, LoadSceneMode __)
+    {
+        // Force a fresh spawn pass after scene reload and reacquire scene-local managers.
+        _spawnPassComplete = false;
+        spawner = null;
+        enemySpawner = null;
+
+        if (_sceneResyncInProgress) return;
+        StartCoroutine(ResyncInitAfterSceneLoad());
+    }
+
+    private IEnumerator ResyncInitAfterSceneLoad()
+    {
+        _sceneResyncInProgress = true;
+        yield return null;
+        yield return new WaitForSeconds(0.15f);
+
+        ResolveRefs();
+        if (conn == null || transport == null || conn.Match == null)
+        {
+            _sceneResyncInProgress = false;
+            yield break;
+        }
+
+        isHost = conn.IsCurrentPlayerMatchCreator;
+        if (!isHost)
+        {
+            _sceneResyncInProgress = false;
+            yield break;
+        }
+
+        // Replicate the lobby start handshake after scene reload to re-sync spawns.
+        _activeInitId = Random.Range(1, int.MaxValue);
+        var initMsg = BuildInitMessage(_activeInitId);
+        _initSent = true;
+        _startSent = false;
+        _readyUserIds.Clear();
+
+        ApplyInitOnce(initMsg);
+        if (!string.IsNullOrEmpty(conn.SelfUserId))
+        {
+            _readyUserIds.Add(conn.SelfUserId);
+        }
+
+        transport.BroadcastInit(initMsg);
+        TrySendStartIfEveryoneReady();
+        EnsureRemoteProxiesForPresentUsers();
+        LogDebug($"SCENE_RESYNC_INIT | initId={_activeInitId} present={GetPresentUserIds().Count}");
+        _sceneResyncInProgress = false;
     }
 
     private Vector3 ResolveSpawnForUser(string userId)
