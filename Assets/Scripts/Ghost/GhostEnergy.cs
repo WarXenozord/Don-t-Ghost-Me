@@ -177,7 +177,7 @@ public class GhostEnergy : MonoBehaviour
             var dist = Vector3.Distance(transform.position, target.position);
             if (dist > lowEnergyKillRadius) continue;
 
-            if (_ghostSpawner.HostKillMediumAndSpawnGhost(info.userId, target.position, target.eulerAngles.y))
+            if (_ghostSpawner.RequestKillMediumAndSpawnGhost(info.userId, target.position, target.eulerAngles.y))
             {
                 killed++;
             }

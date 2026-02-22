@@ -17,6 +17,7 @@ public class MatchTransport : MonoBehaviour
     public const long OPCODE_ENEMY_TELEPORT = 22;
     public const long OPCODE_ENEMY_FX = 23;
     public const long OPCODE_GHOST_SPAWN = 30;
+    public const long OPCODE_GHOST_KILL_REQUEST = 43;
     public const long OPCODE_LAMP_FLICKER = 31;
     public const long OPCODE_OBJECTIVE_STATE = 32;
     public const long OPCODE_CHAT = 33;
@@ -44,6 +45,7 @@ public class MatchTransport : MonoBehaviour
     public event Action<EnemyTeleportMsg> OnEnemyTeleport;
     public event Action<EnemyFxMsg> OnEnemyFx;
     public event Action<GhostSpawnMsg> OnGhostSpawn;
+    public event Action<GhostKillRequestMsg> OnGhostKillRequest;
     public event Action<LampFlickerMsg> OnLampFlicker;
     public event Action<ObjectiveStateMsg> OnObjectiveState;
     public event Action<ChatMsg> OnChat;
@@ -274,6 +276,12 @@ public class MatchTransport : MonoBehaviour
                 //Debug.Log("[MatchTransport] RECV_RITUAL_COMPLETE from=" + msg.senderUserId);
             }
         }
+        else if (state.OpCode == OPCODE_GHOST_KILL_REQUEST)
+        {
+            var msg = JsonUtility.FromJson<GhostKillRequestMsg>(json);
+            msg.senderUserId = state.UserPresence.UserId;
+            OnGhostKillRequest?.Invoke(msg);
+        }
         else if (state.OpCode == OPCODE_ALIVE_COUNT)
         {
             var msg = JsonUtility.FromJson<AliveCountMsg>(json);
@@ -385,6 +393,13 @@ public async void BroadcastRitualComplete(RitualCompleteMsg msg)
         {
             Debug.Log("[MatchTransport] SEND_GHOST_SPAWN user=" + msg.userId);
         }
+    }
+
+    public async void SendGhostKillRequest(GhostKillRequestMsg msg)
+    {
+        if (conn?.Socket == null || conn.Match == null) return;
+        var bytes = Encoding.UTF8.GetBytes(JsonUtility.ToJson(msg));
+        await conn.Socket.SendMatchStateAsync(conn.Match.Id, OPCODE_GHOST_KILL_REQUEST, bytes);
     }
 
     public async void BroadcastLampFlicker(LampFlickerMsg msg)
@@ -594,6 +609,15 @@ public async void BroadcastRitualComplete(RitualCompleteMsg msg)
 
     [Serializable]
     public class GhostSpawnMsg
+    {
+        public string userId;
+        public float x, y, z;
+        public float yaw;
+        [NonSerialized] public string senderUserId;
+    }
+
+    [Serializable]
+    public class GhostKillRequestMsg
     {
         public string userId;
         public float x, y, z;

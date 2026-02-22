@@ -46,8 +46,31 @@ public class GhostSpawner : MonoBehaviour
         if (transport != null && _bound)
         {
             transport.OnGhostSpawn -= OnGhostSpawnReceived;
+            transport.OnGhostKillRequest -= OnGhostKillRequestReceived;
             _bound = false;
         }
+    }
+
+    public bool RequestKillMediumAndSpawnGhost(string userId, Vector3 position, float yaw)
+    {
+        ResolveRefs();
+        if (string.IsNullOrEmpty(userId)) return false;
+        if (conn == null || transport == null || conn.Match == null) return false;
+
+        if (conn.IsCurrentPlayerMatchCreator)
+        {
+            return HostKillMediumAndSpawnGhost(userId, position, yaw);
+        }
+
+        transport.SendGhostKillRequest(new MatchTransport.GhostKillRequestMsg
+        {
+            userId = userId,
+            x = position.x,
+            y = position.y,
+            z = position.z,
+            yaw = yaw
+        });
+        return true;
     }
 
     public bool HostKillMediumAndSpawnGhost(string userId, Vector3 position, float yaw)
@@ -89,6 +112,14 @@ public class GhostSpawner : MonoBehaviour
         if (msg == null || string.IsNullOrEmpty(msg.userId)) return;
         if (conn != null && !string.IsNullOrEmpty(msg.senderUserId) && msg.senderUserId == conn.SelfUserId) return;
         ApplyGhostSpawn(msg);
+    }
+
+    private void OnGhostKillRequestReceived(MatchTransport.GhostKillRequestMsg msg)
+    {
+        if (msg == null || string.IsNullOrEmpty(msg.userId)) return;
+        if (conn == null || !conn.IsCurrentPlayerMatchCreator) return;
+
+        HostKillMediumAndSpawnGhost(msg.userId, new Vector3(msg.x, msg.y, msg.z), msg.yaw);
     }
 
     private void ApplyGhostSpawn(MatchTransport.GhostSpawnMsg msg)
@@ -181,6 +212,7 @@ public class GhostSpawner : MonoBehaviour
     {
         if (!transport || _bound) return;
         transport.OnGhostSpawn += OnGhostSpawnReceived;
+        transport.OnGhostKillRequest += OnGhostKillRequestReceived;
         _bound = true;
     }
 
