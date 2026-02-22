@@ -9,6 +9,7 @@ public class GhostSpawner : MonoBehaviour
     public NakamaConnection conn;
     public MatchTransport transport;
     public PlayerSpawnManager playerSpawner;
+    public PlayerDeathTracker deathTracker;
 
     [Header("Prefabs")]
     public GameObject localGhostPrefab;
@@ -66,6 +67,10 @@ public class GhostSpawner : MonoBehaviour
         };
 
         ApplyGhostSpawn(msg);
+        if (deathTracker != null)
+        {
+            deathTracker.RegisterPlayerDead(userId);
+        }
         transport.BroadcastGhostSpawn(msg);
         return true;
     }
@@ -169,6 +174,7 @@ public class GhostSpawner : MonoBehaviour
         if (!conn) conn = NakamaConnection.Instance != null ? NakamaConnection.Instance : FindObjectOfType<NakamaConnection>();
         if (!transport) transport = MatchTransport.Instance != null ? MatchTransport.Instance : FindObjectOfType<MatchTransport>();
         if (!playerSpawner) playerSpawner = PlayerSpawnManager.Instance != null ? PlayerSpawnManager.Instance : FindObjectOfType<PlayerSpawnManager>();
+        if (!deathTracker) deathTracker = PlayerDeathTracker.Instance != null ? PlayerDeathTracker.Instance : FindObjectOfType<PlayerDeathTracker>();
     }
 
     private void EnsureBound()

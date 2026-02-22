@@ -27,10 +27,12 @@ public class MatchTransport : MonoBehaviour
     public const long OPCODE_LOBBY_JOIN_REQUEST = 39;
     public const long OPCODE_LOBBY_PLACEHOLDER_SPAWN = 40;
     public const long OPCODE_RITUAL_COMPLETE = 41;
+    public const long OPCODE_ALIVE_COUNT = 42;
 
     public NakamaConnection conn;
 
     public event Action<RitualCompleteMsg> OnRitualComplete;
+    public event Action<AliveCountMsg> OnAliveCount;
 
     public event Action<InputMsg> OnInput;
     public event Action<SnapshotMsg> OnSnapshot;
@@ -272,6 +274,12 @@ public class MatchTransport : MonoBehaviour
                 //Debug.Log("[MatchTransport] RECV_RITUAL_COMPLETE from=" + msg.senderUserId);
             }
         }
+        else if (state.OpCode == OPCODE_ALIVE_COUNT)
+        {
+            var msg = JsonUtility.FromJson<AliveCountMsg>(json);
+            msg.senderUserId = state.UserPresence.UserId;
+            OnAliveCount?.Invoke(msg);
+        }
     }
 
     public async void SendInput(InputMsg msg)
@@ -348,7 +356,16 @@ public async void BroadcastRitualComplete(RitualCompleteMsg msg)
         {
             Debug.Log("[MatchTransport] SEND_RITUAL_COMPLETE");
         }
-    }    public async void BroadcastEnemyFx(EnemyFxMsg msg)
+    }
+
+    public async void BroadcastAliveCount(AliveCountMsg msg)
+    {
+        if (conn?.Socket == null || conn.Match == null) return;
+        var bytes = Encoding.UTF8.GetBytes(JsonUtility.ToJson(msg));
+        await conn.Socket.SendMatchStateAsync(conn.Match.Id, OPCODE_ALIVE_COUNT, bytes);
+    }
+
+    public async void BroadcastEnemyFx(EnemyFxMsg msg)
     {
         if (conn?.Socket == null || conn.Match == null) return;
         var bytes = Encoding.UTF8.GetBytes(JsonUtility.ToJson(msg));
@@ -466,6 +483,15 @@ public async void BroadcastRitualComplete(RitualCompleteMsg msg)
         public string mediumUserId;
         public SpawnPoint[] spawns;
         public Vector3 goalPos;
+        [NonSerialized] public string senderUserId;
+    }
+
+    [Serializable]
+    public class AliveCountMsg
+    {
+        public int initId;
+        public int aliveCount;
+        public int totalCount;
         [NonSerialized] public string senderUserId;
     }
     [Serializable]

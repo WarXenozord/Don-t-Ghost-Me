@@ -3,8 +3,11 @@ using UnityEngine.SceneManagement;
 using System.Collections.Generic;
 
 /// <summary>
-/// Tracks player deaths and triggers game over when all players are dead.
-/// A player is "dead" when they become a ghost.
+/// Host-authoritative player death counter.
+/// - Scene start: alive count = total players from Init spawns.
+/// - On host-confirmed death: alive count decrements once per user.
+/// - Host broadcasts alive count to clients.
+/// - On scene reload: counter resets and re-initializes from Init spawns.
 /// </summary>
 public class PlayerDeathTracker : MonoBehaviour
 {
@@ -12,24 +15,24 @@ public class PlayerDeathTracker : MonoBehaviour
 
     [Header("References")]
     public NakamaConnection conn;
-    public PlayerSpawnManager playerSpawner;
+    public MatchTransport transport;
     public FloorProgressionManager progressionManager;
 
     [Header("Game Over")]
     public string gameOverScene = "GameOver";
-    public float gameOverDelay = 3f; // Delay before loading game over scene
+    public float gameOverDelay = 3f;
 
     [Header("Debug")]
     public bool enableDebugLogs = true;
 
-    // Track which players are currently alive (mediums)
-    private readonly HashSet<string> _alivePlayers = new HashSet<string>();
     private readonly HashSet<string> _deadPlayers = new HashSet<string>();
-    
-    private bool _gameOverTriggered = false;
-    private float _gameOverTimer = 0f;
-    private float _suppressChecksUntil;
-    private readonly Dictionary<string, float> _nextMissingBodyLogAt = new Dictionary<string, float>();
+    private bool _countInitialized;
+    private int _aliveCount;
+    private int _totalCount;
+
+    private bool _gameOverTriggered;
+    private float _gameOverTimer;
+    private bool _boundTransport;
 
     void Awake()
     {
@@ -42,21 +45,29 @@ public class PlayerDeathTracker : MonoBehaviour
         Instance = this;
         DontDestroyOnLoad(gameObject);
         SceneManager.sceneLoaded += OnSceneLoaded;
+        ResolveRefs();
+        EnsureBound();
+        ResetForNewLevel();
     }
 
     void OnDestroy()
     {
         if (Instance == this) Instance = null;
         SceneManager.sceneLoaded -= OnSceneLoaded;
+
+        if (transport != null && _boundTransport)
+        {
+            transport.OnAliveCount -= OnAliveCountReceived;
+            _boundTransport = false;
+        }
     }
 
     void Update()
     {
         ResolveRefs();
-        if (Time.unscaledTime < _suppressChecksUntil) return;
-        CheckPlayerStates();
+        EnsureBound();
+        TryInitializeCount();
 
-        // Game over countdown
         if (_gameOverTriggered)
         {
             _gameOverTimer -= Time.deltaTime;
@@ -68,112 +79,140 @@ public class PlayerDeathTracker : MonoBehaviour
     }
 
     /// <summary>
-    /// Registers a player as alive (called when player spawns as medium)
-    /// </summary>
-    public void RegisterPlayerAlive(string userId)
-    {
-        if (string.IsNullOrEmpty(userId)) return;
-
-        _alivePlayers.Add(userId);
-        _deadPlayers.Remove(userId);
-
-        if (enableDebugLogs)
-            Debug.Log($"[DeathTracker] Player {userId} registered as ALIVE. Alive: {_alivePlayers.Count}, Dead: {_deadPlayers.Count}");
-    }
-
-    /// <summary>
-    /// Registers a player as dead (called when player becomes ghost)
+    /// Host-only call: invoked when a player truly dies (second touch -> ghost spawn).
     /// </summary>
     public void RegisterPlayerDead(string userId)
     {
         if (string.IsNullOrEmpty(userId)) return;
+        if (!IsHost()) return;
 
-        _alivePlayers.Remove(userId);
+        TryInitializeCount();
+        if (!_countInitialized) return;
+        if (_deadPlayers.Contains(userId)) return;
+
         _deadPlayers.Add(userId);
+        _aliveCount = Mathf.Max(0, _aliveCount - 1);
 
         if (enableDebugLogs)
-            Debug.Log($"[DeathTracker] Player {userId} registered as DEAD. Alive: {_alivePlayers.Count}, Dead: {_deadPlayers.Count}");
-
-        // Check if all dead
-        CheckForGameOver();
-    }
-
-    /// <summary>
-    /// Checks current player states and updates alive/dead tracking
-    /// </summary>
-    private void CheckPlayerStates()
-    {
-        if (playerSpawner == null) return;
-
-        // Get all current players in match
-        var currentPlayers = GetAllPlayerIds();
-        PrunePlayersNotInMatch(currentPlayers);
-
-        foreach (var userId in currentPlayers)
         {
-            if (!playerSpawner.TryGet(userId, out var playerGo) || playerGo == null)
-            {
-                // Missing body should still count as an alive player by default until
-                // a ghost body is explicitly observed/registered for this user.
-                if (!_deadPlayers.Contains(userId) && !_alivePlayers.Contains(userId))
-                {
-                    RegisterPlayerAlive(userId);
-                }
-                continue;
-            }
-
-            // Check if player is a ghost
-            var ghost = playerGo.GetComponentInChildren<GhostController>(true);
-            var isGhost = ghost != null;
-            if (isGhost)
-            {
-                // Player is a ghost (dead)
-                if (!_deadPlayers.Contains(userId))
-                {
-                    RegisterPlayerDead(userId);
-                }
-            }
-            else
-            {
-                // Player is a medium (alive)
-                if (!_alivePlayers.Contains(userId))
-                {
-                    RegisterPlayerAlive(userId);
-                }
-            }
+            Debug.Log("[DeathTracker] HOST_DEATH user=" + userId + " alive=" + _aliveCount + "/" + _totalCount);
         }
 
+        BroadcastAliveCount();
         CheckForGameOver();
     }
 
     /// <summary>
-    /// Checks if all players are dead and triggers game over
+    /// Resets internal state so next scene initializes a fresh count.
     /// </summary>
-    private void CheckForGameOver()
+    public void ResetTracker()
     {
-        if (_gameOverTriggered) return;
+        ResetForNewLevel();
+    }
 
-        var allPlayers = GetExpectedPlayerIds();
-        
-        if (allPlayers.Count == 0)
+    public int GetAlivePlayerCount()
+    {
+        return Mathf.Max(0, _aliveCount);
+    }
+
+    public int GetDeadPlayerCount()
+    {
+        var dead = Mathf.Max(0, _totalCount - _aliveCount);
+        return dead;
+    }
+
+    [ContextMenu("Force Game Over")]
+    public void DebugForceGameOver()
+    {
+        TriggerGameOver();
+    }
+
+    private void TryInitializeCount()
+    {
+        if (_countInitialized) return;
+
+        var context = MatchContext.Instance;
+        if (context == null || context.lastInit == null || context.lastInit.spawns == null || context.lastInit.spawns.Length == 0)
         {
-            // No players yet, don't trigger game over
             return;
         }
 
-        // Authoritative condition: every expected player currently has a ghost body.
-        // This avoids false positives when one side has stale alive/dead counters.
-        bool allDead = AreAllExpectedPlayersGhost(allPlayers);
-
-        if (allDead)
+        var uniqueUsers = new HashSet<string>();
+        var spawns = context.lastInit.spawns;
+        for (var i = 0; i < spawns.Length; i++)
         {
-            TriggerGameOver();
+            var s = spawns[i];
+            if (s == null || string.IsNullOrEmpty(s.userId)) continue;
+            uniqueUsers.Add(s.userId);
+        }
+
+        if (uniqueUsers.Count <= 0) return;
+
+        _deadPlayers.Clear();
+        _totalCount = uniqueUsers.Count;
+        _aliveCount = _totalCount;
+        _countInitialized = true;
+        _gameOverTriggered = false;
+        _gameOverTimer = 0f;
+
+        if (enableDebugLogs)
+        {
+            Debug.Log("[DeathTracker] INIT_COUNT alive=" + _aliveCount + "/" + _totalCount);
+        }
+
+        if (IsHost())
+        {
+            BroadcastAliveCount();
         }
     }
 
-    /// <summary>
-    /// Triggers game over sequence
-    /// </summary>
+    private void BroadcastAliveCount()
+    {
+        if (!IsHost()) return;
+        if (transport == null || conn == null || conn.Match == null) return;
+
+        var context = MatchContext.Instance;
+        var initId = (context != null && context.lastInit != null) ? context.lastInit.initId : -1;
+        transport.BroadcastAliveCount(new MatchTransport.AliveCountMsg
+        {
+            initId = initId,
+            aliveCount = _aliveCount,
+            totalCount = _totalCount
+        });
+    }
+
+    private void OnAliveCountReceived(MatchTransport.AliveCountMsg msg)
+    {
+        if (msg == null) return;
+        if (IsHost()) return;
+        if (msg.totalCount <= 0) return;
+
+        var context = MatchContext.Instance;
+        var localInitId = (context != null && context.lastInit != null) ? context.lastInit.initId : -1;
+        if (localInitId >= 0 && msg.initId >= 0 && msg.initId != localInitId) return;
+
+        _totalCount = Mathf.Max(0, msg.totalCount);
+        _aliveCount = Mathf.Clamp(msg.aliveCount, 0, _totalCount);
+        _countInitialized = true;
+
+        if (enableDebugLogs)
+        {
+            Debug.Log("[DeathTracker] SYNC_COUNT alive=" + _aliveCount + "/" + _totalCount);
+        }
+
+        CheckForGameOver();
+    }
+
+    private void CheckForGameOver()
+    {
+        if (_gameOverTriggered) return;
+        if (!_countInitialized) return;
+        if (_totalCount <= 0) return;
+        if (_aliveCount > 0) return;
+
+        TriggerGameOver();
+    }
+
     private void TriggerGameOver()
     {
         if (_gameOverTriggered) return;
@@ -181,221 +220,71 @@ public class PlayerDeathTracker : MonoBehaviour
         _gameOverTriggered = true;
         _gameOverTimer = gameOverDelay;
 
-        Debug.Log($"[DeathTracker] GAME OVER! All {_deadPlayers.Count} players are dead. Loading game over scene in {gameOverDelay}s...");
+        if (enableDebugLogs)
+        {
+            Debug.Log("[DeathTracker] GAME OVER! alive=0/" + _totalCount + " loading in " + gameOverDelay + "s");
+        }
 
-        // End the run
         if (progressionManager != null)
         {
             progressionManager.EndRun();
         }
     }
 
-    /// <summary>
-    /// Loads the game over scene
-    /// </summary>
     private void LoadGameOverScene()
     {
-        Debug.Log($"[DeathTracker] Loading game over scene: {gameOverScene}");
-        
+        if (enableDebugLogs)
+        {
+            Debug.Log("[DeathTracker] Loading game over scene: " + gameOverScene);
+        }
+
         if (!string.IsNullOrEmpty(gameOverScene))
         {
             SceneManager.LoadScene(gameOverScene);
         }
-        else
-        {
-            Debug.LogError("[DeathTracker] Game over scene name not set!");
-        }
-    }
-
-    /// <summary>
-    /// Resets the death tracker (call when starting new run)
-    /// </summary>
-    public void ResetTracker()
-    {
-        _alivePlayers.Clear();
-        _deadPlayers.Clear();
-        _gameOverTriggered = false;
-        _gameOverTimer = 0f;
-        _suppressChecksUntil = Time.unscaledTime + 2f;
-        _nextMissingBodyLogAt.Clear();
-
-        Debug.Log("[DeathTracker] Tracker reset");
-    }
-
-    /// <summary>
-    /// Gets all player IDs currently in the match
-    /// </summary>
-    private HashSet<string> GetAllPlayerIds()
-    {
-        var players = new HashSet<string>();
-
-        if (conn == null || conn.Match == null) return players;
-
-        // Add all presences
-        if (conn.Match.Presences != null)
-        {
-            foreach (var presence in conn.Match.Presences)
-            {
-                if (presence != null && !string.IsNullOrEmpty(presence.UserId))
-                {
-                    players.Add(presence.UserId);
-                }
-            }
-        }
-
-        // Add self
-        if (!string.IsNullOrEmpty(conn.SelfUserId))
-        {
-            players.Add(conn.SelfUserId);
-        }
-
-        return players;
-    }
-
-    private HashSet<string> GetExpectedPlayerIds()
-    {
-        var expected = new HashSet<string>();
-        var context = MatchContext.Instance;
-        var spawns = context != null && context.lastInit != null ? context.lastInit.spawns : null;
-
-        if (spawns != null && spawns.Length > 0)
-        {
-            for (var i = 0; i < spawns.Length; i++)
-            {
-                var s = spawns[i];
-                if (s == null || string.IsNullOrEmpty(s.userId)) continue;
-                expected.Add(s.userId);
-            }
-        }
-
-        if (expected.Count == 0)
-        {
-            return GetAllPlayerIds();
-        }
-
-        return expected;
-    }
-
-    private bool AreAllExpectedPlayersGhost(HashSet<string> expectedPlayers)
-    {
-        if (expectedPlayers == null || expectedPlayers.Count == 0) return false;
-        if (playerSpawner == null) return false;
-
-        foreach (var userId in expectedPlayers)
-        {
-            if (string.IsNullOrEmpty(userId)) return false;
-            if (!playerSpawner.TryGet(userId, out var go) || go == null)
-            {
-                if (enableDebugLogs && ShouldLogMissingBody(userId))
-                {
-                    Debug.Log($"[DeathTracker] Not all dead yet: missing body for {userId}");
-                }
-                return false;
-            }
-
-            var ghost = go.GetComponentInChildren<GhostController>(true);
-            if (ghost == null)
-            {
-                if (enableDebugLogs) Debug.Log($"[DeathTracker] Not all dead yet: {userId} is still medium");
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private bool ShouldLogMissingBody(string userId)
-    {
-        if (string.IsNullOrEmpty(userId)) return false;
-        var now = Time.unscaledTime;
-        if (_nextMissingBodyLogAt.TryGetValue(userId, out var nextAt) && now < nextAt) return false;
-        _nextMissingBodyLogAt[userId] = now + 2f;
-        return true;
     }
 
     private void OnSceneLoaded(Scene _, LoadSceneMode __)
     {
-        // Give GameBootstrap/spawners time to build local+remote avatars.
-        _suppressChecksUntil = Time.unscaledTime + 3f;
-        _nextMissingBodyLogAt.Clear();
+        ResetForNewLevel();
     }
 
-    private void PrunePlayersNotInMatch(HashSet<string> currentPlayers)
+    private void ResetForNewLevel()
     {
-        if (currentPlayers == null) return;
+        _deadPlayers.Clear();
+        _countInitialized = false;
+        _aliveCount = 0;
+        _totalCount = 0;
+        _gameOverTriggered = false;
+        _gameOverTimer = 0f;
 
-        var removeAlive = new List<string>();
-        foreach (var userId in _alivePlayers)
+        if (enableDebugLogs)
         {
-            if (!currentPlayers.Contains(userId))
-            {
-                removeAlive.Add(userId);
-            }
+            Debug.Log("[DeathTracker] Reset for new level.");
         }
-        for (var i = 0; i < removeAlive.Count; i++)
-        {
-            _alivePlayers.Remove(removeAlive[i]);
-        }
+    }
 
-        var removeDead = new List<string>();
-        foreach (var userId in _deadPlayers)
-        {
-            if (!currentPlayers.Contains(userId))
-            {
-                removeDead.Add(userId);
-            }
-        }
-        for (var i = 0; i < removeDead.Count; i++)
-        {
-            _deadPlayers.Remove(removeDead[i]);
-        }
+    private bool IsHost()
+    {
+        return conn != null && conn.IsCurrentPlayerMatchCreator;
     }
 
     private void ResolveRefs()
     {
         if (conn == null)
             conn = NakamaConnection.Instance != null ? NakamaConnection.Instance : FindObjectOfType<NakamaConnection>();
-        
-        if (playerSpawner == null)
-            playerSpawner = PlayerSpawnManager.Instance != null ? PlayerSpawnManager.Instance : FindObjectOfType<PlayerSpawnManager>();
-        
+
+        if (transport == null)
+            transport = MatchTransport.Instance != null ? MatchTransport.Instance : FindObjectOfType<MatchTransport>();
+
         if (progressionManager == null)
             progressionManager = FloorProgressionManager.Instance != null ? FloorProgressionManager.Instance : FindObjectOfType<FloorProgressionManager>();
     }
 
-    /// <summary>
-    /// Gets current alive player count (for UI)
-    /// </summary>
-    public int GetAlivePlayerCount()
+    private void EnsureBound()
     {
-        var expected = GetExpectedPlayerIds();
-        if (expected.Count == 0) return _alivePlayers.Count;
-
-        var alive = 0;
-        foreach (var userId in expected)
-        {
-            if (string.IsNullOrEmpty(userId)) continue;
-            if (_deadPlayers.Contains(userId)) continue;
-            alive++;
-        }
-
-        return alive;
-    }
-
-    /// <summary>
-    /// Gets current dead player count (for UI)
-    /// </summary>
-    public int GetDeadPlayerCount()
-    {
-        return _deadPlayers.Count;
-    }
-
-    /// <summary>
-    /// Debug: Force game over
-    /// </summary>
-    [ContextMenu("Force Game Over")]
-    public void DebugForceGameOver()
-    {
-        TriggerGameOver();
+        if (_boundTransport || transport == null) return;
+        transport.OnAliveCount += OnAliveCountReceived;
+        _boundTransport = true;
     }
 }
