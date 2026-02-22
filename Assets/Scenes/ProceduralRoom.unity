@@ -420,7 +420,7 @@ RectTransform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 435009012}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: 0, y: 0, z: -15.5}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -453,8 +453,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: Find...
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: 67e01473d63f066438d2bf0291a36ce3, type: 2}
-  m_sharedMaterial: {fileID: -2934644850761540182, guid: 67e01473d63f066438d2bf0291a36ce3, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 9ed8607afd0bbc34ea42508538bce75c, type: 2}
+  m_sharedMaterial: {fileID: -1124450821964970179, guid: 9ed8607afd0bbc34ea42508538bce75c, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -1705,7 +1705,6 @@ MonoBehaviour:
   localYawSnapThreshold: 45
   boundsPadding: 0.35
   clampSnapshotPoses: 0
-  enableSpawnDebugLogs: 1
 --- !u!4 &1594733322
 Transform:
   m_ObjectHideFlags: 0
@@ -2533,8 +2532,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: Find...
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: 67e01473d63f066438d2bf0291a36ce3, type: 2}
-  m_sharedMaterial: {fileID: -2934644850761540182, guid: 67e01473d63f066438d2bf0291a36ce3, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 9ed8607afd0bbc34ea42508538bce75c, type: 2}
+  m_sharedMaterial: {fileID: -1124450821964970179, guid: 9ed8607afd0bbc34ea42508538bce75c, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
