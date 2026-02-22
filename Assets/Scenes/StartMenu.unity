@@ -4532,6 +4532,7 @@ GameObject:
   - component: {fileID: 1212379287}
   - component: {fileID: 1212379290}
   - component: {fileID: 1212379289}
+  - component: {fileID: 1212379291}
   m_Layer: 5
   m_Name: Book
   m_TagString: Untagged
@@ -4640,6 +4641,18 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
+      - m_Target: {fileID: 1212379291}
+        m_TargetAssemblyTypeName: UIButtonSFX, Assembly-CSharp
+        m_MethodName: PlayClick
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
       - m_Target: {fileID: 1212379290}
         m_TargetAssemblyTypeName: BookClick, Assembly-CSharp
         m_MethodName: OnClick
@@ -4667,6 +4680,20 @@ MonoBehaviour:
   controller: {fileID: 1807725820}
   bookAnimator: {fileID: 1471904247}
   bookPivot: {fileID: 1663232631}
+--- !u!114 &1212379291
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1212379285}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c2bbf467d4951d94db4839e45cc62a0a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  clickClip: {fileID: 8300000, guid: 7749de43adf53024e8694591a8d2777f, type: 3}
+  audioSource: {fileID: 1175022433}
 --- !u!1 &1231234624
 GameObject:
   m_ObjectHideFlags: 0
@@ -6785,6 +6812,8 @@ MonoBehaviour:
   floatingText: {fileID: 709856231}
   finalUFOGif: {fileID: 443196699}
   finalGifDelay: 1
+  musicSource: {fileID: 1175022433}
+  ufoMusic: {fileID: 8300000, guid: ce261dfe1aedee24381ba86364719e70, type: 3}
   flyDuration: 1
   secondFlyDuration: 2
 --- !u!4 &1807725821
