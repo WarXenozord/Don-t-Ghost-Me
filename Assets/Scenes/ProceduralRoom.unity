@@ -293,7 +293,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -376.1, y: 64.3}
+  m_AnchoredPosition: {x: -398.6, y: 156.7}
   m_SizeDelta: {x: 80, y: 80}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &244443206
@@ -394,6 +394,7 @@ MonoBehaviour:
   toMediumsIndicator: {fileID: 1472976500}
   toGhostsIndicator: {fileID: 2001037722}
   maxLines: 9
+  messageLifetimeSeconds: 10
 --- !u!1 &435009012
 GameObject:
   m_ObjectHideFlags: 0
@@ -428,7 +429,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 62.7, y: 9.2}
+  m_AnchoredPosition: {x: 62.7, y: -1.3}
   m_SizeDelta: {x: 160, y: 20.4627}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &435009014
@@ -1343,8 +1344,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -304.6194, y: 135.70001}
-  m_SizeDelta: {x: 231.7612, y: 30}
+  m_AnchoredPosition: {x: -322.9, y: 225.9}
+  m_SizeDelta: {x: 231.7612, y: 40}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &1304738251
 CanvasRenderer:
@@ -1652,7 +1653,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Texture: {fileID: 0}
+  m_Texture: {fileID: 2800000, guid: a0c8335c1daa69c44a2d65d6bc311eee, type: 3}
   m_UVRect:
     serializedVersion: 2
     x: 0
@@ -2224,14 +2225,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 0, b: 0, a: 1}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Texture: {fileID: 0}
+  m_Texture: {fileID: 2800000, guid: cad4c3f3e6474d24ea4a5ce0c1361460, type: 3}
   m_UVRect:
     serializedVersion: 2
     x: 0
@@ -2508,7 +2509,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -30.7, y: -4.7686}
+  m_AnchoredPosition: {x: -30.7, y: -7.2}
   m_SizeDelta: {x: 160, y: 20.4627}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &2099774128
@@ -2558,8 +2559,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 12.49
-  m_fontSizeBase: 12.49
+  m_fontSize: 16
+  m_fontSizeBase: 16
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
