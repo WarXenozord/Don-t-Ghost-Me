@@ -224,6 +224,17 @@ public class HostAuthority : MonoBehaviour
         _gameplayStarted = true;
     }
 
+    public void PrepareForFloorTransitionReload()
+    {
+        _initialEnemiesSpawned = false;
+        _gameplayStarted = false;
+        _spawnPassComplete = false;
+        _inputTimer = 0f;
+        _snapTimer = 0f;
+        _animTimer = 0f;
+        if (enemySpawner != null) enemySpawner.ClearAll();
+    }
+
     public bool HostSpawnEnemyCommand(Vector3 position, float yaw = 0f, string prefabId = "default")
     {
         if (conn == null || !conn.IsCurrentPlayerMatchCreator) return false;
