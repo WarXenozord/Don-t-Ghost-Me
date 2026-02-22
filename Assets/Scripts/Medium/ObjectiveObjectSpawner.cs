@@ -25,6 +25,7 @@ public class ObjectiveObjectSpawner : MonoBehaviour
 
     [Header("References")]
     [SerializeField] private GhostInteraction ghostInteraction; // refresh cache after spawning
+    [SerializeField] private FloorProgressionManager progressionManager;
 
     // ?? Public API ?????????????????????????????????????????????????????????
 
@@ -38,11 +39,20 @@ public class ObjectiveObjectSpawner : MonoBehaviour
     {
         if (candlePrefab == null || ritualMarkPrefab == null)
         {
-            Debug.LogWarning("[ObjectiveSpawner] Missing prefabs — skipping objective spawn.");
+            Debug.LogWarning("[ObjectiveSpawner] Missing prefabs ï¿½ skipping objective spawn.");
             return;
         }
 
-        var rng = new System.Random(seed ^ 0xCAFE);
+                if (progressionManager == null)
+        {
+            progressionManager = FloorProgressionManager.Instance != null ? FloorProgressionManager.Instance : FindObjectOfType<FloorProgressionManager>();
+        }
+        if (progressionManager != null)
+        {
+            candleCount = Mathf.Max(1, progressionManager.CurrentFloor + 2);
+        }
+
+var rng = new System.Random(seed ^ 0xCAFE);
 
         // Spawn ritual mark first (so we know which room it's in)
         Transform markTransform = SpawnRitualMark(rooms, buildingParents, rng);

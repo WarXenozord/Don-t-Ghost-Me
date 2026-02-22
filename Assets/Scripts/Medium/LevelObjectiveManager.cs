@@ -31,6 +31,7 @@ public class LevelObjectiveManager : MonoBehaviour
     [Header("Network Sync")]
     [SerializeField] private MatchTransport transport;
     [SerializeField] private NakamaConnection conn;
+    [SerializeField] private FloorProgressionManager progressionManager;
     [Header("Debug Skip")]
     [SerializeField] private bool enableDebugSkipHotkey = false;
     [SerializeField] private KeyCode debugSkipHotkey = KeyCode.H;
@@ -68,7 +69,17 @@ public class LevelObjectiveManager : MonoBehaviour
     {
         if (conn == null) conn = NakamaConnection.Instance != null ? NakamaConnection.Instance : FindObjectOfType<NakamaConnection>();
         if (transport == null) transport = MatchTransport.Instance != null ? MatchTransport.Instance : FindObjectOfType<MatchTransport>();
+        if (progressionManager == null) progressionManager = FloorProgressionManager.Instance != null ? FloorProgressionManager.Instance : FindObjectOfType<FloorProgressionManager>();
         if (transport != null) transport.OnObjectiveState += OnObjectiveStateReceived;
+
+        if (progressionManager != null)
+        {
+            requiredCandles = Mathf.Max(1, progressionManager.CurrentFloor + 2);
+        }
+        else
+        {
+            requiredCandles = Mathf.Max(1, requiredCandles);
+        }
 
         BuildCandleRegistry();
 
